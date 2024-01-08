@@ -1462,6 +1462,7 @@ pub struct Blas<A: HalApi> {
 
 impl<A: HalApi> Drop for Blas<A> {
     fn drop(&mut self) {
+        log::info!("dropping Blas");
         unsafe {
             if let Some(structure) = self.raw.take() {
                 use hal::Device;

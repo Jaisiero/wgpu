@@ -4,6 +4,8 @@ use arrayvec::ArrayVec;
 use ash::{extensions::ext, vk};
 
 use std::{mem, ops::Range, slice};
+use wgt::AccelerationStructureType;
+use crate::AccelerationStructureCopy;
 
 const ALLOCATION_GRANULARITY: u32 = 16;
 const DST_IMAGE_LAYOUT: vk::ImageLayout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
@@ -1129,6 +1131,39 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             self.device
                 .raw
                 .cmd_dispatch_indirect(self.active, buffer.raw, offset)
+        }
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, src: &super::AccelerationStructure, dst: &super::AccelerationStructure, copy: AccelerationStructureCopy) {
+        let ray_tracing_functions = self
+            .device
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+
+        let structure_type = match copy.type_flags {
+            AccelerationStructureType::Triangles => vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+            AccelerationStructureType::AABBs => vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR,
+            AccelerationStructureType::Instances => vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        };
+
+        let mode = match copy.copy_flags {
+            wgt::AccelerationStructureCopy::Clone => vk::CopyAccelerationStructureModeKHR::CLONE,
+            wgt::AccelerationStructureCopy::Compact => vk::CopyAccelerationStructureModeKHR::COMPACT,
+        };
+
+        unsafe {
+            ray_tracing_functions.acceleration_structure.copy_acceleration_structure(
+                vk::DeferredOperationKHR::null(),
+                &vk::CopyAccelerationStructureInfoKHR {
+                    s_type: structure_type,
+                    p_next: std::ptr::null(),
+                    src: src.raw,
+                    dst: dst.raw,
+                    mode,
+                }
+            ).expect("Copy Failed");
         }
     }
 }

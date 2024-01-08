@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 
 use std::ops::Range;
+use crate::AccelerationStructureCopy;
 
 #[derive(Clone, Debug)]
 pub struct Api;
@@ -249,6 +250,11 @@ impl crate::Device<Api> for Context {
     ) -> crate::AccelerationStructureBuildSizes {
         Default::default()
     }
+
+    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure: &Resource) -> wgt::BufferAddress {
+        Default::default()
+    }
+
     unsafe fn get_acceleration_structure_device_address(
         &self,
         _acceleration_structure: &Resource,
@@ -445,5 +451,8 @@ impl crate::CommandEncoder<Api> for Encoder {
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
     ) {
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, src: &Resource, dst: &Resource, copy: AccelerationStructureCopy) {
     }
 }

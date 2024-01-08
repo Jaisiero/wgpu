@@ -2200,6 +2200,28 @@ impl crate::Device<super::Api> for super::Device {
         }
     }
 
+    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure: &super::AccelerationStructure) -> wgt::BufferAddress {
+        let ray_tracing_functions = self
+            .shared
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+        let mut size = vk::DeviceSize::default().to_ne_bytes();
+
+        unsafe {
+            ray_tracing_functions
+                .acceleration_structure
+                .write_acceleration_structures_properties(
+                    &[acceleration_structure.raw],
+                    vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+                    &mut size,
+                    std::mem::size_of::<vk::DeviceSize>(),
+                ).expect("getting properties failed");
+        }
+        wgt::BufferAddress::from_ne_bytes(size)
+    }
+
     unsafe fn get_acceleration_structure_device_address(
         &self,
         acceleration_structure: &super::AccelerationStructure,

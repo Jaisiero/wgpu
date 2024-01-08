@@ -81,7 +81,7 @@ impl<A: HalApi> Device<A> {
                 blas_desc
                     .label
                     .to_hal(self.instance_flags)
-                    .unwrap_or("<BindGroupLayoyt>"),
+                    .unwrap_or("<BindGroupLayout>"),
             ),
             size_info,
             sizes,
@@ -143,7 +143,7 @@ impl<A: HalApi> Device<A> {
             info: ResourceInfo::new(
                 desc.label
                     .to_hal(self.instance_flags)
-                    .unwrap_or("<BindGroupLayoyt>"),
+                    .unwrap_or("<BindGroupLayout>"),
             ),
             size_info,
             flags: desc.flags,

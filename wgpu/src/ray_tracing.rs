@@ -429,6 +429,8 @@ pub trait CommandEncoderRayTracing {
         blas: impl IntoIterator<Item = &'a BlasBuildEntry<'a>>,
         tlas: impl IntoIterator<Item = &'a TlasBuildEntry<'a>>,
     );
+    /// Creates a new blas and copies (in a compacting way) the contents of the provided blas into the new one (compaction flag must be set).
+    fn compact_blas(&mut self, blas: &Blas) -> Blas;
 }
 
 impl CommandEncoderRayTracing for CommandEncoder {
@@ -494,7 +496,6 @@ impl CommandEncoderRayTracing for CommandEncoder {
             &mut tlas,
         );
     }
-
     unsafe fn build_acceleration_structures_unsafe_tlas<'a>(
         &mut self,
         blas: impl IntoIterator<Item = &'a BlasBuildEntry<'a>>,
@@ -548,5 +549,21 @@ impl CommandEncoderRayTracing for CommandEncoder {
             &mut blas,
             &mut tlas,
         );
+    }
+
+    fn compact_blas(&mut self, blas: &Blas) -> Blas {
+        let id = self.id.as_ref().unwrap();
+        let (id, handle, data) = DynContext::command_encoder_compact_blas(
+            &*self.context,
+            id,
+            self.data.as_ref(),
+            &blas.id,
+        );
+        Blas {
+            context: Arc::clone(&self.context),
+            id,
+            data,
+            handle,
+        }
     }
 }

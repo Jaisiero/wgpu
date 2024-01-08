@@ -396,6 +396,7 @@ pub trait Device<A: Api>: WasmNotSendSync {
         &self,
         desc: &GetAccelerationStructureBuildSizesDescriptor<A>,
     ) -> AccelerationStructureBuildSizes;
+    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure:&A::AccelerationStructure) -> wgt::BufferAddress;
     unsafe fn get_acceleration_structure_device_address(
         &self,
         acceleration_structure: &A::AccelerationStructure,
@@ -506,6 +507,7 @@ pub trait CommandEncoder<A: Api>: WasmNotSendSync + fmt::Debug {
     ) where
         T: Iterator<Item = BufferTextureCopy>;
 
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, src: &A::AccelerationStructure, dst: &A::AccelerationStructure, copy: AccelerationStructureCopy);
     // pass common
 
     /// Sets the bind group at `index` to `group`, assuming the layout
@@ -1557,6 +1559,11 @@ pub struct AccelerationStructureAABBs<'a, A: Api> {
     pub count: u32,
     pub stride: wgt::BufferAddress,
     pub flags: AccelerationStructureGeometryFlags,
+}
+
+pub struct AccelerationStructureCopy {
+    pub copy_flags:wgt::AccelerationStructureCopy,
+    pub type_flags: wgt::AccelerationStructureType,
 }
 
 /// * `offset` - offset in bytes

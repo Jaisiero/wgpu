@@ -3,6 +3,7 @@ use crate::auxil::{self, dxgi::result::HResult as _};
 use super::conv;
 use std::{mem, ops::Range, ptr};
 use winapi::um::d3d12 as d3d12_ty;
+use crate::AccelerationStructureCopy;
 
 fn make_box(origin: &wgt::Origin3d, size: &crate::CopyExtent) -> d3d12_ty::D3D12_BOX {
     d3d12_ty::D3D12_BOX {
@@ -1216,6 +1217,9 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
     ) {
+        todo!()
+    }
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, _src: &super::AccelerationStructure, _dst: &super::AccelerationStructure, _copy: AccelerationStructureCopy) {
         todo!()
     }
 }

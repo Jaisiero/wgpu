@@ -7053,6 +7053,26 @@ bitflags::bitflags!(
 );
 impl_bitflags!(AccelerationStructureGeometryFlags);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// What a copy between acceleration structures should do
+pub enum AccelerationStructureCopy {
+    /// Directly duplicate an acceleration structure to another
+    Clone,
+    /// Duplicate and compact an acceleration structure
+    Compact
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// What type the data of an acceleration structure is
+pub enum AccelerationStructureType {
+    /// The types of the acceleration structure are triangles
+    Triangles,
+    /// The types of the acceleration structure are axis aligned bounding boxes
+    AABBs,
+    /// The types of the acceleration structure are instances
+    Instances,
+}
+
 /// Alignemnet requirement for transform buffers used in acceleration structure builds
 pub const TRANSFORM_BUFFER_ALIGNMENT: BufferAddress = 16;
 

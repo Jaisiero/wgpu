@@ -5,7 +5,7 @@ use glam::{Affine3A, Mat4, Quat, Vec3};
 use wgpu::util::DeviceExt;
 
 use rt::traits::*;
-use wgpu::{ray_tracing as rt, StoreOp};
+use wgpu::{CommandEncoderDescriptor, ray_tracing as rt, StoreOp};
 
 // from cube
 #[repr(C)]
@@ -250,7 +250,7 @@ struct Example {
     uniform_buf: wgpu::Buffer,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
-    blas: rt::Blas,
+    //blas: rt::Blas,
     tlas_package: rt::TlasPackage,
     compute_pipeline: wgpu::ComputePipeline,
     compute_bind_group: wgpu::BindGroup,
@@ -462,6 +462,29 @@ impl crate::framework::Example for Example {
 
         let dist = 3.0;
 
+        let mut encoder =
+            device.create_command_encoder(&CommandEncoderDescriptor { label: None });
+
+        encoder.build_acceleration_structures(
+            iter::once(&rt::BlasBuildEntry {
+                blas: &blas,
+                geometry: rt::BlasGeometries::TriangleGeometries(vec![rt::BlasTriangleGeometry {
+                    size: &blas_geo_size_desc,
+                    vertex_buffer: &vertex_buf,
+                    first_vertex: 0,
+                    vertex_stride: mem::size_of::<Vertex>() as u64,
+                    index_buffer: Some(&index_buf),
+                    index_buffer_offset: Some(0),
+                    transform_buffer: None,
+                    transform_buffer_offset: None,
+                }]),
+            }),
+            iter::empty(),
+            //iter::once(&tlas_package),
+        );
+
+        let blas = encoder.compact_blas(&blas);
+
         for x in 0..side_count {
             for y in 0..side_count {
                 *tlas_package
@@ -484,9 +507,6 @@ impl crate::framework::Example for Example {
             }
         }
 
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
         encoder.build_acceleration_structures(
             iter::once(&rt::BlasBuildEntry {
                 blas: &blas,
@@ -501,7 +521,7 @@ impl crate::framework::Example for Example {
                     transform_buffer_offset: None,
                 }]),
             }),
-            // iter::empty(),
+            //iter::empty(),
             iter::once(&tlas_package),
         );
 
@@ -509,6 +529,7 @@ impl crate::framework::Example for Example {
 
         let start_inst = Instant::now();
 
+        println!("finish");
         Example {
             rt_target,
             rt_view,
@@ -516,7 +537,7 @@ impl crate::framework::Example for Example {
             uniform_buf,
             vertex_buf,
             index_buf,
-            blas,
+            //blas,
             tlas_package,
             compute_pipeline,
             compute_bind_group,

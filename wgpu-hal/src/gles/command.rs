@@ -1,6 +1,7 @@
 use super::{conv, Command as C};
 use arrayvec::ArrayVec;
 use std::{mem, ops::Range};
+use crate::AccelerationStructureCopy;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct TextureSlotDesc {
@@ -1182,6 +1183,10 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
     ) {
+        unimplemented!()
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, _src: &(), _dst: &(), _copy: AccelerationStructureCopy) {
         unimplemented!()
     }
 }

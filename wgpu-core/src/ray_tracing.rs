@@ -41,6 +41,22 @@ pub enum CreateTlasError {
     Unimplemented,
 }
 
+#[derive(Clone, Debug, Error)]
+pub enum CompactBlasError {
+    #[error(transparent)]
+    HalDevice(#[from] hal::DeviceError),
+    #[error(transparent)]
+    Device(#[from] DeviceError),
+    #[error(transparent)]
+    CreateBufferError(#[from] CreateBufferError),
+    #[error(transparent)]
+    CreateBlasError(#[from] CreateBlasError),
+    #[error(transparent)]
+    EncoderError(#[from] CommandEncoderError),
+    #[error("Unimplemented Tlas error: this error is not yet implemented")]
+    Unimplemented,
+}
+
 /// Error encountered while attempting to do a copy on a command encoder.
 #[derive(Clone, Debug, Error)]
 pub enum BuildAccelerationStructureError {
