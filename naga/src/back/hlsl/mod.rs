@@ -149,6 +149,7 @@ impl crate::ShaderStage {
             Self::Vertex => "vs",
             Self::Fragment => "ps",
             Self::Compute => "cs",
+            _ => panic!("need to check ray names"),
         }
     }
 }

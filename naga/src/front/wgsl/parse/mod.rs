@@ -2203,6 +2203,18 @@ impl Parser {
                     stage.set(crate::ShaderStage::Compute, name_span)?;
                     compute_span = name_span;
                 }
+                ("ray-generation", name_span) => {
+                    stage.set(crate::ShaderStage::RayGeneration, name_span)?;
+                }
+                ("ray-closest-hit", name_span) => {
+                    stage.set(crate::ShaderStage::ClosestHit, name_span)?;
+                }
+                ("ray-any-hit", name_span) => {
+                    stage.set(crate::ShaderStage::AnyHit, name_span)?;
+                }
+                ("ray-miss", name_span) => {
+                    stage.set(crate::ShaderStage::Miss, name_span)?;
+                }
                 ("workgroup_size", name_span) => {
                     lexer.expect(Token::Paren('('))?;
                     let mut new_workgroup_size = [None; 3];

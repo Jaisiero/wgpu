@@ -442,6 +442,7 @@ impl fmt::Display for VaryingName<'_> {
                     (ShaderStage::Vertex, true) | (ShaderStage::Fragment, false) => "vs2fs",
                     // fragment to pipeline
                     (ShaderStage::Fragment, true) => "fs2p",
+                    _ => unreachable!(),
                 };
                 write!(f, "_{prefix}_location{location}",)
             }
@@ -458,6 +459,7 @@ impl ShaderStage {
             ShaderStage::Compute => "cs",
             ShaderStage::Fragment => "fs",
             ShaderStage::Vertex => "vs",
+            _ => panic!("need to check ray names"),
         }
     }
 }
@@ -1475,7 +1477,7 @@ impl<'a, W: Write> Writer<'a, W> {
         let emit_interpolation_and_auxiliary = match self.entry_point.stage {
             ShaderStage::Vertex => output,
             ShaderStage::Fragment => !output,
-            ShaderStage::Compute => false,
+            ShaderStage::Compute | ShaderStage::RayGeneration | ShaderStage::ClosestHit | ShaderStage::AnyHit | ShaderStage::Miss => false,
         };
 
         // Write the I/O locations, if allowed
@@ -4413,6 +4415,8 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         Bi::WorkGroupId => "gl_WorkGroupID",
         Bi::WorkGroupSize => "gl_WorkGroupSize",
         Bi::NumWorkGroups => "gl_NumWorkGroups",
+        Bi::LaunchId => "gl_LaunchIDEXT",
+        Bi::LaunchSize => "gl_LaunchSizeEXT",
     }
 }
 

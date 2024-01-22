@@ -784,6 +784,10 @@ impl Writer {
                 .to_words(&mut self.logical_layout.execution_modes);
                 spirv::ExecutionModel::GLCompute
             }
+            crate::ShaderStage::RayGeneration => spirv::ExecutionModel::RayGenerationKHR,
+            crate::ShaderStage::ClosestHit => spirv::ExecutionModel::ClosestHitKHR,
+            crate::ShaderStage::AnyHit => spirv::ExecutionModel::AnyHitKHR,
+            crate::ShaderStage::Miss => spirv::ExecutionModel::MissKHR,
         };
         //self.check(exec_model.required_capabilities())?;
 
@@ -1580,6 +1584,8 @@ impl Writer {
                     Bi::WorkGroupId => BuiltIn::WorkgroupId,
                     Bi::WorkGroupSize => BuiltIn::WorkgroupSize,
                     Bi::NumWorkGroups => BuiltIn::NumWorkgroups,
+                    Bi::LaunchId => BuiltIn::LaunchIdKHR,
+                    Bi::LaunchSize => BuiltIn::LaunchSizeKHR,
                 };
 
                 self.decorate(id, Decoration::BuiltIn, &[built_in as u32]);

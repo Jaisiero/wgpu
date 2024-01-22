@@ -384,6 +384,10 @@ pub enum ShaderStage {
     Vertex,
     Fragment,
     Compute,
+    RayGeneration,
+    ClosestHit,
+    AnyHit,
+    Miss,
 }
 
 /// Addressing space of variables.
@@ -438,6 +442,9 @@ pub enum BuiltIn {
     WorkGroupId,
     WorkGroupSize,
     NumWorkGroups,
+    // any raytracing shader
+    LaunchId,
+    LaunchSize,
 }
 
 /// Number of bytes per scalar.

@@ -1147,6 +1147,7 @@ impl Interface {
                                         )
                                     }
                                     naga::ShaderStage::Compute => (false, 0),
+                                    _ => todo!(),
                                 };
                                 if compatible {
                                     Ok(num_components)

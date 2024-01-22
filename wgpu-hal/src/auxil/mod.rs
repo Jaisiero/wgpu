@@ -51,6 +51,10 @@ pub fn map_naga_stage(stage: naga::ShaderStage) -> wgt::ShaderStages {
         naga::ShaderStage::Vertex => wgt::ShaderStages::VERTEX,
         naga::ShaderStage::Fragment => wgt::ShaderStages::FRAGMENT,
         naga::ShaderStage::Compute => wgt::ShaderStages::COMPUTE,
+        naga::ShaderStage::RayGeneration => wgt::ShaderStages::RAY_GENERATION,
+        naga::ShaderStage::ClosestHit => wgt::ShaderStages::CLOSEST_HIT,
+        naga::ShaderStage::AnyHit => wgt::ShaderStages::ANY_HIT,
+        naga::ShaderStage::Miss => wgt::ShaderStages::MISS,
     }
 }
 

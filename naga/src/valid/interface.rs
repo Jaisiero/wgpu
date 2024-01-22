@@ -198,7 +198,7 @@ impl VaryingContext<'_> {
                         match self.stage {
                             St::Vertex => self.output,
                             St::Fragment => !self.output,
-                            St::Compute => false,
+                            St::Compute | St::Miss | St::ClosestHit | St::AnyHit | St::RayGeneration => false,
                         },
                         *ty_inner
                             == Ti::Vector {
@@ -209,7 +209,7 @@ impl VaryingContext<'_> {
                     Bi::ViewIndex => (
                         match self.stage {
                             St::Vertex | St::Fragment => !self.output,
-                            St::Compute => false,
+                            St::Compute | St::Miss | St::ClosestHit | St::AnyHit | St::RayGeneration => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::I32),
                     ),
@@ -248,6 +248,14 @@ impl VaryingContext<'_> {
                                 size: Vs::Tri,
                                 scalar: crate::Scalar::U32,
                             },
+                    ),
+                    Bi::LaunchId | Bi::LaunchSize => (
+                        self.stage == St::Compute && !self.output,
+                        *ty_inner
+                            == Ti::Vector {
+                            size: Vs::Tri,
+                            scalar: crate::Scalar::U32,
+                        },
                     ),
                 };
 
@@ -311,7 +319,7 @@ impl VaryingContext<'_> {
                 let needs_interpolation = match self.stage {
                     crate::ShaderStage::Vertex => self.output,
                     crate::ShaderStage::Fragment => !self.output,
-                    crate::ShaderStage::Compute => false,
+                    crate::ShaderStage::Compute | crate::ShaderStage::RayGeneration | crate::ShaderStage::ClosestHit | crate::ShaderStage::AnyHit | crate::ShaderStage::Miss => false,
                 };
 
                 // It doesn't make sense to specify a sampling when `interpolation` is `Flat`, but
@@ -576,6 +584,10 @@ impl super::Validator {
                 crate::ShaderStage::Vertex => ShaderStages::VERTEX,
                 crate::ShaderStage::Fragment => ShaderStages::FRAGMENT,
                 crate::ShaderStage::Compute => ShaderStages::COMPUTE,
+                crate::ShaderStage::RayGeneration => ShaderStages::RAY_GENERATION,
+                crate::ShaderStage::AnyHit => ShaderStages::ANY_HIT,
+                crate::ShaderStage::ClosestHit => ShaderStages::CLOSEST_HIT,
+                crate::ShaderStage::Miss => ShaderStages::MISS,
             };
 
             if !info.available_stages.contains(stage_bit) {

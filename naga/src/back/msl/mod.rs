@@ -437,7 +437,7 @@ impl ResolvedBinding {
                     Bi::WorkGroupId => "threadgroup_position_in_grid",
                     Bi::WorkGroupSize => "dispatch_threads_per_threadgroup",
                     Bi::NumWorkGroups => "threadgroups_per_grid",
-                    Bi::CullDistance | Bi::ViewIndex => {
+                    Bi::CullDistance | Bi::ViewIndex | Bi::LaunchId | Bi::LaunchSize => {
                         return Err(Error::UnsupportedBuiltIn(built_in))
                     }
                 };
