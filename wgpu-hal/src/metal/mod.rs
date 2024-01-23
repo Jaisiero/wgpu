@@ -518,12 +518,20 @@ struct MultiStageData<T> {
     vs: T,
     fs: T,
     cs: T,
+    rgs: T,
+    rc_hit_s: T,
+    ra_hit_s: T,
+    r_miss_s: T,
 }
 
 const NAGA_STAGES: MultiStageData<naga::ShaderStage> = MultiStageData {
     vs: naga::ShaderStage::Vertex,
     fs: naga::ShaderStage::Fragment,
     cs: naga::ShaderStage::Compute,
+    rgs: naga::ShaderStage::RayGeneration,
+    rc_hit_s: naga::ShaderStage::ClosestHit,
+    ra_hit_s: naga::ShaderStage::AnyHit,
+    r_miss_s: naga::ShaderStage::Miss,
 };
 
 impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
@@ -533,6 +541,10 @@ impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
             naga::ShaderStage::Vertex => &self.vs,
             naga::ShaderStage::Fragment => &self.fs,
             naga::ShaderStage::Compute => &self.cs,
+            naga::ShaderStage::RayGeneration => &self.rgs,
+            naga::ShaderStage::ClosestHit => &self.rc_hit_s,
+            naga::ShaderStage::AnyHit => &self.ra_hit_s,
+            naga::ShaderStage::Miss => &self.r_miss_s,
         }
     }
 }
@@ -543,6 +555,10 @@ impl<T> MultiStageData<T> {
             vs: fun(&self.vs),
             fs: fun(&self.fs),
             cs: fun(&self.cs),
+            rgs: fun(&self.rgs),
+            rc_hit_s: fun(&self.rc_hit_s),
+            ra_hit_s: fun(&self.ra_hit_s),
+            r_miss_s: fun(&self.r_miss_s),
         }
     }
     fn map<Y>(self, fun: impl Fn(T) -> Y) -> MultiStageData<Y> {
@@ -550,6 +566,10 @@ impl<T> MultiStageData<T> {
             vs: fun(self.vs),
             fs: fun(self.fs),
             cs: fun(self.cs),
+            rgs: fun(self.rgs),
+            rc_hit_s: fun(self.rc_hit_s),
+            ra_hit_s: fun(self.ra_hit_s),
+            r_miss_s: fun(self.r_miss_s),
         }
     }
     fn iter<'a>(&'a self) -> impl Iterator<Item = &'a T> {
