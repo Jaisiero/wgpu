@@ -171,9 +171,11 @@ impl crate::BuiltIn {
             // to this field will get replaced with references to `SPECIAL_CBUF_VAR`
             // in `Writer::write_expr`.
             Self::NumWorkGroups => "SV_GroupID",
-            Self::BaseInstance | Self::BaseVertex | Self::WorkGroupSize | Self::LaunchId | Self::LaunchSize => {
-                return Err(Error::Unimplemented(format!("builtin {self:?}")))
-            }
+            Self::BaseInstance
+            | Self::BaseVertex
+            | Self::WorkGroupSize
+            | Self::LaunchId
+            | Self::LaunchSize => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
             Self::PointSize | Self::ViewIndex | Self::PointCoord => {
                 return Err(Error::Custom(format!("Unsupported builtin {self:?}")))
             }

@@ -50,6 +50,10 @@ pub struct Config {
     pub vertex: Vec<ConfigItem>,
     pub fragment: Vec<ConfigItem>,
     pub compute: Vec<ConfigItem>,
+    pub ray_gen: Vec<ConfigItem>,
+    pub closest_hit: Vec<ConfigItem>,
+    pub any_hit: Vec<ConfigItem>,
+    pub miss: Vec<ConfigItem>,
 }
 
 impl Config {
@@ -58,6 +62,10 @@ impl Config {
             vertex: Default::default(),
             fragment: Default::default(),
             compute: Default::default(),
+            ray_gen: Default::default(),
+            closest_hit: Default::default(),
+            any_hit: Default::default(),
+            miss: Default::default(),
         }
     }
 
@@ -83,8 +91,18 @@ impl Config {
             vertex,
             fragment,
             compute,
+            ray_gen,
+            closest_hit,
+            any_hit,
+            miss,
         } = self;
-        vertex.is_empty() && fragment.is_empty() && compute.is_empty()
+        vertex.is_empty()
+            && fragment.is_empty()
+            && compute.is_empty()
+            && ray_gen.is_empty()
+            && closest_hit.is_empty()
+            && any_hit.is_empty()
+            && miss.is_empty()
     }
 }
 

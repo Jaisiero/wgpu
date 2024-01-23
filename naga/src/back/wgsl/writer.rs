@@ -171,7 +171,12 @@ impl<W: Write> Writer<W> {
         // Write all entry points
         for (index, ep) in module.entry_points.iter().enumerate() {
             let attributes = match ep.stage {
-                ShaderStage::Vertex | ShaderStage::Fragment => vec![Attribute::Stage(ep.stage)],
+                ShaderStage::Vertex
+                | ShaderStage::Fragment
+                | ShaderStage::RayGeneration
+                | ShaderStage::AnyHit
+                | ShaderStage::ClosestHit
+                | ShaderStage::Miss => vec![Attribute::Stage(ep.stage)],
                 ShaderStage::Compute => vec![
                     Attribute::Stage(ShaderStage::Compute),
                     Attribute::WorkGroupSize(ep.workgroup_size),
@@ -209,6 +214,10 @@ impl<W: Write> Writer<W> {
                     ShaderStage::Compute => "ComputeOutput",
                     ShaderStage::Fragment => "FragmentOutput",
                     ShaderStage::Vertex => "VertexOutput",
+                    ShaderStage::RayGeneration => "RayGenerationOutput",
+                    ShaderStage::ClosestHit => "ClosestHitOutput",
+                    ShaderStage::AnyHit => "AnyHitOutput",
+                    ShaderStage::Miss => "MissOutput",
                 };
 
                 write!(self.out, "{name}")?;
@@ -331,6 +340,10 @@ impl<W: Write> Writer<W> {
                         ShaderStage::Vertex => "vertex",
                         ShaderStage::Fragment => "fragment",
                         ShaderStage::Compute => "compute",
+                        ShaderStage::RayGeneration => "ray-generation",
+                        ShaderStage::ClosestHit => "ray-closest-hit",
+                        ShaderStage::AnyHit => "ray-any-hit",
+                        ShaderStage::Miss => "ray-miss",
                     };
                     write!(self.out, "@{stage_str} ")?;
                 }
@@ -1789,9 +1802,9 @@ fn builtin_str(built_in: crate::BuiltIn) -> Result<&'static str, Error> {
         | Bi::CullDistance
         | Bi::PointSize
         | Bi::PointCoord
-        | Bi::WorkGroupSize => {
-            return Err(Error::Custom(format!("Unsupported builtin {built_in:?}")))
-        }
+        | Bi::WorkGroupSize
+        | Bi::LaunchId
+        | Bi::LaunchSize => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
     })
 }
 

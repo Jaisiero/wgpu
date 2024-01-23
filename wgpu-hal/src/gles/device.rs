@@ -174,7 +174,12 @@ impl super::Device {
             naga::ShaderStage::Vertex => glow::VERTEX_SHADER,
             naga::ShaderStage::Fragment => glow::FRAGMENT_SHADER,
             naga::ShaderStage::Compute => glow::COMPUTE_SHADER,
-            naga::ShaderStage::RayGeneration | naga::ShaderStage::ClosestHit | naga::ShaderStage::AnyHit | naga::ShaderStage::Miss => todo!(),
+            naga::ShaderStage::RayGeneration
+            | naga::ShaderStage::ClosestHit
+            | naga::ShaderStage::AnyHit
+            | naga::ShaderStage::Miss => {
+                unreachable!("ray-tracing is not supported")
+            }
         };
 
         let raw = unsafe { gl.create_shader(target) }.unwrap();

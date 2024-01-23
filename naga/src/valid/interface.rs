@@ -198,7 +198,11 @@ impl VaryingContext<'_> {
                         match self.stage {
                             St::Vertex => self.output,
                             St::Fragment => !self.output,
-                            St::Compute | St::Miss | St::ClosestHit | St::AnyHit | St::RayGeneration => false,
+                            St::Compute
+                            | St::Miss
+                            | St::ClosestHit
+                            | St::AnyHit
+                            | St::RayGeneration => false,
                         },
                         *ty_inner
                             == Ti::Vector {
@@ -209,7 +213,11 @@ impl VaryingContext<'_> {
                     Bi::ViewIndex => (
                         match self.stage {
                             St::Vertex | St::Fragment => !self.output,
-                            St::Compute | St::Miss | St::ClosestHit | St::AnyHit | St::RayGeneration => false,
+                            St::Compute
+                            | St::Miss
+                            | St::ClosestHit
+                            | St::AnyHit
+                            | St::RayGeneration => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::I32),
                     ),
@@ -253,9 +261,9 @@ impl VaryingContext<'_> {
                         self.stage == St::Compute && !self.output,
                         *ty_inner
                             == Ti::Vector {
-                            size: Vs::Tri,
-                            scalar: crate::Scalar::U32,
-                        },
+                                size: Vs::Tri,
+                                scalar: crate::Scalar::U32,
+                            },
                     ),
                 };
 
@@ -319,7 +327,11 @@ impl VaryingContext<'_> {
                 let needs_interpolation = match self.stage {
                     crate::ShaderStage::Vertex => self.output,
                     crate::ShaderStage::Fragment => !self.output,
-                    crate::ShaderStage::Compute | crate::ShaderStage::RayGeneration | crate::ShaderStage::ClosestHit | crate::ShaderStage::AnyHit | crate::ShaderStage::Miss => false,
+                    crate::ShaderStage::Compute
+                    | crate::ShaderStage::RayGeneration
+                    | crate::ShaderStage::ClosestHit
+                    | crate::ShaderStage::AnyHit
+                    | crate::ShaderStage::Miss => false,
                 };
 
                 // It doesn't make sense to specify a sampling when `interpolation` is `Flat`, but

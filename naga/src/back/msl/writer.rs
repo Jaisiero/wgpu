@@ -3784,7 +3784,7 @@ impl<W: Write> Writer<W> {
                 crate::ShaderStage::Compute { .. } => {
                     ("kernel", LocationMode::Uniform, LocationMode::Uniform)
                 }
-                _ => todo!("need to check ray names"),
+                _ => unimplemented!("metal does not have a ray-tracing pipeline"),
             };
 
             // Since `Namer.reset` wasn't expecting struct members to be
