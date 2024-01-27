@@ -1,5 +1,5 @@
 use super::{conv, AsNative, TimestampQuerySupport};
-use crate::CommandEncoder as _;
+use crate::{AccelerationStructureCopy, CommandEncoder as _};
 use std::{borrow::Cow, mem, ops::Range};
 
 // has to match `Temp::binding_sizes`
@@ -377,6 +377,10 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
                 conv::get_blit_option(src.format, copy.texture_base.aspect),
             );
         }
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(&mut self, _src: &crate::metal::Api::AccelerationStructure, _dst: &crate::metal::Api::AccelerationStructure, copy: AccelerationStructureCopy) {
+        unimplemented!()
     }
 
     unsafe fn begin_query(&mut self, set: &super::QuerySet, index: u32) {

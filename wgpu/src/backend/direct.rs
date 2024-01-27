@@ -3139,9 +3139,9 @@ impl crate::Context for Context {
 
     fn command_encoder_compact_blas(
         &self,
-        encoder:&Self::CommandEncoderId,
+        encoder: &Self::CommandEncoderId,
         encoder_data: &Self::CommandEncoderData,
-        blas_id:&Self::BlasId,
+        blas_id: &Self::BlasId,
     ) -> (Self::BlasId, Option<u64>, Self::BlasData) {
         let global = &self.0;
         let (id, handle, error) = wgc::gfx_select!(encoder => global.command_encoder_compact_blas(
@@ -3158,11 +3158,7 @@ impl crate::Context for Context {
                 "Device::create_blas",
             );
         }
-        (
-            id,
-            handle,
-            Blas {},
-        )
+        (id, handle, Blas {})
     }
 
     fn command_encoder_build_acceleration_structures_unsafe_tlas<'a>(

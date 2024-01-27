@@ -1058,7 +1058,12 @@ pub trait Context: Debug + WasmNotSendSync + Sized {
     fn blas_drop(&self, blas: &Self::BlasId, blas_data: &Self::BlasData);
     fn tlas_destroy(&self, tlas: &Self::TlasId, tlas_data: &Self::TlasData);
     fn tlas_drop(&self, tlas: &Self::TlasId, tlas_data: &Self::TlasData);
-    fn command_encoder_compact_blas(&self, encoder:&Self::CommandEncoderId, device_data: &Self::CommandEncoderData, blas_id:&Self::BlasId) -> (Self::BlasId, Option<u64>, Self::BlasData);
+    fn command_encoder_compact_blas(
+        &self,
+        encoder: &Self::CommandEncoderId,
+        device_data: &Self::CommandEncoderData,
+        blas_id: &Self::BlasId,
+    ) -> (Self::BlasId, Option<u64>, Self::BlasData);
 }
 
 /// Object id.

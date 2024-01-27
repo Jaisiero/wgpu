@@ -2200,7 +2200,10 @@ impl crate::Device<super::Api> for super::Device {
         }
     }
 
-    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure: &super::AccelerationStructure) -> wgt::BufferAddress {
+    unsafe fn get_acceleration_structure_compact_size(
+        &self,
+        acceleration_structure: &super::AccelerationStructure,
+    ) -> wgt::BufferAddress {
         let ray_tracing_functions = self
             .shared
             .extension_fns
@@ -2217,7 +2220,8 @@ impl crate::Device<super::Api> for super::Device {
                     vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
                     &mut size,
                     std::mem::size_of::<vk::DeviceSize>(),
-                ).expect("getting properties failed");
+                )
+                .expect("getting properties failed");
         }
         wgt::BufferAddress::from_ne_bytes(size)
     }

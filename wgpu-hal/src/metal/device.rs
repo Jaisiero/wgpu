@@ -5,6 +5,7 @@ use std::{
     sync::{atomic, Arc},
     thread, time,
 };
+use wgt::BufferAddress;
 
 use super::conv;
 use crate::auxil::map_naga_stage;
@@ -1225,6 +1226,10 @@ impl crate::Device<super::Api> for super::Device {
         &self,
         _desc: &crate::GetAccelerationStructureBuildSizesDescriptor<super::Api>,
     ) -> crate::AccelerationStructureBuildSizes {
+        unimplemented!()
+    }
+
+    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure: &crate::metal::Api::AccelerationStructure) -> BufferAddress {
         unimplemented!()
     }
 

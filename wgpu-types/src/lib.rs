@@ -7059,7 +7059,7 @@ pub enum AccelerationStructureCopy {
     /// Directly duplicate an acceleration structure to another
     Clone,
     /// Duplicate and compact an acceleration structure
-    Compact
+    Compact,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

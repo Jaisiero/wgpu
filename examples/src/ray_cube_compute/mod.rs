@@ -5,7 +5,7 @@ use glam::{Affine3A, Mat4, Quat, Vec3};
 use wgpu::util::DeviceExt;
 
 use rt::traits::*;
-use wgpu::{CommandEncoderDescriptor, ray_tracing as rt, StoreOp};
+use wgpu::{ray_tracing as rt, CommandEncoderDescriptor, StoreOp};
 
 // from cube
 #[repr(C)]
@@ -462,8 +462,7 @@ impl crate::framework::Example for Example {
 
         let dist = 3.0;
 
-        let mut encoder =
-            device.create_command_encoder(&CommandEncoderDescriptor { label: None });
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         encoder.build_acceleration_structures(
             iter::once(&rt::BlasBuildEntry {

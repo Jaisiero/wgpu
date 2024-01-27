@@ -1,11 +1,24 @@
-use crate::{command::CommandBuffer, device::queue::TempResource, global::Global, hal_api::HalApi, id::{BlasId, CommandEncoderId, TlasId}, identity::GlobalIdentityHandlerFactory, init_tracker::MemoryInitKind, ray_tracing::{
-    tlas_instance_into_bytes, BlasAction, BlasBuildEntry, BlasGeometries,
-    BuildAccelerationStructureError, TlasAction, TlasBuildEntry, TlasPackage,
-    ValidateBlasActionsError, ValidateTlasActionsError,
-}, resource::{Blas, Tlas}, storage::Storage, FastHashSet};
+use crate::{
+    command::CommandBuffer,
+    device::queue::TempResource,
+    global::Global,
+    hal_api::HalApi,
+    id::{BlasId, CommandEncoderId, TlasId},
+    identity::GlobalIdentityHandlerFactory,
+    init_tracker::MemoryInitKind,
+    ray_tracing::{
+        tlas_instance_into_bytes, BlasAction, BlasBuildEntry, BlasGeometries,
+        BuildAccelerationStructureError, TlasAction, TlasBuildEntry, TlasPackage,
+        ValidateBlasActionsError, ValidateTlasActionsError,
+    },
+    resource::{Blas, Tlas},
+    storage::Storage,
+    FastHashSet,
+};
 
-use wgt::{math::align_to, BufferUsages, BlasGeometrySizeDescriptors};
+use wgt::{math::align_to, BlasGeometrySizeDescriptors, BufferUsages};
 
+use crate::identity::Input;
 use crate::ray_tracing::{BlasTriangleGeometry, CompactBlasError};
 use crate::resource::{Buffer, Resource, ResourceInfo, StagingBuffer};
 use crate::track::PendingTransition;
@@ -14,7 +27,6 @@ use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{cmp::max, iter, num::NonZeroU64, ops::Range, ptr};
-use crate::identity::Input;
 
 use super::BakedCommands;
 
@@ -22,48 +34,79 @@ use super::BakedCommands;
 const SCRATCH_BUFFER_ALIGNMENT: u32 = 256;
 
 impl<G: GlobalIdentityHandlerFactory> Global<G> {
-    fn internal_command_encoder_compact_blas<A:HalApi>(&self, src_blas: &Arc<Blas<A>>, raw_device: &A::Device, cmd_buf: &Arc<CommandBuffer<A>>) -> Result<Blas<A>, CompactBlasError> {
+    fn internal_command_encoder_compact_blas<A: HalApi>(
+        &self,
+        src_blas: &Arc<Blas<A>>,
+        raw_device: &A::Device,
+        cmd_buf: &Arc<CommandBuffer<A>>,
+    ) -> Result<Blas<A>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
 
-        let acc_struct_size = unsafe { raw_device.get_acceleration_structure_compact_size(src_blas.raw.as_ref().unwrap()) };
+        let acc_struct_size = unsafe {
+            raw_device.get_acceleration_structure_compact_size(src_blas.raw.as_ref().unwrap())
+        };
 
-        let acc_struct = unsafe { raw_device.create_acceleration_structure(&hal::AccelerationStructureDescriptor {
-            label: None,
-            size: acc_struct_size,
-            format: hal::AccelerationStructureFormat::BottomLevel,
-        }).map_err(CompactBlasError::from)? };
+        let acc_struct = unsafe {
+            raw_device
+                .create_acceleration_structure(&hal::AccelerationStructureDescriptor {
+                    label: None,
+                    size: acc_struct_size,
+                    format: hal::AccelerationStructureFormat::BottomLevel,
+                })
+                .map_err(CompactBlasError::from)?
+        };
 
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
-        let encoder = cmd_buf_data.encoder.open().map_err(CompactBlasError::from)?;
+        let encoder = cmd_buf_data
+            .encoder
+            .open()
+            .map_err(CompactBlasError::from)?;
 
         let ty = match &src_blas.sizes {
-            BlasGeometrySizeDescriptors::Triangles { .. } => wgt::AccelerationStructureType::Triangles,
+            BlasGeometrySizeDescriptors::Triangles { .. } => {
+                wgt::AccelerationStructureType::Triangles
+            }
         };
 
-        unsafe { encoder.copy_acceleration_structure_to_acceleration_structure(src_blas.raw.as_ref().unwrap(), &acc_struct, hal::AccelerationStructureCopy {
-            copy_flags: wgt::AccelerationStructureCopy::Compact,
-            type_flags: ty,
-        }) }
+        unsafe {
+            encoder.copy_acceleration_structure_to_acceleration_structure(
+                src_blas.raw.as_ref().unwrap(),
+                &acc_struct,
+                hal::AccelerationStructureCopy {
+                    copy_flags: wgt::AccelerationStructureCopy::Compact,
+                    type_flags: ty,
+                },
+            )
+        }
         let handle = unsafe { raw_device.get_acceleration_structure_device_address(&acc_struct) };
 
         let mut blas = Blas {
             raw: Some(acc_struct),
             device: src_blas.device.clone(),
             info: ResourceInfo::new(src_blas.info.label.as_str()),
-            size_info: src_blas.size_info.clone(),
+            size_info: src_blas.size_info,
             sizes: src_blas.sizes.clone(),
-            flags: src_blas.flags.clone(),
+            flags: src_blas.flags,
             update_mode: src_blas.update_mode,
-            built_index: RwLock::new(src_blas.built_index.read().clone()),
+            built_index: RwLock::new(*src_blas.built_index.read()),
             handle,
         };
         blas.size_info.acceleration_structure_size = acc_struct_size;
-        log::info!("src: {}, compacted: {}", src_blas.size_info.acceleration_structure_size, blas.size_info.acceleration_structure_size);
+        log::info!(
+            "src: {}, compacted: {}",
+            src_blas.size_info.acceleration_structure_size,
+            blas.size_info.acceleration_structure_size
+        );
         Ok(blas)
     }
 
-    pub fn command_encoder_compact_blas<A: HalApi>(&self, encoder_id: CommandEncoderId, blas_id: BlasId, id_in: Input<G, BlasId>) -> (BlasId, Option<u64>, Option<CompactBlasError>) {
+    pub fn command_encoder_compact_blas<A: HalApi>(
+        &self,
+        encoder_id: CommandEncoderId,
+        blas_id: BlasId,
+        id_in: Input<G, BlasId>,
+    ) -> (BlasId, Option<u64>, Option<CompactBlasError>) {
         let hub = A::hub(self);
         let fid = hub.blas_s.prepare::<G>(id_in);
         let blas_guard = hub.blas_s.read();
@@ -73,7 +116,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             Ok(cmd_buf) => cmd_buf,
             Err(err) => {
                 let id = fid.assign_error(src_blas.label().as_str());
-                return (id, None, Some(CompactBlasError::from(err)))
+                return (id, None, Some(CompactBlasError::from(err)));
             }
         };
         let device = &mut &cmd_buf.device;
@@ -90,7 +133,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 let id = fid.assign_error(src_blas.label().as_str());
                 (id, None, Some(err))
             }
-        }
+        };
     }
     pub fn command_encoder_build_acceleration_structures_unsafe_tlas<'a, A: HalApi>(
         &self,
