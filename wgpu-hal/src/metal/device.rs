@@ -1229,7 +1229,10 @@ impl crate::Device<super::Api> for super::Device {
         unimplemented!()
     }
 
-    unsafe fn get_acceleration_structure_compact_size(&self, acceleration_structure: &crate::metal::Api::AccelerationStructure) -> BufferAddress {
+    unsafe fn get_acceleration_structure_compact_size(
+        &self,
+        acceleration_structure: &crate::metal::Api::AccelerationStructure,
+    ) -> BufferAddress {
         unimplemented!()
     }
 
