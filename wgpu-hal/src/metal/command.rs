@@ -383,7 +383,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         _src: &super::AccelerationStructure,
         _dst: &super::AccelerationStructure,
-        copy: AccelerationStructureCopy,
+        _copy: AccelerationStructureCopy,
     ) {
         unimplemented!()
     }

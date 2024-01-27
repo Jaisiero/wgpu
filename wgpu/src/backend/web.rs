@@ -3501,9 +3501,9 @@ impl crate::context::Context for Context {
 
     fn command_encoder_compact_blas(
         &self,
-        encoder: &Self::CommandEncoderId,
-        device_data: &Self::CommandEncoderData,
-        blas_id: &Self::BlasId,
+        _encoder: &Self::CommandEncoderId,
+        _encoder_data: &Self::CommandEncoderData,
+        _blas_id: &Self::BlasId,
     ) -> (Self::BlasId, Option<u64>, Self::BlasData) {
         unimplemented!("Raytracing not implemented for web");
     }

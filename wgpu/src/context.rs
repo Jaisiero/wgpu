@@ -1061,7 +1061,7 @@ pub trait Context: Debug + WasmNotSendSync + Sized {
     fn command_encoder_compact_blas(
         &self,
         encoder: &Self::CommandEncoderId,
-        device_data: &Self::CommandEncoderData,
+        encoder_data: &Self::CommandEncoderData,
         blas_id: &Self::BlasId,
     ) -> (Self::BlasId, Option<u64>, Self::BlasData);
 }
