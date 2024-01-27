@@ -3498,6 +3498,15 @@ impl crate::context::Context for Context {
     fn tlas_drop(&self, _tlas: &Self::TlasId, _tlas_data: &Self::TlasData) {
         unimplemented!("Raytracing not implemented for web");
     }
+
+    fn command_encoder_compact_blas(
+        &self,
+        encoder: &Self::CommandEncoderId,
+        device_data: &Self::CommandEncoderData,
+        blas_id: &Self::BlasId,
+    ) -> (Self::BlasId, Option<u64>, Self::BlasData) {
+        unimplemented!("Raytracing not implemented for web");
+    }
 }
 
 pub(crate) type SurfaceOutputDetail = ();

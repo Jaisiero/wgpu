@@ -381,8 +381,8 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
     unsafe fn copy_acceleration_structure_to_acceleration_structure(
         &mut self,
-        _src: &crate::metal::Api::AccelerationStructure,
-        _dst: &crate::metal::Api::AccelerationStructure,
+        _src: &super::AccelerationStructure,
+        _dst: &super::AccelerationStructure,
         copy: AccelerationStructureCopy,
     ) {
         unimplemented!()
