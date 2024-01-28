@@ -78,25 +78,34 @@ static_assertions::assert_impl_all!(BlasBuildEntry<'_>: WasmNotSendSync);
 /// Bottom level acceleration structure.
 /// Used to represent a collection of geometries for ray tracing inside a top level acceleration structure.
 pub struct Blas {
+    pub(crate) internal: Arc<BlasInternal>,
+}
+static_assertions::assert_impl_all!(Blas: WasmNotSendSync);
+
+#[derive(Debug)]
+pub(crate) struct BlasInternal {
     pub(crate) context: Arc<C>,
     pub(crate) id: ObjectId,
     pub(crate) data: Box<Data>,
     pub(crate) handle: Option<u64>,
 }
-static_assertions::assert_impl_all!(Blas: WasmNotSendSync);
 
 impl Blas {
     /// Raw handle to the acceleration structure, used inside raw instance buffers.
     pub fn handle(&self) -> Option<u64> {
-        self.handle
+        self.internal.handle
     }
     /// Destroy the associated native resources as soon as possible.
     pub fn destroy(&self) {
-        DynContext::blas_destroy(&*self.context, &self.id, self.data.as_ref());
+        DynContext::blas_destroy(
+            &*self.internal.context,
+            &self.internal.id,
+            self.internal.data.as_ref(),
+        );
     }
 }
 
-impl Drop for Blas {
+impl Drop for BlasInternal {
     fn drop(&mut self) {
         if !thread::panicking() {
             self.context.blas_drop(&self.id, self.data.as_ref());
@@ -144,7 +153,7 @@ static_assertions::assert_impl_all!(TlasBuildEntry<'_>: WasmNotSendSync);
 /// Safe instance for a top level acceleration structure.
 #[derive(Debug, Clone)]
 pub struct TlasInstance {
-    pub(crate) blas: ObjectId,
+    pub(crate) blas: Arc<BlasInternal>,
     /// Affine transform matrix 3x4 (rows x columns, row mayor order).
     pub transform: [f32; 12],
     /// Custom index for the instance used inside the shader (max 24 bits).
@@ -161,7 +170,7 @@ impl TlasInstance {
     /// - mask: Mask for the instance used inside the shader to filter instances
     pub fn new(blas: &Blas, transform: [f32; 12], custom_index: u32, mask: u8) -> Self {
         Self {
-            blas: blas.id,
+            blas: blas.internal.clone(),
             transform,
             custom_index,
             mask,
@@ -170,7 +179,7 @@ impl TlasInstance {
 
     /// Set the bottom level acceleration structure.
     pub fn set_blas(&mut self, blas: &Blas) {
-        self.blas = blas.id;
+        self.blas = blas.internal.clone();
     }
 }
 
@@ -369,10 +378,12 @@ impl DeviceRayTracing for Device {
         );
 
         Blas {
-            context: Arc::clone(&self.context),
-            id,
-            data,
-            handle,
+            internal: Arc::new(BlasInternal {
+                context: Arc::clone(&self.context),
+                id,
+                data,
+                handle,
+            }),
         }
     }
 
@@ -467,7 +478,7 @@ impl CommandEncoderRayTracing for CommandEncoder {
                 }
             };
             DynContextBlasBuildEntry {
-                blas_id: e.blas.id,
+                blas_id: e.blas.internal.id,
                 geometries,
             }
         });
@@ -475,7 +486,7 @@ impl CommandEncoderRayTracing for CommandEncoder {
         let mut tlas = tlas.into_iter().map(|e: &TlasPackage| {
             let instances = e.instances.iter().map(|instance: &Option<TlasInstance>| {
                 instance.as_ref().map(|instance| DynContextTlasInstance {
-                    blas: instance.blas,
+                    blas: instance.blas.id,
                     transform: &instance.transform,
                     custom_index: instance.custom_index,
                     mask: instance.mask,
@@ -529,7 +540,7 @@ impl CommandEncoderRayTracing for CommandEncoder {
                 }
             };
             DynContextBlasBuildEntry {
-                blas_id: e.blas.id,
+                blas_id: e.blas.internal.id,
                 geometries,
             }
         });
@@ -557,13 +568,15 @@ impl CommandEncoderRayTracing for CommandEncoder {
             &*self.context,
             id,
             self.data.as_ref(),
-            &blas.id,
+            &blas.internal.id,
         );
         Blas {
-            context: Arc::clone(&self.context),
-            id,
-            data,
-            handle,
+            internal: Arc::new(BlasInternal {
+                context: Arc::clone(&self.context),
+                id,
+                data,
+                handle,
+            }),
         }
     }
 }
