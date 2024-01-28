@@ -111,29 +111,37 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let fid = hub.blas_s.prepare::<G>(id_in);
         let blas_guard = hub.blas_s.read();
         let src_blas = blas_guard.get(blas_id).unwrap().clone();
+        // this removes a deadlock where fid.assign() tries to get the lock while it is in blas_guard
         drop(blas_guard);
-        let cmd_buf = match CommandBuffer::get_encoder(hub, encoder_id) {
-            Ok(cmd_buf) => cmd_buf,
-            Err(err) => {
-                let id = fid.assign_error(src_blas.label().as_str());
-                return (id, None, Some(CompactBlasError::from(err)));
+        let err = loop {
+            if !src_blas
+                .flags
+                .contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION)
+            {
+                break CompactBlasError::BlasMissingAllowCompaction;
             }
+            let cmd_buf = match CommandBuffer::get_encoder(hub, encoder_id) {
+                Ok(cmd_buf) => cmd_buf,
+                Err(err) => break CompactBlasError::from(err),
+            };
+            let device = &mut &cmd_buf.device;
+            let raw_device = device.raw();
+            return match self.internal_command_encoder_compact_blas(&src_blas, raw_device, &cmd_buf)
+            {
+                Ok(blas) => {
+                    let handle = blas.handle;
+                    let (id, resource) = fid.assign(blas);
+                    device.trackers.lock().blas_s.insert_single(id, resource);
+                    log::info!("Compacted Blas {:?}", blas_id);
+                    (id, Some(handle), None)
+                }
+                Err(err) => {
+                    break err;
+                }
+            };
         };
-        let device = &mut &cmd_buf.device;
-        let raw_device = device.raw();
-        return match self.internal_command_encoder_compact_blas(&src_blas, raw_device, &cmd_buf) {
-            Ok(blas) => {
-                let handle = blas.handle;
-                let (id, resource) = fid.assign(blas);
-                device.trackers.lock().blas_s.insert_single(id, resource);
-                log::info!("Compacted Blas {:?}", blas_id);
-                (id, Some(handle), None)
-            }
-            Err(err) => {
-                let id = fid.assign_error(src_blas.label().as_str());
-                (id, None, Some(err))
-            }
-        };
+        let id = fid.assign_error(src_blas.label().as_str());
+        (id, None, Some(err))
     }
     pub fn command_encoder_build_acceleration_structures_unsafe_tlas<'a, A: HalApi>(
         &self,

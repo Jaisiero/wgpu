@@ -53,7 +53,9 @@ pub enum CompactBlasError {
     CreateBlasError(#[from] CreateBlasError),
     #[error(transparent)]
     EncoderError(#[from] CommandEncoderError),
-    #[error("Unimplemented Tlas error: this error is not yet implemented")]
+    #[error("src Blas is missing 'ALLOW_COMPACTION' flag")]
+    BlasMissingAllowCompaction,
+    #[error("Unimplemented Compact Blas error: this error is not yet implemented")]
     Unimplemented,
 }
 

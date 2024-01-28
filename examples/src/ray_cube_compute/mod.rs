@@ -366,7 +366,8 @@ impl crate::framework::Example for Example {
         let blas = device.create_blas(
             &rt::CreateBlasDescriptor {
                 label: None,
-                flags: rt::AccelerationStructureFlags::PREFER_FAST_TRACE,
+                flags: rt::AccelerationStructureFlags::PREFER_FAST_TRACE
+                    | rt::AccelerationStructureFlags::ALLOW_COMPACTION,
                 update_mode: rt::AccelerationStructureUpdateMode::Build,
             },
             rt::BlasGeometrySizeDescriptors::Triangles {
