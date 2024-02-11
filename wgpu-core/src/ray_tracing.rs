@@ -74,7 +74,7 @@ pub enum BuildAccelerationStructureError {
     MissingAssociatedData(BufferId),
 
     #[error(
-        "Blas {0:?} build sizes to may be greater than the descriptor at build time specified"
+        "Blas {0:?} build sizes may not be greater than the descriptor at build time specified"
     )]
     IncompatibleBlasBuildSizes(BlasId),
 

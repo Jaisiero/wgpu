@@ -885,12 +885,10 @@ impl Global {
                             || size_desc.vertex_count < mesh.size.vertex_count
                             || size_desc.vertex_format != mesh.size.vertex_format
                             || size_desc.index_count.is_none() != mesh.size.index_count.is_none()
-                            || (size_desc.index_count.is_none()
-                                || size_desc.index_count.unwrap() < mesh.size.index_count.unwrap())
+                            || size_desc.index_count.map_or(false, |_| size_desc.index_count.unwrap() < mesh.size.index_count.unwrap())
                             || size_desc.index_format.is_none() != mesh.size.index_format.is_none()
-                            || (size_desc.index_format.is_none()
-                                || size_desc.index_format.unwrap()
-                                    != mesh.size.index_format.unwrap())
+                            || size_desc.index_format.map_or(false, |_| size_desc.index_format.unwrap()
+                            != mesh.size.index_format.unwrap())
                         {
                             return Err(
                                 BuildAccelerationStructureError::IncompatibleBlasBuildSizes(
@@ -1534,7 +1532,7 @@ impl Global {
             raw: Mutex::new(Some(scratch_buffer)),
             device: device.clone(),
             size: max(scratch_buffer_blas_size, scratch_buffer_tlas_size),
-            info: ResourceInfo::new("Ratracing scratch buffer"),
+            info: ResourceInfo::new("Raytracing scratch buffer"),
             is_coherent: scratch_mapping.is_coherent,
         };
         let staging_fid = hub.staging_buffers.request();
