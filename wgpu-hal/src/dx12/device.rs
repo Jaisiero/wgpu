@@ -682,7 +682,7 @@ impl crate::Device<super::Api> for super::Device {
                     num_texture_views += count
                 }
                 wgt::BindingType::Sampler { .. } => num_samplers += count,
-                wgt::BindingType::AccelerationStructure => todo!(),
+                wgt::BindingType::AccelerationStructure { .. } => todo!(),
             }
         }
 
@@ -1204,7 +1204,7 @@ impl crate::Device<super::Api> for super::Device {
                         cpu_samplers.as_mut().unwrap().stage.push(data.handle.raw);
                     }
                 }
-                wgt::BindingType::AccelerationStructure => todo!(),
+                wgt::BindingType::AccelerationStructure { .. } => todo!(),
             }
         }
 

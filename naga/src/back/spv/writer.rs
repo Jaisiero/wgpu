@@ -648,7 +648,7 @@ impl Writer {
                 id,
                 spirv::StorageClass::Function,
                 init_word.or_else(|| match ir_module.types[variable.ty].inner {
-                    crate::TypeInner::RayQuery => None,
+                    crate::TypeInner::RayQuery { .. } => None,
                     _ => {
                         let type_id = context.get_type_id(LookupType::Handle(variable.ty));
                         Some(context.writer.write_constant_null(type_id))
@@ -870,11 +870,21 @@ impl Writer {
                     _ => {}
                 }
             }
-            crate::TypeInner::AccelerationStructure => {
-                self.require_any("Acceleration Structure", &[spirv::Capability::RayQueryKHR])?;
+            crate::TypeInner::AccelerationStructure { vertex_return } => {
+                let caps = if vertex_return {
+                    vec![spirv::Capability::RayQueryKHR, spirv::Capability::RayTracingPositionFetchKHR]
+                } else {
+                    vec![spirv::Capability::RayQueryKHR]
+                };
+                self.require_any("Acceleration Structure", &caps)?;
             }
-            crate::TypeInner::RayQuery => {
-                self.require_any("Ray Query", &[spirv::Capability::RayQueryKHR])?;
+            crate::TypeInner::RayQuery { vertex_return } => {
+                let caps = if vertex_return {
+                    vec![spirv::Capability::RayQueryKHR, spirv::Capability::RayTracingPositionFetchKHR]
+                } else {
+                    vec![spirv::Capability::RayQueryKHR]
+                };
+                self.require_any("Ray Query", &caps)?;
             }
             _ => {}
         }
@@ -955,8 +965,8 @@ impl Writer {
                 let class = map_storage_class(space);
                 Instruction::type_pointer(id, class, inner_ty)
             }
-            LocalType::AccelerationStructure => Instruction::type_acceleration_structure(id),
-            LocalType::RayQuery => Instruction::type_ray_query(id),
+            LocalType::AccelerationStructure { .. } => Instruction::type_acceleration_structure(id),
+            LocalType::RayQuery { .. } => Instruction::type_ray_query(id),
         };
 
         instruction.to_words(&mut self.logical_layout.declarations);
@@ -1055,8 +1065,8 @@ impl Writer {
                 | crate::TypeInner::ValuePointer { .. }
                 | crate::TypeInner::Image { .. }
                 | crate::TypeInner::Sampler { .. }
-                | crate::TypeInner::AccelerationStructure
-                | crate::TypeInner::RayQuery => unreachable!(),
+                | crate::TypeInner::AccelerationStructure { .. }
+                | crate::TypeInner::RayQuery { .. } => unreachable!(),
             };
 
             instruction.to_words(&mut self.logical_layout.declarations);

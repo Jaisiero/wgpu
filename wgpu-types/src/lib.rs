@@ -873,6 +873,14 @@ bitflags::bitflags! {
         /// - Vulkan (with dualSrcBlend)
         /// - DX12
         const DUAL_SOURCE_BLENDING = 1 << 54;
+        /// Allows for returning of hit triangles vertex position on acceleration
+        /// structure marked with [`AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN`].
+        ///
+        /// Supported platforms:
+        /// - Vulkan
+        ///
+        /// This is a native only feature
+        const RAY_HIT_VERTEX_RETURN = 1 << 55;
     }
 }
 
@@ -6421,12 +6429,24 @@ pub enum BindingType {
     /// var as: acceleration_structure;
     /// ```
     ///
+    /// or with vertex return enabled
+    /// ```rust,ignore
+    /// @group(0) @binding(0)
+    /// var as: acceleration_structure<vertex_return>;
+    /// ```
+    ///
     /// Example GLSL syntax:
     /// ```cpp,ignore
     /// layout(binding = 0)
     /// uniform accelerationStructureEXT as;
     /// ```
-    AccelerationStructure,
+    AccelerationStructure {
+        /// Whether this acceleration structure can be used to
+        /// create a ray query that has flag vertex return in the shader
+        ///
+        /// If enabled requires
+        vertex_return: bool
+    },
 }
 
 impl BindingType {
@@ -7174,6 +7194,8 @@ bitflags::bitflags!(
         const PREFER_FAST_BUILD = 1 << 3;
         /// Optimize for low memory footprint (scratch and output)
         const LOW_MEMORY = 1 << 4;
+        /// Allow retrieval of a vertex hit by ay ray in a raytraced scene
+        const ALLOW_RAY_HIT_VERTEX_RETURN = 1 << 5;
     }
 );
 impl_bitflags!(AccelerationStructureFlags);

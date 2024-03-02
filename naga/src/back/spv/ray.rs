@@ -102,6 +102,15 @@ impl<'w> BlockContext<'w> {
                     .body
                     .push(Instruction::ray_query_proceed(result_type_id, id, query_id));
             }
+            crate::RayQueryFunction::ReturnHitVertex { result } => {
+                let id = self.gen_id();
+                self.cached[result] = id;
+                let result_type_id = self.get_expression_type_id(&self.fun_info[result].ty);
+
+                block
+                    .body
+                    .push(Instruction::ray_query_return_vertex_position(result_type_id, id, query_id));
+            }
             crate::RayQueryFunction::Terminate => {}
         }
     }
@@ -257,5 +266,33 @@ impl<'w> BlockContext<'w> {
             ],
         ));
         id
+    }
+
+    pub(super) fn write_ray_query_return_vertex_position(
+        &mut self,
+        query: Handle<crate::Expression>,
+        block: &mut Block,
+    ) -> spirv::Word {
+        let query_id = self.cached[query];
+        let id = self.gen_id();
+
+        let vec3f_handle = self.ir_module.types.get(&crate::Type {
+            name: None,
+            inner: crate::TypeInner::Vector { size: crate::VectorSize::Tri, scalar: crate::Scalar::F32 },
+        }).expect("type should have been populated");
+
+        block.body.push(Instruction::ray_query_return_vertex_position(
+            *self.writer.lookup_type.get(&LookupType::Handle(self.ir_module.types.get(&crate::Type {
+                name: None,
+                inner: crate::TypeInner::Array {
+                    base: vec3f_handle,
+                    size: crate::ArraySize::Constant(unsafe { std::num::NonZeroU32::new_unchecked(3) }),
+                    stride: 16,
+                },
+            }).expect("type should have been populated"))).expect("type should have been populated"),
+            id,
+            query_id,
+        ));
+        return id
     }
 }

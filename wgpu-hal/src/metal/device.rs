@@ -637,7 +637,7 @@ impl crate::Device<super::Api> for super::Device {
                                 wgt::StorageTextureAccess::ReadWrite => true,
                             };
                         }
-                        wgt::BindingType::AccelerationStructure => unimplemented!(),
+                        wgt::BindingType::AccelerationStructure { .. } => unimplemented!(),
                     }
 
                     let br = naga::ResourceBinding {

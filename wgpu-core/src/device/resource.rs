@@ -1529,6 +1529,10 @@ impl<A: HalApi> Device<A> {
                 .flags
                 .contains(wgt::DownlevelFlags::CUBE_ARRAY_TEXTURES),
         );
+        caps.set(
+            Caps::RAY_HIT_VERTEX_POSITION,
+            self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN),
+        );
 
         let debug_source =
             if self.instance_flags.contains(wgt::InstanceFlags::DEBUG) && !source.is_empty() {
@@ -1799,7 +1803,7 @@ impl<A: HalApi> Device<A> {
                         },
                     )
                 }
-                Bt::AccelerationStructure => (None, WritableStorage::No),
+                Bt::AccelerationStructure { .. } => (None, WritableStorage::No),
             };
 
             // Validate the count parameter

@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use crate::arena::{Arena, Handle, UniqueArena};
 
 use thiserror::Error;
@@ -140,6 +141,7 @@ impl Clone for TypeResolution {
                     scalar,
                     space,
                 },
+                Ti::Array { base, size, stride } => Ti::Array {base, size, stride},
                 _ => unreachable!("Unexpected clone type: {:?}", v),
             }),
         }
@@ -881,6 +883,13 @@ impl<'a> ResolveContext<'a> {
                     .ray_intersection
                     .ok_or(ResolveError::MissingSpecialType)?;
                 TypeResolution::Handle(result)
+            }
+            crate::Expression::RayQueryVertexPositions { .. } => {
+                let base = self.types.get(&crate::Type { name: None, inner: Ti::Vector {
+                    size: crate::VectorSize::Tri,
+                    scalar: crate::Scalar::F32
+                } }).ok_or(ResolveError::MissingSpecialType)?;
+                TypeResolution::Value(Ti::Array { size: crate::ArraySize::Constant(unsafe {NonZeroU32::new_unchecked(3)}), base, stride: 16})
             }
         })
     }

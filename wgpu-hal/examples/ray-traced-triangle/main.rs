@@ -315,7 +315,9 @@ impl<A: hal::Api> Example<A> {
                 wgt::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgt::ShaderStages::COMPUTE,
-                    ty: wgt::BindingType::AccelerationStructure,
+                    ty: wgt::BindingType::AccelerationStructure {
+                        vertex_return:false,
+                    },
                     count: None,
                 },
             ],

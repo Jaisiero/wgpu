@@ -313,8 +313,8 @@ impl super::TypeInner {
             Self::Struct { span, .. } => span,
             Self::Image { .. }
             | Self::Sampler { .. }
-            | Self::AccelerationStructure
-            | Self::RayQuery
+            | Self::AccelerationStructure { .. }
+            | Self::RayQuery { .. }
             | Self::BindingArray { .. } => 0,
         }
     }

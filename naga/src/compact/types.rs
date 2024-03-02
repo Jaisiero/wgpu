@@ -34,8 +34,8 @@ impl<'a> TypeTracer<'a> {
                 | Ti::ValuePointer { .. }
                 | Ti::Image { .. }
                 | Ti::Sampler { .. }
-                | Ti::AccelerationStructure
-                | Ti::RayQuery => {}
+                | Ti::AccelerationStructure { .. }
+                | Ti::RayQuery { .. } => {}
 
                 // Types that do contain handles.
                 Ti::Pointer { base, space: _ }
@@ -70,8 +70,8 @@ impl ModuleMap {
             | Ti::ValuePointer { .. }
             | Ti::Image { .. }
             | Ti::Sampler { .. }
-            | Ti::AccelerationStructure
-            | Ti::RayQuery => {}
+            | Ti::AccelerationStructure { .. }
+            | Ti::RayQuery { .. } => {}
 
             // Types that do contain handles.
             Ti::Pointer {

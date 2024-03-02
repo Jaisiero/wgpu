@@ -108,6 +108,8 @@ bitflags::bitflags! {
         const DUAL_SOURCE_BLENDING = 0x2000;
         /// Support for arrayed cube textures.
         const CUBE_ARRAY_TEXTURES = 0x4000;
+        /// Support for ray queries returning vertex position
+        const RAY_HIT_VERTEX_POSITION = 0x8000;
     }
 }
 
@@ -244,8 +246,8 @@ impl crate::TypeInner {
             Self::Array { .. }
             | Self::Image { .. }
             | Self::Sampler { .. }
-            | Self::AccelerationStructure
-            | Self::RayQuery
+            | Self::AccelerationStructure { .. }
+            | Self::RayQuery { .. }
             | Self::BindingArray { .. } => false,
         }
     }

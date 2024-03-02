@@ -593,7 +593,14 @@ impl<W: Write> Writer<W> {
                 }
                 write!(self.out, ">")?;
             }
-            TypeInner::AccelerationStructure => write!(self.out, "acceleration_structure")?,
+            TypeInner::AccelerationStructure { vertex_return } => {
+                let caps = if vertex_return {
+                    "<vertex_return>"
+                } else {
+                    ""
+                };
+                write!(self.out, "acceleration_structure{}", caps)?
+            },
             _ => {
                 return Err(Error::Unimplemented(format!("write_value_type {inner:?}")));
             }
@@ -1678,7 +1685,8 @@ impl<W: Write> Writer<W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. }
+            | Expression::RayQueryVertexPositions { .. } => unreachable!(),
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }

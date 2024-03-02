@@ -49,8 +49,8 @@ impl super::Validator {
                 | crate::TypeInner::Atomic { .. }
                 | crate::TypeInner::Image { .. }
                 | crate::TypeInner::Sampler { .. }
-                | crate::TypeInner::AccelerationStructure
-                | crate::TypeInner::RayQuery => (),
+                | crate::TypeInner::AccelerationStructure { .. }
+                | crate::TypeInner::RayQuery { .. } => (),
                 crate::TypeInner::Pointer { base, space: _ } => {
                     this_handle.check_dep(base)?;
                 }
@@ -397,7 +397,7 @@ impl super::Validator {
             crate::Expression::RayQueryGetIntersection {
                 query,
                 committed: _,
-            } => {
+            } | crate::Expression::RayQueryVertexPositions { query } => {
                 handle.check_dep(query)?;
             }
         }
@@ -527,6 +527,9 @@ impl super::Validator {
                     } => {
                         validate_expr(acceleration_structure)?;
                         validate_expr(descriptor)?;
+                    }
+                    crate::RayQueryFunction::ReturnHitVertex { result } => {
+                        validate_expr(result)?;
                     }
                     crate::RayQueryFunction::Proceed { result } => {
                         validate_expr(result)?;

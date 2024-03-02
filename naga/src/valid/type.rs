@@ -617,12 +617,19 @@ impl super::Validator {
                 TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE)
             }
             Ti::Sampler { .. } => TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE),
-            Ti::AccelerationStructure => {
+            Ti::AccelerationStructure { vertex_return } => {
+
                 self.require_type_capability(Capabilities::RAY_QUERY)?;
+                if vertex_return {
+                    self.require_type_capability(Capabilities::RAY_HIT_VERTEX_POSITION)?;
+                }
                 TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE)
             }
-            Ti::RayQuery => {
+            Ti::RayQuery { vertex_return } => {
                 self.require_type_capability(Capabilities::RAY_QUERY)?;
+                if vertex_return {
+                    self.require_type_capability(Capabilities::RAY_HIT_VERTEX_POSITION)?;
+                }
                 TypeInfo::new(
                     TypeFlags::DATA | TypeFlags::CONSTRUCTIBLE | TypeFlags::SIZED,
                     Alignment::ONE,

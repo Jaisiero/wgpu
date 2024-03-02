@@ -826,10 +826,10 @@ pub enum TypeInner {
     Sampler { comparison: bool },
 
     /// Opaque object representing an acceleration structure of geometry.
-    AccelerationStructure,
+    AccelerationStructure { vertex_return: bool },
 
     /// Locally used handle for ray queries.
-    RayQuery,
+    RayQuery { vertex_return: bool },
 
     /// Array of bindings.
     ///
@@ -1580,6 +1580,13 @@ pub enum Expression {
     /// a pointer to a structure containing a runtime array in its' last field.
     ArrayLength(Handle<Expression>),
 
+    /// Get the Positions of the triangle hit by the [`RayQuery`]
+    ///
+    /// [`RayQuery`]: Statement::RayQuery
+    RayQueryVertexPositions {
+        query: Handle<Expression>,
+    },
+
     /// Result of a [`Proceed`] [`RayQuery`] statement.
     ///
     /// [`Proceed`]: RayQueryFunction::Proceed
@@ -1660,6 +1667,20 @@ pub enum RayQueryFunction {
     /// [`query`]: Statement::RayQuery::query
     /// [`Bool`]: ScalarKind::Bool
     Proceed {
+        result: Handle<Expression>,
+    },
+
+    ReturnHitVertex {
+        /// Return the vertex position of the triangle hit by the statement's [`query`] operand
+        ///
+        /// After executing this statement the `result` expression is a
+        /// [`Array`] of the positions of the three points of the triangle,
+        /// given in ['vec3'] of [`F32`]
+        ///
+        /// [`query`]: Statement::RayQuery::query
+        /// [`Array`]: TypeInner::Array
+        /// [`vec3`]: TypeInner::Vector
+        /// [`F32`]: ScalarKind::Float
         result: Handle<Expression>,
     },
 
