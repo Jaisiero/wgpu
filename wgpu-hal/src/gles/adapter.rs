@@ -628,6 +628,11 @@ impl super::Adapter {
             // that's the only way to get gl_InstanceID to work correctly.
             features.set(wgt::Features::INDIRECT_FIRST_INSTANCE, supported);
         }
+        // Supported by GL 3.3+, Not supported by GLES 3.0+
+        features.set(
+            wgt::Features::TEXTURE_FORMAT_16BIT_NORM,
+            es_ver.is_none() && full_ver >= Some((3, 3)),
+        );
 
         let max_texture_size = unsafe { gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) } as u32;
         let max_texture_3d_size = unsafe { gl.get_parameter_i32(glow::MAX_3D_TEXTURE_SIZE) } as u32;
@@ -729,9 +734,19 @@ impl super::Adapter {
             max_push_constant_size: super::MAX_PUSH_CONSTANTS as u32 * 4,
             min_uniform_buffer_offset_alignment,
             min_storage_buffer_offset_alignment,
-            max_inter_stage_shader_components: unsafe {
-                gl.get_parameter_i32(glow::MAX_VARYING_COMPONENTS)
-            } as u32,
+            max_inter_stage_shader_components: {
+                // MAX_VARYING_COMPONENTS may return 0, because it is deprecated since OpenGL 3.2 core,
+                // and an OpenGL Context with the core profile and with forward-compatibility=true,
+                // will make deprecated constants unavailable.
+                let max_varying_components =
+                    unsafe { gl.get_parameter_i32(glow::MAX_VARYING_COMPONENTS) } as u32;
+                if max_varying_components == 0 {
+                    // default value for max_inter_stage_shader_components
+                    60
+                } else {
+                    max_varying_components
+                }
+            },
             max_color_attachments,
             max_color_attachment_bytes_per_sample,
             max_compute_workgroup_storage_size: if supports_work_group_params {
@@ -837,7 +852,14 @@ impl super::Adapter {
         let source = if es {
             format!("#version 300 es\nprecision lowp float;\n{source}")
         } else {
-            format!("#version 130\n{source}")
+            let version = gl.version();
+            if version.major == 3 && version.minor == 0 {
+                // OpenGL 3.0 only supports this format
+                format!("#version 130\n{source}")
+            } else {
+                // OpenGL 3.1+ support this format
+                format!("#version 140\n{source}")
+            }
         };
         let shader = unsafe { gl.create_shader(shader_type) }.expect("Could not create shader");
         unsafe { gl.shader_source(shader, &source) };
@@ -1032,6 +1054,9 @@ impl crate::Adapter<super::Api> for super::Adapter {
 
         let texture_float_linear = feature_fn(wgt::Features::FLOAT32_FILTERABLE, filterable);
 
+        let texture_rgb16bit_renderable =
+            feature_fn(wgt::Features::TEXTURE_FORMAT_16BIT_NORM, renderable);
+
         match format {
             Tf::R8Unorm => filterable_renderable,
             Tf::R8Snorm => filterable,
@@ -1068,8 +1093,8 @@ impl crate::Adapter<super::Api> for super::Adapter {
             Tf::Rg32Float => unfilterable | float_renderable | texture_float_linear,
             Tf::Rgba16Uint => renderable | storage,
             Tf::Rgba16Sint => renderable | storage,
-            Tf::Rgba16Unorm => empty,
-            Tf::Rgba16Snorm => empty,
+            Tf::Rgba16Unorm => texture_rgb16bit_renderable,
+            Tf::Rgba16Snorm => texture_rgb16bit_renderable,
             Tf::Rgba16Float => filterable | storage | half_float_renderable,
             Tf::Rgba32Uint => renderable | storage,
             Tf::Rgba32Sint => renderable | storage,

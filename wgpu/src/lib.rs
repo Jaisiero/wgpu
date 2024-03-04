@@ -372,7 +372,7 @@ static_assertions::assert_impl_all!(SurfaceConfiguration: Send, Sync);
 /// Handle to a presentable surface.
 ///
 /// A `Surface` represents a platform-specific surface (e.g. a window) onto which rendered images may
-/// be presented. A `Surface` may be created with the unsafe function [`Instance::create_surface`].
+/// be presented. A `Surface` may be created with the function [`Instance::create_surface`].
 ///
 /// This type is unique to the Rust API of `wgpu`. In the WebGPU specification,
 /// [`GPUCanvasContext`](https://gpuweb.github.io/gpuweb/#canvas-context)
@@ -1804,7 +1804,7 @@ impl Instance {
             );
         }
 
-        #[cfg(all(webgpu, web_sys_unstable_apis))]
+        #[cfg(webgpu)]
         {
             let is_only_available_backend = !cfg!(wgpu_core);
             let requested_webgpu = _instance_desc.backends.contains(Backends::BROWSER_WEBGPU);
@@ -1959,7 +1959,7 @@ impl Instance {
     /// Creates a new surface targeting a given window/canvas/surface/etc..
     ///
     /// See [`SurfaceTarget`] for what targets are supported.
-    /// See [`Instance::create_surface`] for surface creation with unsafe target variants.
+    /// See [`Instance::create_surface_unsafe`] for surface creation with unsafe target variants.
     ///
     /// Most commonly used are window handles (or provider of windows handles)
     /// which can be passed directly as they're automatically converted to [`SurfaceTarget`].
@@ -3078,7 +3078,7 @@ impl<'a> BufferSlice<'a> {
     /// this function directly hands you the ArrayBuffer that we mapped the data into in js.
     ///
     /// This is only available on WebGPU, on any other backends this will return `None`.
-    #[cfg(all(webgpu, web_sys_unstable_apis))]
+    #[cfg(webgpu)]
     pub fn get_mapped_range_as_array_buffer(&self) -> Option<js_sys::ArrayBuffer> {
         self.buffer
             .context
@@ -3416,7 +3416,7 @@ impl CommandEncoder {
     /// # Panics
     ///
     /// - Buffer does not have `COPY_DST` usage.
-    /// - Range it out of bounds
+    /// - Range is out of bounds
     pub fn clear_buffer(
         &mut self,
         buffer: &Buffer,
@@ -4793,11 +4793,11 @@ impl Surface<'_> {
         let caps = self.get_capabilities(adapter);
         Some(SurfaceConfiguration {
             usage: wgt::TextureUsages::RENDER_ATTACHMENT,
-            format: *caps.formats.get(0)?,
+            format: *caps.formats.first()?,
             width,
             height,
             desired_maximum_frame_latency: 2,
-            present_mode: *caps.present_modes.get(0)?,
+            present_mode: *caps.present_modes.first()?,
             alpha_mode: wgt::CompositeAlphaMode::Auto,
             view_formats: vec![],
         })
@@ -4947,7 +4947,7 @@ impl<T> Eq for Id<T> {}
 
 impl<T> PartialOrd for Id<T> {
     fn partial_cmp(&self, other: &Id<T>) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 
