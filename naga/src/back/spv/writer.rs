@@ -1867,6 +1867,7 @@ impl Writer {
             .any(|arg| has_view_index_check(ir_module, arg.binding.as_ref(), arg.ty));
         let has_ray_query = ir_module.special_types.ray_desc.is_some()
             | ir_module.special_types.ray_intersection.is_some();
+        let has_vertex_return = ir_module.special_types.ray_vertex_return.is_some();
 
         if self.physical_layout.version < 0x10300 && has_storage_buffers {
             // enable the storage buffer class on < SPV-1.3
@@ -1879,6 +1880,10 @@ impl Writer {
         }
         if has_ray_query {
             Instruction::extension("SPV_KHR_ray_query")
+                .to_words(&mut self.logical_layout.extensions)
+        }
+        if has_vertex_return {
+            Instruction::extension("SPV_KHR_ray_tracing_position_fetch")
                 .to_words(&mut self.logical_layout.extensions)
         }
         Instruction::type_void(self.void_type).to_words(&mut self.logical_layout.declarations);

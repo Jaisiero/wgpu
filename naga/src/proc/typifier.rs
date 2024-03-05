@@ -885,11 +885,11 @@ impl<'a> ResolveContext<'a> {
                 TypeResolution::Handle(result)
             }
             crate::Expression::RayQueryVertexPositions { .. } => {
-                let base = self.types.get(&crate::Type { name: None, inner: Ti::Vector {
-                    size: crate::VectorSize::Tri,
-                    scalar: crate::Scalar::F32
-                } }).ok_or(ResolveError::MissingSpecialType)?;
-                TypeResolution::Value(Ti::Array { size: crate::ArraySize::Constant(unsafe {NonZeroU32::new_unchecked(3)}), base, stride: 16})
+                let result = self
+                    .special_types
+                    .ray_vertex_return
+                    .ok_or(ResolveError::MissingSpecialType)?;
+                TypeResolution::Handle(result)
             }
         })
     }
