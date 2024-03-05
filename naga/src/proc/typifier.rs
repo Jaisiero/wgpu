@@ -1,4 +1,3 @@
-use std::num::NonZeroU32;
 use crate::arena::{Arena, Handle, UniqueArena};
 
 use thiserror::Error;
@@ -141,7 +140,7 @@ impl Clone for TypeResolution {
                     scalar,
                     space,
                 },
-                Ti::Array { base, size, stride } => Ti::Array {base, size, stride},
+                Ti::Array { base, size, stride } => Ti::Array { base, size, stride },
                 _ => unreachable!("Unexpected clone type: {:?}", v),
             }),
         }

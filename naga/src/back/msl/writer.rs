@@ -3153,7 +3153,7 @@ impl<W: Write> Writer<W> {
         let mut uses_ray_query = false;
         for (_, ty) in module.types.iter() {
             match ty.inner {
-                crate::TypeInner::AccelerationStructure  { .. } => {
+                crate::TypeInner::AccelerationStructure { .. } => {
                     if options.lang_version < (2, 4) {
                         return Err(Error::UnsupportedRayTracing);
                     }

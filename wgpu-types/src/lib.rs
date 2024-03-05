@@ -6445,7 +6445,7 @@ pub enum BindingType {
         /// create a ray query that has flag vertex return in the shader
         ///
         /// If enabled requires
-        vertex_return: bool
+        vertex_return: bool,
     },
 }
 

@@ -1583,9 +1583,7 @@ pub enum Expression {
     /// Get the Positions of the triangle hit by the [`RayQuery`]
     ///
     /// [`RayQuery`]: Statement::RayQuery
-    RayQueryVertexPositions {
-        query: Handle<Expression>,
-    },
+    RayQueryVertexPositions { query: Handle<Expression> },
 
     /// Result of a [`Proceed`] [`RayQuery`] statement.
     ///

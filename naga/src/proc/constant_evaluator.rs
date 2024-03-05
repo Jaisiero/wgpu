@@ -702,7 +702,9 @@ impl<'a> ConstantEvaluator<'a> {
             Expression::ImageSample { .. }
             | Expression::ImageLoad { .. }
             | Expression::ImageQuery { .. } => Err(ConstantEvaluatorError::ImageExpression),
-            Expression::RayQueryProceedResult | Expression::RayQueryGetIntersection { .. } | Expression::RayQueryVertexPositions { .. } => {
+            Expression::RayQueryProceedResult
+            | Expression::RayQueryGetIntersection { .. }
+            | Expression::RayQueryVertexPositions { .. } => {
                 Err(ConstantEvaluatorError::RayQueryExpression)
             }
         }

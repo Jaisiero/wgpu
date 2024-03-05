@@ -350,7 +350,7 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
-            Ex::RayQueryVertexPositions {ref mut query} => adjust(query),
+            Ex::RayQueryVertexPositions { ref mut query } => adjust(query),
         }
     }
 

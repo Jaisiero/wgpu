@@ -610,7 +610,9 @@ impl Resource {
                     },
                 }
             }
-            ResourceType::AccelerationStructure { vertex_return } => BindingType::AccelerationStructure { vertex_return },
+            ResourceType::AccelerationStructure { vertex_return } => {
+                BindingType::AccelerationStructure { vertex_return }
+            }
         })
     }
 }
@@ -918,7 +920,9 @@ impl Interface {
                         size: wgt::BufferSize::new(size as u64).unwrap(),
                     }
                 }
-                naga::TypeInner::AccelerationStructure { vertex_return } => ResourceType::AccelerationStructure { vertex_return },
+                naga::TypeInner::AccelerationStructure { vertex_return } => {
+                    ResourceType::AccelerationStructure { vertex_return }
+                }
                 ref other => ResourceType::Buffer {
                     size: wgt::BufferSize::new(other.size(module.to_ctx()) as u64).unwrap(),
                 },

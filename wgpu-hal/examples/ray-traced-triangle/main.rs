@@ -316,7 +316,7 @@ impl<A: hal::Api> Example<A> {
                     binding: 2,
                     visibility: wgt::ShaderStages::COMPUTE,
                     ty: wgt::BindingType::AccelerationStructure {
-                        vertex_return:false,
+                        vertex_return: false,
                     },
                     count: None,
                 },

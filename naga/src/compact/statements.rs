@@ -294,7 +294,7 @@ impl FunctionMap {
                 self.expressions.adjust(acceleration_structure);
                 self.expressions.adjust(descriptor);
             }
-            Qf::ReturnHitVertex { ref mut result} => {
+            Qf::ReturnHitVertex { ref mut result } => {
                 self.expressions.adjust(result);
             }
             Qf::Proceed { ref mut result } => {
