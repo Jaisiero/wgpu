@@ -769,7 +769,7 @@ impl crate::Device<super::Api> for super::Device {
                         );
                         counter.textures += size;
                     }
-                    wgt::BindingType::AccelerationStructure => unimplemented!(),
+                    wgt::BindingType::AccelerationStructure { .. } => unimplemented!(),
                 }
             }
         }
