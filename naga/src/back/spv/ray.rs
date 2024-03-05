@@ -280,18 +280,6 @@ impl<'w> BlockContext<'w> {
         let query_id = self.cached[query];
         let id = self.gen_id();
 
-        let vec3f_handle = self
-            .ir_module
-            .types
-            .get(&crate::Type {
-                name: None,
-                inner: crate::TypeInner::Vector {
-                    size: crate::VectorSize::Tri,
-                    scalar: crate::Scalar::F32,
-                },
-            })
-            .expect("type should have been populated");
-
         block
             .body
             .push(Instruction::ray_query_return_vertex_position(
