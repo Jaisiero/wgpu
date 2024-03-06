@@ -5,6 +5,7 @@ use glam::Vec3;
 use nanorand::{Rng, WyRand};
 use std::{borrow::Cow, f32::consts, iter, mem};
 use wgpu::util::DeviceExt;
+use crate::water::point_gen::TerrainVertexAttributes;
 
 ///
 /// Radius of the terrain.

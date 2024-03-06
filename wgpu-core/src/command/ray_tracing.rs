@@ -702,7 +702,7 @@ impl Global {
                 raw: Mutex::new(Some(scratch_buffer)),
                 device: device.clone(),
                 size: max(scratch_buffer_blas_size, scratch_buffer_tlas_size),
-                info: ResourceInfo::new("Raytracing scratch buffer"),
+                info: ResourceInfo::new("Raytracing scratch buffer", Some(device.tracker_indices.buffers.clone())),
                 is_coherent: scratch_mapping.is_coherent,
             })));
 
@@ -1344,7 +1344,7 @@ impl Global {
                     raw: Mutex::new(Some(staging_buffer)),
                     device: device.clone(),
                     size: instance_buffer_staging_source.len() as u64,
-                    info: ResourceInfo::new("Raytracing staging buffer"),
+                    info: ResourceInfo::new("Raytracing staging buffer", Some(device.tracker_indices.buffers.clone())),
                     is_coherent: mapping.is_coherent,
                 };
                 let staging_fid = hub.staging_buffers.request();
@@ -1532,7 +1532,7 @@ impl Global {
             raw: Mutex::new(Some(scratch_buffer)),
             device: device.clone(),
             size: max(scratch_buffer_blas_size, scratch_buffer_tlas_size),
-            info: ResourceInfo::new("Raytracing scratch buffer"),
+            info: ResourceInfo::new("Raytracing scratch buffer", Some(device.tracker_indices.buffers.clone())),
             is_coherent: scratch_mapping.is_coherent,
         };
         let staging_fid = hub.staging_buffers.request();

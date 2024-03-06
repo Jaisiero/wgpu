@@ -554,14 +554,14 @@ impl<A: HalApi> Device<A> {
                 if resource.is_unique() {
                     temp_suspected
                         .blas_s
-                        .insert(resource.as_info().id(), resource.clone());
+                        .insert(resource.as_info().tracker_index(), resource.clone());
                 }
             }
             for resource in trackers.tlas_s.used_resources() {
                 if resource.is_unique() {
                     temp_suspected
                         .tlas_s
-                        .insert(resource.as_info().id(), resource.clone());
+                        .insert(resource.as_info().tracker_index(), resource.clone());
                 }
             }
         }

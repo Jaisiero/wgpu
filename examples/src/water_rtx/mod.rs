@@ -287,18 +287,26 @@ impl crate::framework::Example for Example {
             });
 
         // Generate the buffer data.
-        let terrain_vertices = terrain.make_buffer_data();
+        let mut terrain_vertices = terrain.make_buffer_data();
+
+        println!("size {}", terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>());
+        /*if (terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>()) > 2_097_152 {
+            let new_len = 2_097_152 / mem::size_of::<point_gen::TerrainVertexAttributes>();
+            println!("new_len {new_len}");
+            let new_len = new_len - (new_len % 3);
+            terrain_vertices.truncate(new_len);
+        }*/
 
         // Create the buffers on the GPU to hold the data.
         let water_vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Water vertices"),
             contents: bytemuck::cast_slice(&water_vertices),
-            usage: wgpu::BufferUsages::BLAS_INPUT | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::BLAS_INPUT | wgpu::BufferUsages::STORAGE,
         });
         
         let blas_desc = rt::CreateBlasDescriptor {
             label: None,
-            flags: AccelerationStructureBuildFlags::PREFER_FAST_BUILD,
+            flags: AccelerationStructureBuildFlags::PREFER_FAST_TRACE,
             update_mode: AccelerationStructureUpdateMode::Build,
         };
 
@@ -481,6 +489,7 @@ impl crate::framework::Example for Example {
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
+        //panic!("success");
         // Done
         Example {
             water_blas,
