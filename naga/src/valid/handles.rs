@@ -397,8 +397,7 @@ impl super::Validator {
             crate::Expression::RayQueryGetIntersection {
                 query,
                 committed: _,
-            }
-            | crate::Expression::RayQueryVertexPositions { query } => {
+            } => {
                 handle.check_dep(query)?;
             }
         }
@@ -529,8 +528,8 @@ impl super::Validator {
                         validate_expr(acceleration_structure)?;
                         validate_expr(descriptor)?;
                     }
-                    crate::RayQueryFunction::ReturnHitVertex { result } => {
-                        validate_expr(result)?;
+                    crate::RayQueryFunction::WriteHitVertex { write, committed: _ } => {
+                        validate_expr(write)?;
                     }
                     crate::RayQueryFunction::Proceed { result } => {
                         validate_expr(result)?;

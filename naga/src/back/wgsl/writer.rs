@@ -1681,8 +1681,7 @@ impl<W: Write> Writer<W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. }
-            | Expression::RayQueryVertexPositions { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } => unreachable!(),
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }
