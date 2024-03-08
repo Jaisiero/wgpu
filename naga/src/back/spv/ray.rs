@@ -108,7 +108,7 @@ impl<'w> BlockContext<'w> {
                 }
                 let bool_word = self.writer.get_constant_scalar(crate::Literal::Bool(committed));
                 let write_type_id = self.get_expression_type_id(&self.fun_info[write].ty);
-
+                println!("{}, {}, {}", bool_word, write_type_id, query_id);
                 block
                     .body
                     .push(Instruction::ray_query_return_vertex_position(
