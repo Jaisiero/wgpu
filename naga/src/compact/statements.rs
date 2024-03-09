@@ -141,9 +141,6 @@ impl FunctionTracer<'_> {
             Qf::Proceed { result } => {
                 self.expressions_used.insert(result);
             }
-            Qf::ReturnHitVertex { result } => {
-                self.expressions_used.insert(result);
-            }
             Qf::Terminate => {}
         }
     }
@@ -293,9 +290,6 @@ impl FunctionMap {
             } => {
                 self.expressions.adjust(acceleration_structure);
                 self.expressions.adjust(descriptor);
-            }
-            Qf::ReturnHitVertex { ref mut result } => {
-                self.expressions.adjust(result);
             }
             Qf::Proceed { ref mut result } => {
                 self.expressions.adjust(result);

@@ -1420,7 +1420,10 @@ impl<'w> BlockContext<'w> {
                 }
                 self.write_ray_query_get_intersection(query, block)
             }
-            crate::Expression::RayQueryVertexPositions { query } => {
+            crate::Expression::RayQueryVertexPositions { query, committed } => {
+                if !committed {
+                    return Err(Error::FeatureNotImplemented("candidate intersection"));
+                }
                 self.write_ray_query_return_vertex_position(query, block)
             }
         };

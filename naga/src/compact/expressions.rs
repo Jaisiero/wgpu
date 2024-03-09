@@ -190,7 +190,10 @@ impl<'tracer> ExpressionTracer<'tracer> {
                     query,
                     committed: _,
                 } => self.expressions_used.insert(query),
-                Ex::RayQueryVertexPositions { query } => self.expressions_used.insert(query),
+                Ex::RayQueryVertexPositions {
+                    query,
+                    committed: _,
+                } => self.expressions_used.insert(query),
             }
         }
     }
@@ -350,7 +353,10 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
-            Ex::RayQueryVertexPositions { ref mut query } => adjust(query),
+            Ex::RayQueryVertexPositions {
+                ref mut query,
+                committed: _,
+            } => adjust(query),
         }
     }
 

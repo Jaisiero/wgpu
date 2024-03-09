@@ -740,7 +740,10 @@ impl FunctionInfo {
                 non_uniform_result: self.add_ref(query),
                 requirements: UniformityRequirements::empty(),
             },
-            E::RayQueryVertexPositions { query } => Uniformity {
+            E::RayQueryVertexPositions {
+                query,
+                committed: _,
+            } => Uniformity {
                 non_uniform_result: self.add_ref(query),
                 requirements: UniformityRequirements::empty(),
             },

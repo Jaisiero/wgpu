@@ -1583,7 +1583,10 @@ pub enum Expression {
     /// Get the Positions of the triangle hit by the [`RayQuery`]
     ///
     /// [`RayQuery`]: Statement::RayQuery
-    RayQueryVertexPositions { query: Handle<Expression> },
+    RayQueryVertexPositions {
+        query: Handle<Expression>,
+        committed: bool,
+    },
 
     /// Result of a [`Proceed`] [`RayQuery`] statement.
     ///
@@ -1665,20 +1668,6 @@ pub enum RayQueryFunction {
     /// [`query`]: Statement::RayQuery::query
     /// [`Bool`]: ScalarKind::Bool
     Proceed {
-        result: Handle<Expression>,
-    },
-
-    ReturnHitVertex {
-        /// Return the vertex position of the triangle hit by the statement's [`query`] operand
-        ///
-        /// After executing this statement the `result` expression is a
-        /// [`Array`] of the positions of the three points of the triangle,
-        /// given in ['vec3'] of [`F32`]
-        ///
-        /// [`query`]: Statement::RayQuery::query
-        /// [`Array`]: TypeInner::Array
-        /// [`vec3`]: TypeInner::Vector
-        /// [`F32`]: ScalarKind::Float
         result: Handle<Expression>,
     },
 

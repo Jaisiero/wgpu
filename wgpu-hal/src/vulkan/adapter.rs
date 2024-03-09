@@ -3,12 +3,12 @@ use super::conv;
 use ash::{extensions::khr, vk};
 use parking_lot::Mutex;
 
+use bitflags::Flags;
 use std::{
     collections::BTreeMap,
     ffi::CStr,
     sync::{atomic::AtomicIsize, Arc},
 };
-use bitflags::Flags;
 
 fn depth_stencil_required_flags() -> vk::FormatFeatureFlags {
     vk::FormatFeatureFlags::SAMPLED_IMAGE | vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT
@@ -42,7 +42,7 @@ pub struct PhysicalDeviceFeatures {
     ray_query: Option<vk::PhysicalDeviceRayQueryFeaturesKHR>,
     zero_initialize_workgroup_memory:
         Option<vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures>,
-    position_fetch: Option<vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR>
+    position_fetch: Option<vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR>,
 }
 
 // This is safe because the structs have `p_next: *mut c_void`, which we null out/never read.
@@ -356,15 +356,17 @@ impl PhysicalDeviceFeatures {
             } else {
                 None
             },
-            position_fetch: if enabled_extensions.contains(&vk::KhrRayTracingPositionFetchFn::name()) {
+            position_fetch: if enabled_extensions
+                .contains(&vk::KhrRayTracingPositionFetchFn::name())
+            {
                 Some(
                     vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::builder()
                         .ray_tracing_position_fetch(true)
-                        .build()
+                        .build(),
                 )
             } else {
                 None
-            }
+            },
         }
     }
 
@@ -498,7 +500,7 @@ impl PhysicalDeviceFeatures {
         );
         features.set(
             F::RAY_HIT_VERTEX_RETURN,
-            caps.supports_extension(vk::KhrRayTracingPositionFetchFn::name())
+            caps.supports_extension(vk::KhrRayTracingPositionFetchFn::name()),
         );
 
         let intel_windows = caps.properties.vendor_id == db::intel::VENDOR && cfg!(windows);
@@ -811,8 +813,8 @@ impl PhysicalDeviceCapabilities {
         if requested_features.contains(wgt::Features::RAY_QUERY) {
             extensions.push(vk::KhrRayQueryFn::name());
         }
-        
-        if requested_features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) { 
+
+        if requested_features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) {
             extensions.push(vk::KhrRayTracingPositionFetchFn::name())
         }
 
@@ -1658,9 +1660,11 @@ impl crate::Adapter<super::Api> for super::Adapter {
         let enabled_core = enabled_phd_features.core.clone();
         let info = enabled_phd_features
             .add_to_device_create_builder(pre_info)
-            .push_next(&mut vk::PhysicalDeviceFeatures2::builder()
-                .features(enabled_core)
-                .build())
+            .push_next(
+                &mut vk::PhysicalDeviceFeatures2::builder()
+                    .features(enabled_core)
+                    .build(),
+            )
             .build();
         let raw_device = {
             profiling::scope!("vkCreateDevice");

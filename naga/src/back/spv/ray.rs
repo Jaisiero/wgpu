@@ -102,21 +102,6 @@ impl<'w> BlockContext<'w> {
                     .body
                     .push(Instruction::ray_query_proceed(result_type_id, id, query_id));
             }
-            crate::RayQueryFunction::WriteHitVertex { write, committed } => {
-                if !committed {
-                    unimplemented!()
-                }
-                let bool_word = self.writer.get_constant_scalar(crate::Literal::Bool(committed));
-                let write_type_id = self.get_expression_type_id(&self.fun_info[write].ty);
-
-                block
-                    .body
-                    .push(Instruction::ray_query_return_vertex_position(
-                        write_type_id,
-                        bool_word,
-                        query_id,
-                    ));
-            }
             crate::RayQueryFunction::Terminate => {}
         }
     }
@@ -281,22 +266,23 @@ impl<'w> BlockContext<'w> {
     ) -> spirv::Word {
         let query_id = self.cached[query];
         let id = self.gen_id();
-
+        let result = self
+            .ir_module
+            .special_types
+            .ray_vertex_return
+            .expect("type should have been populated");
+        let bool_id = self.writer.get_constant_scalar(crate::Literal::Bool(true));
         block
             .body
             .push(Instruction::ray_query_return_vertex_position(
                 *self
                     .writer
                     .lookup_type
-                    .get(&LookupType::Handle(
-                        self.ir_module
-                            .special_types
-                            .ray_vertex_return
-                            .expect("type should have been populated"),
-                    ))
+                    .get(&LookupType::Handle(result))
                     .expect("type should have been populated"),
                 id,
                 query_id,
+                bool_id,
             ));
         id
     }
