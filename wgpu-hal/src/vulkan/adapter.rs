@@ -3,7 +3,6 @@ use super::conv;
 use ash::{extensions::khr, vk};
 use parking_lot::Mutex;
 
-use bitflags::Flags;
 use std::{
     collections::BTreeMap,
     ffi::CStr,
