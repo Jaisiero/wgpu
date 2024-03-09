@@ -3566,7 +3566,8 @@ impl<'a, W: Write> Writer<'a, W> {
                 write!(self.out, ".length())")?
             }
             // not supported yet
-            Expression::RayQueryGetIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. }
+            | Expression::RayQueryVertexPositions { .. } => unreachable!(),
         }
 
         Ok(())

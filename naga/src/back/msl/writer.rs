@@ -1992,6 +1992,9 @@ impl<W: Write> Writer<W> {
                     write!(self.out, ")")?;
                 }
             }
+            crate::Expression::RayQueryVertexPositions { .. } => {
+                unimplemented!()
+            }
             crate::Expression::RayQueryGetIntersection { query, committed } => {
                 if context.lang_version < (2, 4) {
                     return Err(Error::UnsupportedRayTracing);
@@ -3039,7 +3042,7 @@ impl<W: Write> Writer<W> {
                             self.put_expression(query, &context.expression, true)?;
                             writeln!(self.out, ".{RAY_QUERY_FIELD_READY} = false;")?;
                         }
-                        crate::RayQueryFunction::WriteHitVertex { .. } => {
+                        crate::RayQueryFunction::ReturnHitVertex { .. } => {
                             unimplemented!("metal does not support return hit vertex")
                         }
                         crate::RayQueryFunction::Terminate => {

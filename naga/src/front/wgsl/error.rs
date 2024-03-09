@@ -195,7 +195,6 @@ pub enum Error<'a> {
     InvalidAtomicPointer(Span),
     InvalidAtomicOperandType(Span),
     InvalidRayQueryPointer(Span),
-    InvalidRayVertexReturnArg(Span),
     Pointer(&'static str, Span),
     NotPointer(Span),
     NotReference(&'static str, Span),
@@ -551,11 +550,6 @@ impl<'a> Error<'a> {
             Error::InvalidRayQueryPointer(span) => ParseError {
                 message: "ray query operation is done on a pointer to a non-ray-query".to_string(),
                 labels: vec![(span, "ray query pointer is invalid".into())],
-                notes: vec![],
-            },
-            Error::InvalidRayVertexReturnArg(span) => ParseError {
-                message: "write vertex positions is done on a non array".to_string(),
-                labels: vec![(span, "argument into vertex return is invalid".into())],
                 notes: vec![],
             },
             Error::NotPointer(span) => ParseError {

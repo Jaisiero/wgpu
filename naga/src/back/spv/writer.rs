@@ -1,4 +1,11 @@
-use super::{block::DebugInfoInner, helpers::{contains_builtin, global_needs_wrapper, map_storage_class}, make_local, Block, BlockContext, CachedConstant, CachedExpressions, DebugInfo, EntryPointContext, Error, Function, FunctionArgument, GlobalVariable, IdGenerator, Instruction, LocalType, LocalVariable, LogicalLayout, LookupFunctionType, LookupType, LoopContext, Options, PhysicalLayout, PipelineOptions, ResultMember, Writer, WriterFlags, BITS_PER_BYTE};
+use super::{
+    block::DebugInfoInner,
+    helpers::{contains_builtin, global_needs_wrapper, map_storage_class},
+    make_local, Block, BlockContext, CachedConstant, CachedExpressions, DebugInfo,
+    EntryPointContext, Error, Function, FunctionArgument, GlobalVariable, IdGenerator, Instruction,
+    LocalType, LocalVariable, LogicalLayout, LookupFunctionType, LookupType, LoopContext, Options,
+    PhysicalLayout, PipelineOptions, ResultMember, Writer, WriterFlags, BITS_PER_BYTE,
+};
 use crate::{
     arena::{Handle, UniqueArena},
     back::spv::BindingInfo,

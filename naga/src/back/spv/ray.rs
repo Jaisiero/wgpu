@@ -108,7 +108,7 @@ impl<'w> BlockContext<'w> {
                 }
                 let bool_word = self.writer.get_constant_scalar(crate::Literal::Bool(committed));
                 let write_type_id = self.get_expression_type_id(&self.fun_info[write].ty);
-                println!("{}, {}, {}", bool_word, write_type_id, query_id);
+
                 block
                     .body
                     .push(Instruction::ray_query_return_vertex_position(
@@ -271,6 +271,33 @@ impl<'w> BlockContext<'w> {
                 world_to_object_id,
             ],
         ));
+        id
+    }
+
+    pub(super) fn write_ray_query_return_vertex_position(
+        &mut self,
+        query: Handle<crate::Expression>,
+        block: &mut Block,
+    ) -> spirv::Word {
+        let query_id = self.cached[query];
+        let id = self.gen_id();
+
+        block
+            .body
+            .push(Instruction::ray_query_return_vertex_position(
+                *self
+                    .writer
+                    .lookup_type
+                    .get(&LookupType::Handle(
+                        self.ir_module
+                            .special_types
+                            .ray_vertex_return
+                            .expect("type should have been populated"),
+                    ))
+                    .expect("type should have been populated"),
+                id,
+                query_id,
+            ));
         id
     }
 }

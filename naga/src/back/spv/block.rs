@@ -1420,6 +1420,9 @@ impl<'w> BlockContext<'w> {
                 }
                 self.write_ray_query_get_intersection(query, block)
             }
+            crate::Expression::RayQueryVertexPositions { query } => {
+                self.write_ray_query_return_vertex_position(query, block)
+            }
         };
 
         self.cached[expr_handle] = id;

@@ -276,9 +276,9 @@ impl StatementGraph {
                             self.emits.push((id, result));
                             "RayQueryProceed"
                         }
-                        crate::RayQueryFunction::WriteHitVertex { write, committed } => {
-                            self.dependencies.push((id, write, "write"));
-                            if committed { "writeCommittedHitVertexPositions" } else { "writeCandidateHitVertexPositions" }
+                        crate::RayQueryFunction::ReturnHitVertex { result } => {
+                            self.emits.push((id, result));
+                            "HitVertexPositions"
                         }
                         crate::RayQueryFunction::Terminate => "RayQueryTerminate",
                     }
@@ -589,6 +589,10 @@ fn write_function_expressions(
                 edges.insert("", query);
                 let ty = if committed { "Committed" } else { "Candidate" };
                 (format!("rayQueryGet{}Intersection", ty).into(), 4)
+            }
+            E::RayQueryVertexPositions { query } => {
+                edges.insert("", query);
+                ("HitVertexPositions".into(), 4)
             }
         };
 

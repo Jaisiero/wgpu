@@ -883,6 +883,13 @@ impl<'a> ResolveContext<'a> {
                     .ok_or(ResolveError::MissingSpecialType)?;
                 TypeResolution::Handle(result)
             }
+            crate::Expression::RayQueryVertexPositions { .. } => {
+                let result = self
+                    .special_types
+                    .ray_vertex_return
+                    .ok_or(ResolveError::MissingSpecialType)?;
+                TypeResolution::Handle(result)
+            }
         })
     }
 }
