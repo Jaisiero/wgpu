@@ -12,6 +12,7 @@ use std::{
     ptr,
     sync::Arc,
 };
+use bitflags::Flags;
 
 impl super::DeviceShared {
     pub(super) unsafe fn set_object_name(
@@ -320,7 +321,7 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
 
         if flags.contains(gpu_alloc::AllocationFlags::DEVICE_ADDRESS) {
             info_flags = vk::MemoryAllocateFlagsInfo::builder()
-                .flags(vk::MemoryAllocateFlags::DEVICE_ADDRESS);
+                .flags(vk::MemoryAllocateFlags::DEVICE_ADDRESS | vk::MemoryAllocateFlags::DEVICE_ADDRESS_CAPTURE_REPLAY);
             info = info.push_next(&mut info_flags);
         }
 
@@ -844,11 +845,18 @@ impl crate::Device<super::Api> for super::Device {
         &self,
         desc: &crate::BufferDescriptor,
     ) -> Result<super::Buffer, crate::DeviceError> {
-        let vk_info = vk::BufferCreateInfo::builder()
+        let mut vk_info = vk::BufferCreateInfo::builder()
             .size(desc.size)
             .usage(conv::map_buffer_usage(desc.usage))
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
+        if desc.usage.intersects(
+            crate::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT
+                | crate::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT
+                | crate::BufferUses::ACCELERATION_STRUCTURE_SCRATCH,
+        ) {
+            vk_info = vk_info.flags(vk::BufferCreateFlags::DEVICE_ADDRESS_CAPTURE_REPLAY);
+        }
         let raw = unsafe { self.shared.raw.create_buffer(&vk_info, None)? };
         let req = unsafe { self.shared.raw.get_buffer_memory_requirements(raw) };
 

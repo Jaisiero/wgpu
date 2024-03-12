@@ -324,6 +324,7 @@ impl PhysicalDeviceFeatures {
                 Some(
                     vk::PhysicalDeviceBufferDeviceAddressFeaturesKHR::builder()
                         .buffer_device_address(true)
+                        .buffer_device_address_capture_replay(true)
                         .build(),
                 )
             } else {
