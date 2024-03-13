@@ -341,7 +341,10 @@ impl Global {
                     raw: Mutex::new(Some(e)),
                     device: device.clone(),
                     size,
-                    info: ResourceInfo::new("Raytracing scratch buffer", Some(device.tracker_indices.buffers.clone())),
+                    info: ResourceInfo::new(
+                        "Raytracing scratch buffer",
+                        Some(device.tracker_indices.buffers.clone()),
+                    ),
                     is_coherent: mapping.is_coherent,
                 })))
             }

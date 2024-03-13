@@ -173,7 +173,12 @@ impl TlasInstance {
     }
     /// [TlasInstance::new] but with a default transformation matrix
     pub fn new_untransformed(blas: &Blas, custom_index: u32, mask: u8) -> Self {
-        Self::new(blas, [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0], custom_index, mask)
+        Self::new(
+            blas,
+            [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            custom_index,
+            mask,
+        )
     }
 
     /// Set the bottom level acceleration structure.

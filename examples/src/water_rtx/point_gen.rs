@@ -37,7 +37,6 @@ pub struct TerrainVertexAttributes {
     position: [f32; 3],
     // commenting this out fixes problem
     //normal: [f32; 3],
-
     color: u32,
 }
 
@@ -180,7 +179,10 @@ impl HexTerrainMesh {
                     .map(|((pos, normal), colour)| TerrainVertexAttributes {
                         position: *pos.as_ref(),
                         //normal,
-                        color: colour[0] as u32 | (colour[1] as u32 >> 8) | (colour[2] as u32 >> 16) | (colour[3] as u32 >> 24)
+                        color: colour[0] as u32
+                            | (colour[1] as u32 >> 8)
+                            | (colour[2] as u32 >> 16)
+                            | (colour[3] as u32 >> 24),
                     }),
             );
         };
@@ -255,17 +257,16 @@ impl HexWaterMesh {
             let ca = calculate_differences(b, c, a);
             let ab = calculate_differences(c, a, b);
 
-            vertices.extend(
-                [a, b, c]
-                    .iter()
-                    .zip([bc, ca, ab].iter())
-                    .map(|(&position, &offsets)| {
-                        let position = [position[0] as f32 * 0.5, 0.0, position[1] as f32 * Self::Y_SCALE];
-                        WaterVertexAttributes {
-                            position,
-                        }
-                    }),
-            );
+            vertices.extend([a, b, c].iter().zip([bc, ca, ab].iter()).map(
+                |(&position, &offsets)| {
+                    let position = [
+                        position[0] as f32 * 0.5,
+                        0.0,
+                        position[1] as f32 * Self::Y_SCALE,
+                    ];
+                    WaterVertexAttributes { position }
+                },
+            ));
         };
 
         for i in -self.half_size..=self.half_size {

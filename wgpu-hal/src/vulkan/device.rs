@@ -12,7 +12,6 @@ use std::{
     ptr,
     sync::Arc,
 };
-use bitflags::Flags;
 
 impl super::DeviceShared {
     pub(super) unsafe fn set_object_name(
@@ -320,8 +319,10 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
         let mut info_flags;
 
         if flags.contains(gpu_alloc::AllocationFlags::DEVICE_ADDRESS) {
-            info_flags = vk::MemoryAllocateFlagsInfo::builder()
-                .flags(vk::MemoryAllocateFlags::DEVICE_ADDRESS | vk::MemoryAllocateFlags::DEVICE_ADDRESS_CAPTURE_REPLAY);
+            info_flags = vk::MemoryAllocateFlagsInfo::builder().flags(
+                vk::MemoryAllocateFlags::DEVICE_ADDRESS
+                    | vk::MemoryAllocateFlags::DEVICE_ADDRESS_CAPTURE_REPLAY,
+            );
             info = info.push_next(&mut info_flags);
         }
 

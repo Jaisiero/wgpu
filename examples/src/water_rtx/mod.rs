@@ -3,11 +3,14 @@ mod point_gen;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
 use nanorand::{Rng, WyRand};
-use std::{borrow::Cow, f32::consts, iter, mem};
 use std::time::Instant;
-use wgpu::{Features, Limits, ray_tracing as rt, util::DeviceExt, VertexFormat};
+use std::{borrow::Cow, f32::consts, iter, mem};
 use wgpu::hal::AccelerationStructureBuildFlags;
-use wgpu::ray_tracing::{AccelerationStructureUpdateMode, BlasTriangleGeometrySizeDescriptor, CommandEncoderRayTracing, DeviceRayTracing};
+use wgpu::ray_tracing::{
+    AccelerationStructureUpdateMode, BlasTriangleGeometrySizeDescriptor, CommandEncoderRayTracing,
+    DeviceRayTracing,
+};
+use wgpu::{ray_tracing as rt, util::DeviceExt, Features, Limits, VertexFormat};
 
 ///
 /// Radius of the terrain.
@@ -93,17 +96,9 @@ impl Example {
     /// Creates the view matrices, and the corrected projection matrix.
     ///
     fn generate_matrices(aspect_ratio: f32) -> Matrices {
-        let projection = glam::Mat4::perspective_rh(
-            59.0_f32.to_radians(),
-            aspect_ratio,
-            0.001,
-            1000.0,
-        );
-        let view = glam::Mat4::look_at_rh(
-            CAMERA,
-            glam::Vec3::ZERO,
-            glam::Vec3::Y,
-        );
+        let projection =
+            glam::Mat4::perspective_rh(59.0_f32.to_radians(), aspect_ratio, 0.001, 1000.0);
+        let view = glam::Mat4::look_at_rh(CAMERA, glam::Vec3::ZERO, glam::Vec3::Y);
 
         let scale = glam::Mat4::from_scale(glam::Vec3::new(8.0, 1.5, 8.0));
 
@@ -201,10 +196,7 @@ impl Example {
             label: Some("Water Bind Group"),
         });
 
-        (
-            depth_view,
-            uniform_bind_group,
-        )
+        (depth_view, uniform_bind_group)
     }
 }
 
@@ -223,7 +215,6 @@ impl crate::framework::Example for Example {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> Self {
-
         device.limits();
         let start = Instant::now();
 
@@ -288,8 +279,13 @@ impl crate::framework::Example for Example {
         // Generate the buffer data.
         let mut terrain_vertices = terrain.make_buffer_data();
 
-        println!("size {}", terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>());
-        if (terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>()) > MAX_SIZE {
+        println!(
+            "size {}",
+            terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>()
+        );
+        if (terrain_vertices.len() * mem::size_of::<point_gen::TerrainVertexAttributes>())
+            > MAX_SIZE
+        {
             let new_len = MAX_SIZE / mem::size_of::<point_gen::TerrainVertexAttributes>();
             println!("new_len {new_len}");
             let new_len = new_len - (new_len % 3);
@@ -302,21 +298,26 @@ impl crate::framework::Example for Example {
             contents: bytemuck::cast_slice(&water_vertices),
             usage: wgpu::BufferUsages::BLAS_INPUT | wgpu::BufferUsages::STORAGE,
         });
-        
+
         let blas_desc = rt::CreateBlasDescriptor {
             label: None,
             flags: AccelerationStructureBuildFlags::PREFER_FAST_TRACE,
             update_mode: AccelerationStructureUpdateMode::Build,
         };
 
-        let water_geo_size= rt::BlasTriangleGeometrySizeDescriptor {
+        let water_geo_size = rt::BlasTriangleGeometrySizeDescriptor {
             vertex_format: wgpu::VertexFormat::Float32x3,
             vertex_count: water_vertices.len() as u32,
             index_format: None,
             index_count: None,
             flags: rt::AccelerationStructureGeometryFlags::OPAQUE,
         };
-        let water_blas = device.create_blas(&blas_desc, rt::BlasGeometrySizeDescriptors::Triangles { desc: vec![water_geo_size.clone()], });
+        let water_blas = device.create_blas(
+            &blas_desc,
+            rt::BlasGeometrySizeDescriptors::Triangles {
+                desc: vec![water_geo_size.clone()],
+            },
+        );
 
         let terrain_vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Terrain vertices"),
@@ -332,7 +333,12 @@ impl crate::framework::Example for Example {
             flags: rt::AccelerationStructureGeometryFlags::OPAQUE,
         };
         println!("{}, {}", water_vertices.len(), terrain_vertices.len());
-        let terrain_blas = device.create_blas(&blas_desc, rt::BlasGeometrySizeDescriptors::Triangles { desc: vec![terrain_geo_size.clone()], });
+        let terrain_blas = device.create_blas(
+            &blas_desc,
+            rt::BlasGeometrySizeDescriptors::Triangles {
+                desc: vec![terrain_geo_size.clone()],
+            },
+        );
 
         let tlas = device.create_tlas(&rt::CreateTlasDescriptor {
             label: None,
@@ -341,60 +347,71 @@ impl crate::framework::Example for Example {
             update_mode: AccelerationStructureUpdateMode::Build,
         });
 
-        let vertex_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
+        let vertex_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::AccelerationStructure,
                     count: None,
-                },
-            ],
-        });
+                }],
+            });
 
         let vertex_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &vertex_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::AccelerationStructure(&tlas),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::AccelerationStructure(&tlas),
+            }],
         });
         let mut tlas_package = rt::TlasPackage::new(tlas, 2);
 
-        *tlas_package.get_mut_single(0).unwrap() = Some(rt::TlasInstance::new_untransformed(&terrain_blas, 0, 0xff));
-        *tlas_package.get_mut_single(1).unwrap() = Some(rt::TlasInstance::new_untransformed(&water_blas, 0, 0xff));
+        *tlas_package.get_mut_single(0).unwrap() =
+            Some(rt::TlasInstance::new_untransformed(&terrain_blas, 0, 0xff));
+        *tlas_package.get_mut_single(1).unwrap() =
+            Some(rt::TlasInstance::new_untransformed(&water_blas, 0, 0xff));
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        encoder.build_acceleration_structures(vec![
-            rt::BlasBuildEntry {
-                blas: &water_blas,
-                geometry: rt::BlasGeometries::TriangleGeometries(vec![rt::BlasTriangleGeometry {
-                    size: &water_geo_size,
-                    vertex_buffer: &water_vertex_buf,
-                    first_vertex: 0,
-                    vertex_stride: mem::size_of::<point_gen::WaterVertexAttributes>() as wgpu::BufferAddress,
-                    index_buffer: None,
-                    index_buffer_offset: None,
-                    transform_buffer: None,
-                    transform_buffer_offset: None,
-                }]) },
-            rt::BlasBuildEntry {
-                blas: &terrain_blas,
-                geometry: rt::BlasGeometries::TriangleGeometries(vec![rt::BlasTriangleGeometry {
-                    size: &terrain_geo_size,
-                    vertex_buffer: &terrain_vertex_buf,
-                    first_vertex: 0,
-                    vertex_stride: mem::size_of::<point_gen::TerrainVertexAttributes>() as wgpu::BufferAddress,
-                    index_buffer: None,
-                    index_buffer_offset: None,
-                    transform_buffer: None,
-                    transform_buffer_offset: None,
-                }]) }
-        ].iter(), iter::once(&tlas_package));
+        encoder.build_acceleration_structures(
+            vec![
+                rt::BlasBuildEntry {
+                    blas: &water_blas,
+                    geometry: rt::BlasGeometries::TriangleGeometries(vec![
+                        rt::BlasTriangleGeometry {
+                            size: &water_geo_size,
+                            vertex_buffer: &water_vertex_buf,
+                            first_vertex: 0,
+                            vertex_stride: mem::size_of::<point_gen::WaterVertexAttributes>()
+                                as wgpu::BufferAddress,
+                            index_buffer: None,
+                            index_buffer_offset: None,
+                            transform_buffer: None,
+                            transform_buffer_offset: None,
+                        },
+                    ]),
+                },
+                rt::BlasBuildEntry {
+                    blas: &terrain_blas,
+                    geometry: rt::BlasGeometries::TriangleGeometries(vec![
+                        rt::BlasTriangleGeometry {
+                            size: &terrain_geo_size,
+                            vertex_buffer: &terrain_vertex_buf,
+                            first_vertex: 0,
+                            vertex_stride: mem::size_of::<point_gen::TerrainVertexAttributes>()
+                                as wgpu::BufferAddress,
+                            index_buffer: None,
+                            index_buffer_offset: None,
+                            transform_buffer: None,
+                            transform_buffer_offset: None,
+                        },
+                    ]),
+                },
+            ]
+            .iter(),
+            iter::once(&tlas_package),
+        );
         queue.submit(Some(encoder.finish()));
 
         // Create the bind group layout. This is what our uniforms will look like.
@@ -410,7 +427,7 @@ impl crate::framework::Example for Example {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: wgpu::BufferSize::new(
-                                mem::size_of::<RTUniforms>() as _,
+                                mem::size_of::<RTUniforms>() as _
                             ),
                         },
                         count: None,
@@ -462,10 +479,7 @@ impl crate::framework::Example for Example {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[
-                &uniform_bind_group_layout,
-                &vertex_bind_group_layout,
-            ],
+            bind_group_layouts: &[&uniform_bind_group_layout, &vertex_bind_group_layout],
             push_constant_ranges: &[],
         });
 
