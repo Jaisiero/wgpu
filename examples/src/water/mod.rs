@@ -1,6 +1,5 @@
 mod point_gen;
 
-use crate::water::point_gen::TerrainVertexAttributes;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use nanorand::{Rng, WyRand};

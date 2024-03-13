@@ -35,9 +35,6 @@ const SQRT_3: f32 = 1.7320508;
 #[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
 pub struct TerrainVertexAttributes {
     position: [f32; 3],
-    // commenting this out fixes problem
-    //normal: [f32; 3],
-    color: u32,
 }
 
 #[repr(C)]
@@ -176,13 +173,8 @@ impl HexTerrainMesh {
                             .chain(std::iter::repeat::<[f32; 3]>(n2.into())),
                     )
                     .zip(std::iter::repeat(c))
-                    .map(|((pos, normal), colour)| TerrainVertexAttributes {
+                    .map(|((pos, _normal), _colour)| TerrainVertexAttributes {
                         position: *pos.as_ref(),
-                        //normal,
-                        color: colour[0] as u32
-                            | (colour[1] as u32 >> 8)
-                            | (colour[2] as u32 >> 16)
-                            | (colour[3] as u32 >> 24),
                     }),
             );
         };
@@ -236,7 +228,7 @@ impl HexWaterMesh {
         }
     }
 
-    const Y_SCALE: f32 = 0.86602540378443864676372317075294;
+    const Y_SCALE: f32 = 0.8660254;
     ///
     /// Generates the points required to render the mesh.
     ///
@@ -258,7 +250,7 @@ impl HexWaterMesh {
             let ab = calculate_differences(c, a, b);
 
             vertices.extend([a, b, c].iter().zip([bc, ca, ab].iter()).map(
-                |(&position, &offsets)| {
+                |(&position, _)| {
                     let position = [
                         position[0] as f32 * 0.5,
                         0.0,

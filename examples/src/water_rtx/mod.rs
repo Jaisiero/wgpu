@@ -1,16 +1,16 @@
 mod point_gen;
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 use nanorand::{Rng, WyRand};
 use std::time::Instant;
-use std::{borrow::Cow, f32::consts, iter, mem};
+use std::{borrow::Cow, iter, mem};
 use wgpu::hal::AccelerationStructureBuildFlags;
 use wgpu::ray_tracing::{
-    AccelerationStructureUpdateMode, BlasTriangleGeometrySizeDescriptor, CommandEncoderRayTracing,
+    AccelerationStructureUpdateMode, CommandEncoderRayTracing,
     DeviceRayTracing,
 };
-use wgpu::{ray_tracing as rt, util::DeviceExt, Features, Limits, VertexFormat};
+use wgpu::{ray_tracing as rt, util::DeviceExt, Features, Limits};
 
 ///
 /// Radius of the terrain.
@@ -30,7 +30,6 @@ const CAMERA: Vec3 = glam::Vec3::new(-200.0, 70.0, 200.0);
 
 struct Matrices {
     view: glam::Mat4,
-    flipped_view: glam::Mat4,
     projection: glam::Mat4,
 }
 
@@ -50,12 +49,6 @@ struct WaterUniforms {
     height: [f32; 4],
 }
 
-struct Uniforms {
-    terrain_normal: TerrainUniforms,
-    terrain_flipped: TerrainUniforms,
-    water: WaterUniforms,
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug)]
 struct RTUniforms {
@@ -64,13 +57,6 @@ struct RTUniforms {
 }
 
 struct Example {
-    water_blas: rt::Blas,
-    water_vertex_buf: wgpu::Buffer,
-    water_vertex_count: usize,
-
-    terrain_blas: rt::Blas,
-    terrain_vertex_buf: wgpu::Buffer,
-    terrain_vertex_count: usize,
 
     depth_buffer: wgpu::TextureView,
 
@@ -88,7 +74,6 @@ struct Example {
 
     vertex_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
-    tlas_package: rt::TlasPackage,
 }
 
 impl Example {
@@ -104,17 +89,8 @@ impl Example {
 
         let reg_view = view * scale;
 
-        let flipped_view = glam::Mat4::look_at_rh(
-            glam::Vec3::new(CAMERA.x, -CAMERA.y, CAMERA.z),
-            glam::Vec3::ZERO,
-            glam::Vec3::Y,
-        );
-
-        let flipped_view = flipped_view * scale;
-
         Matrices {
             view: reg_view,
-            flipped_view,
             projection,
         }
     }
@@ -122,7 +98,6 @@ impl Example {
     fn generate_uniforms(width: u32, height: u32) -> RTUniforms {
         let Matrices {
             view,
-            flipped_view,
             projection,
         } = Self::generate_matrices(width as f32 / height as f32);
 
@@ -218,13 +193,7 @@ impl crate::framework::Example for Example {
         device.limits();
         let start = Instant::now();
 
-        // Size of one water vertex
-        let water_vertex_size = mem::size_of::<point_gen::WaterVertexAttributes>();
-
         let water_vertices = point_gen::HexWaterMesh::generate(SIZE).generate_points();
-
-        // Size of one terrain vertex
-        let terrain_vertex_size = mem::size_of::<point_gen::TerrainVertexAttributes>();
 
         // Noise generation
         let terrain_noise = noise::OpenSimplex::default();
@@ -375,7 +344,7 @@ impl crate::framework::Example for Example {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         encoder.build_acceleration_structures(
-            vec![
+            [
                 rt::BlasBuildEntry {
                     blas: &water_blas,
                     geometry: rt::BlasGeometries::TriangleGeometries(vec![
@@ -508,14 +477,7 @@ impl crate::framework::Example for Example {
         //panic!("success");
         // Done
         Example {
-            water_blas,
-            water_vertex_buf,
-            water_vertex_count: water_vertices.len(),
             uniform_bind_group_layout,
-
-            terrain_blas,
-            terrain_vertex_buf,
-            terrain_vertex_count: terrain_vertices.len(),
 
             depth_buffer,
 
@@ -528,7 +490,6 @@ impl crate::framework::Example for Example {
 
             pipeline,
             vertex_bind_group,
-            tlas_package,
         }
     }
 
