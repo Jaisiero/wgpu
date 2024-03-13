@@ -75,6 +75,7 @@ pub struct BlasBuildEntry<'a> {
 static_assertions::assert_impl_all!(BlasBuildEntry<'_>: WasmNotSendSync);
 
 #[derive(Debug)]
+#[allow(clippy::arc_with_non_send_sync)]
 /// Bottom level acceleration structure.
 /// Used to represent a collection of geometries for ray tracing inside a top level acceleration structure.
 pub struct Blas(Arc<BlasInternal>);
@@ -380,7 +381,7 @@ impl DeviceRayTracing for Device {
             desc,
             sizes,
         );
-
+        #[allow(clippy::arc_with_non_send_sync)]
         Blas(Arc::new(BlasInternal {
             context: Arc::clone(&self.context),
             id,

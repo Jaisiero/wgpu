@@ -249,16 +249,19 @@ impl HexWaterMesh {
             let ca = calculate_differences(b, c, a);
             let ab = calculate_differences(c, a, b);
 
-            vertices.extend([a, b, c].iter().zip([bc, ca, ab].iter()).map(
-                |(&position, _)| {
-                    let position = [
-                        position[0] as f32 * 0.5,
-                        0.0,
-                        position[1] as f32 * Self::Y_SCALE,
-                    ];
-                    WaterVertexAttributes { position }
-                },
-            ));
+            vertices.extend(
+                [a, b, c]
+                    .iter()
+                    .zip([bc, ca, ab].iter())
+                    .map(|(&position, _)| {
+                        let position = [
+                            position[0] as f32 * 0.5,
+                            0.0,
+                            position[1] as f32 * Self::Y_SCALE,
+                        ];
+                        WaterVertexAttributes { position }
+                    }),
+            );
         };
 
         for i in -self.half_size..=self.half_size {

@@ -7,8 +7,7 @@ use std::time::Instant;
 use std::{borrow::Cow, iter, mem};
 use wgpu::hal::AccelerationStructureBuildFlags;
 use wgpu::ray_tracing::{
-    AccelerationStructureUpdateMode, CommandEncoderRayTracing,
-    DeviceRayTracing,
+    AccelerationStructureUpdateMode, CommandEncoderRayTracing, DeviceRayTracing,
 };
 use wgpu::{ray_tracing as rt, util::DeviceExt, Features, Limits};
 
@@ -57,7 +56,6 @@ struct RTUniforms {
 }
 
 struct Example {
-
     depth_buffer: wgpu::TextureView,
 
     current_frame: usize,
@@ -96,10 +94,7 @@ impl Example {
     }
 
     fn generate_uniforms(width: u32, height: u32) -> RTUniforms {
-        let Matrices {
-            view,
-            projection,
-        } = Self::generate_matrices(width as f32 / height as f32);
+        let Matrices { view, projection } = Self::generate_matrices(width as f32 / height as f32);
 
         RTUniforms {
             view_inverse: view.inverse().to_cols_array_2d(),
