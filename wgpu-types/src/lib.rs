@@ -7101,11 +7101,11 @@ pub enum BlasGeometrySizeDescriptors {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 /// Update mode for acceleration structure builds.
 pub enum AccelerationStructureUpdateMode {
-    /// Allwasy perform a full build.
+    /// Always perform a full build.
     Build,
     /// If possible, perform an incremental update.
     /// Not advised for major topology changes.
-    /// (Usefull for e.g. skinning)
+    /// (Useful for e.g. skinning)
     PreferUpdate,
 }
 
@@ -7190,10 +7190,10 @@ bitflags::bitflags!(
 );
 impl_bitflags!(AccelerationStructureGeometryFlags);
 
-/// Alignemnet requirement for transform buffers used in acceleration structure builds
+/// Alignment requirement for transform buffers used in acceleration structure builds
 pub const TRANSFORM_BUFFER_ALIGNMENT: BufferAddress = 16;
 
-/// Alignemnet requirement for instanc buffers used in acceleration structure builds
+/// Alignment requirement for instance buffers used in acceleration structure builds
 pub const INSTANCE_BUFFER_ALIGNMENT: BufferAddress = 16;
 
 pub use send_sync::*;
