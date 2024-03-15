@@ -5,9 +5,9 @@ use glam::Vec3;
 use nanorand::{Rng, WyRand};
 use std::time::Instant;
 use std::{borrow::Cow, iter, mem};
-use wgpu::hal::AccelerationStructureBuildFlags;
 use wgpu::ray_tracing::{
-    AccelerationStructureUpdateMode, CommandEncoderRayTracing, DeviceRayTracing,
+    AccelerationStructureFlags, AccelerationStructureUpdateMode, CommandEncoderRayTracing,
+    DeviceRayTracing,
 };
 use wgpu::{ray_tracing as rt, util::DeviceExt, Features, Limits};
 
@@ -265,7 +265,7 @@ impl crate::framework::Example for Example {
 
         let blas_desc = rt::CreateBlasDescriptor {
             label: None,
-            flags: AccelerationStructureBuildFlags::PREFER_FAST_TRACE,
+            flags: AccelerationStructureFlags::PREFER_FAST_TRACE,
             update_mode: AccelerationStructureUpdateMode::Build,
         };
 
