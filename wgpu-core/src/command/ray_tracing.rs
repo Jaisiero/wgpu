@@ -25,6 +25,7 @@ use parking_lot::{Mutex, RwLockReadGuard};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{cmp::max, iter, num::NonZeroU64, ops::Range, ptr};
+use bitflags::Flags;
 
 use super::BakedCommands;
 
@@ -1257,6 +1258,10 @@ impl Global {
                     .ok_or(BuildAccelerationStructureError::InvalidBlasForInstance(
                         instance.blas_id,
                     ))?;
+
+                if tlas.flags.contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN) && !blas.flags.contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN) {
+                    return Err(BuildAccelerationStructureError::MissingBlasVertexReturn(instance.blas_id, package.tlas_id));
+                }
 
                 instance_buffer_staging_source
                     .extend(tlas_instance_into_bytes::<A>(&instance, blas.handle));

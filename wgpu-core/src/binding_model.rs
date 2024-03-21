@@ -185,6 +185,8 @@ pub enum CreateBindGroupError {
     ResourceUsageConflict(#[from] UsageConflict),
     #[error("Tlas {0:?} is invalid or destroyed")]
     InvalidTlas(TlasId),
+    #[error("Tlas {0:?} is missing flag ALLOW_RAY_HIT_VERTEX_RETURN")]
+    MissingVertexReturnFlag(TlasId),
 }
 
 impl PrettyError for CreateBindGroupError {

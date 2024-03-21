@@ -53,6 +53,7 @@ use std::{
         Arc, Weak,
     },
 };
+use bitflags::Flags;
 
 use super::{
     life::{self, ResourceMaps},
@@ -2289,6 +2290,12 @@ impl<A: HalApi> Device<A> {
                         .acceleration_structures
                         .add_single(&tlas_guard, id)
                         .ok_or(Error::InvalidTlas(id))?;
+
+                    if let wgt::BindingType::AccelerationStructure { vertex_return: true } = decl.ty {
+                        if !tlas.flags.contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN) {
+                            return Err(Error::MissingVertexReturnFlag(id));
+                        }
+                    }
 
                     let raw = tlas.raw.as_ref().ok_or(Error::InvalidTlas(id))?;
 

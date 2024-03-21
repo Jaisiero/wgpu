@@ -29,6 +29,8 @@ pub enum CreateBlasError {
         "Only one of 'index_count' and 'index_format' was provided (either provide both or none)"
     )]
     MissingIndexData,
+    #[error("To use flag ALLOW_RAY_HIT_VERTEX_RETURN device feature RAY_HIT_VERTEX_RETURN must be used too")]
+    MissingVertexReturnFeature,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -37,6 +39,8 @@ pub enum CreateTlasError {
     Device(#[from] DeviceError),
     #[error(transparent)]
     CreateBufferError(#[from] CreateBufferError),
+    #[error("To use flag ALLOW_RAY_HIT_VERTEX_RETURN device feature RAY_HIT_VERTEX_RETURN must be used too")]
+    MissingVertexReturnFeature,
     #[error("Unimplemented Tlas error: this error is not yet implemented")]
     Unimplemented,
 }
@@ -102,6 +106,9 @@ pub enum BuildAccelerationStructureError {
 
     #[error("Buffer {0:?} is missing `TLAS_INPUT` usage flag")]
     MissingTlasInputUsageFlag(BufferId),
+
+    #[error("Blas {0:?} was missing flag ALLOW_RAY_HIT_VERTEX_RETURN while tlas {1:?} had flag")]
+    MissingBlasVertexReturn(BlasId, TlasId),
 }
 
 #[derive(Clone, Debug, Error)]
