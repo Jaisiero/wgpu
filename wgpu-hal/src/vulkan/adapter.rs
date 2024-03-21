@@ -3,7 +3,6 @@ use super::conv;
 use ash::{extensions::khr, vk};
 use parking_lot::Mutex;
 
-use bitflags::Flags;
 use std::{
     collections::BTreeMap,
     ffi::CStr,
@@ -1657,7 +1656,7 @@ impl crate::Adapter<super::Api> for super::Adapter {
         let pre_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&family_infos)
             .enabled_extension_names(&str_pointers);
-        let enabled_core = enabled_phd_features.core.clone();
+        let enabled_core = enabled_phd_features.core;
         let info = enabled_phd_features
             .add_to_device_create_builder(pre_info)
             .push_next(

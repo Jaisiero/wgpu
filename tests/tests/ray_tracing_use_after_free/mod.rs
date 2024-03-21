@@ -1,12 +1,15 @@
 use std::iter;
 use std::mem::size_of;
-use wgpu::include_wgsl;
 use wgpu::ray_tracing::{
     AccelerationStructureUpdateMode, BlasBuildEntry, BlasGeometries, BlasTriangleGeometry,
     CommandEncoderRayTracing, CreateBlasDescriptor, CreateTlasDescriptor, DeviceRayTracing,
     TlasInstance, TlasPackage,
 };
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::{
+    include_wgsl, BindGroupDescriptor, BindGroupEntry, BindingResource, ComputePassDescriptor,
+    ComputePipelineDescriptor,
+};
 use wgpu_macros::gpu_test;
 use wgpu_test::{GpuTestConfiguration, TestParameters, TestingContext};
 use wgt::{
@@ -36,7 +39,9 @@ fn execute(ctx: TestingContext) {
             flags: AccelerationStructureFlags::empty(),
             update_mode: AccelerationStructureUpdateMode::Build,
         },
-        BlasGeometrySizeDescriptors::Triangles { desc: vec![size] },
+        BlasGeometrySizeDescriptors::Triangles {
+            desc: vec![size.clone()],
+        },
     );
     let vertex_buf = ctx.device.create_buffer_init(&BufferInitDescriptor {
         label: None,
@@ -50,7 +55,7 @@ fn execute(ctx: TestingContext) {
         update_mode: AccelerationStructureUpdateMode::Build,
     });
     let mut tlas_package = TlasPackage::new(tlas, 1);
-    *tlas_package.get_mut_single(0) = Some(TlasInstance::new(&blas, [0.0; 12], 0, 0));
+    *tlas_package.get_mut_single(0).unwrap() = Some(TlasInstance::new(&blas, [0.0; 12], 0, 0));
     let mut encoder = ctx
         .device
         .create_command_encoder(&CommandEncoderDescriptor::default());
@@ -80,10 +85,41 @@ fn execute(ctx: TestingContext) {
     let shader = ctx
         .device
         .create_shader_module(include_wgsl!("compute_usage.wgsl"));
+    let compute_pipeline = ctx
+        .device
+        .create_compute_pipeline(&ComputePipelineDescriptor {
+            label: None,
+            layout: None,
+            module: &shader,
+            entry_point: "main",
+        });
+    let bind_group = ctx.device.create_bind_group(&BindGroupDescriptor {
+        label: None,
+        layout: &compute_pipeline.get_bind_group_layout(0),
+        entries: &[BindGroupEntry {
+            binding: 0,
+            resource: BindingResource::AccelerationStructure(tlas_package.tlas()),
+        }],
+    });
+    drop(tlas_package);
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&CommandEncoderDescriptor::default());
+    {
+        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: None,
+            timestamp_writes: None,
+        });
+        compute_pass.set_pipeline(&compute_pipeline);
+        compute_pass.set_bind_group(0, &bind_group, &[]);
+        compute_pass.dispatch_workgroups(1, 1, 1);
+    }
+    ctx.queue.submit(Some(encoder.finish()));
+    panic!()
 }
 
 #[gpu_test]
-static RAY_TRACING: GpuTestConfiguration = GpuTestConfiguration::new()
+static RAY_TRACING_USE_AFTER_FREE: GpuTestConfiguration = GpuTestConfiguration::new()
     .parameters(
         TestParameters::default()
             .test_features_limits()
