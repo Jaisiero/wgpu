@@ -10,7 +10,6 @@ use crate::{
 };
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
-use bitflags::Flags;
 
 use crate::resource::{ResourceInfo, StagingBuffer};
 use hal::{AccelerationStructureTriangleIndices, Device as _};
@@ -24,8 +23,12 @@ impl<A: HalApi> Device<A> {
     ) -> Result<resource::Blas<A>, CreateBlasError> {
         debug_assert_eq!(self_id.backend(), A::VARIANT);
 
-        if blas_desc.flags.contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN) && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) {
-            return Err(CreateBlasError::MissingVertexReturnFeature)
+        if blas_desc
+            .flags
+            .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
+            && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN)
+        {
+            return Err(CreateBlasError::MissingVertexReturnFeature);
         }
 
         let size_info = match &sizes {
@@ -103,8 +106,12 @@ impl<A: HalApi> Device<A> {
     ) -> Result<resource::Tlas<A>, CreateTlasError> {
         debug_assert_eq!(self_id.backend(), A::VARIANT);
 
-        if desc.flags.contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN) && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) {
-            return Err(CreateTlasError::MissingVertexReturnFeature)
+        if desc
+            .flags
+            .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
+            && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN)
+        {
+            return Err(CreateTlasError::MissingVertexReturnFeature);
         }
 
         let size_info = unsafe {
