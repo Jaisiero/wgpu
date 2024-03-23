@@ -23,6 +23,14 @@ impl<A: HalApi> Device<A> {
     ) -> Result<resource::Blas<A>, CreateBlasError> {
         debug_assert_eq!(self_id.backend(), A::VARIANT);
 
+        if blas_desc
+            .flags
+            .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
+            && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN)
+        {
+            return Err(CreateBlasError::MissingVertexReturnFeature);
+        }
+
         let size_info = match &sizes {
             wgt::BlasGeometrySizeDescriptors::Triangles { desc } => {
                 let mut entries =
@@ -97,6 +105,14 @@ impl<A: HalApi> Device<A> {
         desc: &resource::TlasDescriptor,
     ) -> Result<resource::Tlas<A>, CreateTlasError> {
         debug_assert_eq!(self_id.backend(), A::VARIANT);
+
+        if desc
+            .flags
+            .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
+            && !self.features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN)
+        {
+            return Err(CreateTlasError::MissingVertexReturnFeature);
+        }
 
         let size_info = unsafe {
             self.raw().get_acceleration_structure_build_sizes(

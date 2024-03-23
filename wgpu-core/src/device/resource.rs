@@ -2290,6 +2290,18 @@ impl<A: HalApi> Device<A> {
                         .add_single(&tlas_guard, id)
                         .ok_or(Error::InvalidTlas(id))?;
 
+                    if let wgt::BindingType::AccelerationStructure {
+                        vertex_return: true,
+                    } = decl.ty
+                    {
+                        if !tlas
+                            .flags
+                            .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
+                        {
+                            return Err(Error::MissingVertexReturnFlag(id));
+                        }
+                    }
+
                     let raw = tlas.raw.as_ref().ok_or(Error::InvalidTlas(id))?;
 
                     let res_index = hal_tlas_s.len();
