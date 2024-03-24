@@ -1387,7 +1387,6 @@ impl Global {
             let query_set_guard = hub.query_sets.read();
             let buffer_guard = hub.buffers.read();
             let view_guard = hub.texture_views.read();
-            let tlas_guard = hub.tlas_s.read();
 
             log::trace!(
                 "Encoding render pass begin in command buffer {:?}",
@@ -1507,11 +1506,11 @@ impl Global {
                             .used
                             .acceleration_structures
                             .used_resources()
-                            .map(|blas| {
-                                tracker.tlas_s.add_single(&tlas_guard, blas.as_info().id());
+                            .map(|tlas| {
+                                tracker.tlas_s.insert_single(tlas.clone());
 
                                 crate::ray_tracing::TlasAction {
-                                    id: blas.as_info().id(),
+                                    id: tlas.as_info().id(),
                                     kind: crate::ray_tracing::TlasActionKind::Use,
                                 }
                             });

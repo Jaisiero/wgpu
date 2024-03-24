@@ -403,7 +403,6 @@ impl Global {
         let pipeline_guard = hub.compute_pipelines.read();
         let query_set_guard = hub.query_sets.read();
         let buffer_guard = hub.buffers.read();
-        let tlas_guard = hub.tlas_s.read();
 
         let mut state = State {
             binder: Binder::new(),
@@ -536,7 +535,7 @@ impl Global {
                         .acceleration_structures
                         .used_resources()
                         .map(|tlas| {
-                            tracker.tlas_s.add_single(&tlas_guard, tlas.as_info().id());
+                            tracker.tlas_s.insert_single(tlas.clone());
                             crate::ray_tracing::TlasAction {
                                 id: tlas.as_info().id(),
                                 kind: crate::ray_tracing::TlasActionKind::Use,
