@@ -1075,6 +1075,13 @@ impl super::InstanceShared {
                 builder = builder.push_next(next);
             }
 
+            if capabilities.supports_extension(vk::KhrRayTracingPositionFetchFn::name()) {
+                let next = features
+                    .position_fetch
+                    .insert(vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::default());
+                builder = builder.push_next(next);
+            }
+
             // `VK_KHR_zero_initialize_workgroup_memory` is promoted to 1.3
             if capabilities.device_api_version >= vk::API_VERSION_1_3
                 || capabilities.supports_extension(vk::KhrZeroInitializeWorkgroupMemoryFn::name())
@@ -1495,6 +1502,9 @@ impl super::Adapter {
             );
             if features.contains(wgt::Features::RAY_QUERY) {
                 capabilities.push(spv::Capability::RayQueryKHR);
+            }
+            if features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) {
+                capabilities.push(spv::Capability::RayQueryPositionFetchKHR)
             }
             spv::Options {
                 lang_version: (1, 0),
