@@ -1,7 +1,6 @@
 use super::{conv, AsNative, TimestampQuerySupport};
 use crate::{AccelerationStructureCopy, CommandEncoder as _};
 use std::{borrow::Cow, mem, ops::Range};
-use wgt::BufferAddress;
 
 // has to match `Temp::binding_sizes`
 const WORD_SIZE: usize = 4;
@@ -1245,7 +1244,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         unimplemented!()
     }
 
-    unsafe fn read_acceleration_structure_compact_size(&mut self, acceleration_structure: &crate::metal::Api::AccelerationStructure, buf: &crate::metal::Api::Buffer, offset: BufferAddress) {
+    unsafe fn read_acceleration_structure_compact_size(&mut self, _acceleration_structure: &super::AccelerationStructure, _buf: &super::Buffer) {
         unimplemented!()
     }
 }

@@ -663,7 +663,6 @@ pub trait CommandEncoder<A: Api>: WasmNotSendSync + fmt::Debug {
         &mut self,
         acceleration_structure: &A::AccelerationStructure,
         buf: &A::Buffer,
-        offset: wgt::BufferAddress,
     );
 }
 

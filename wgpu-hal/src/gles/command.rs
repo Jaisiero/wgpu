@@ -1200,7 +1200,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         _acceleration_structure: &(),
         _buf: &super::Buffer,
-        _offset: wgt::BufferAddress,
     ) {
         unimplemented!()
     }

@@ -655,7 +655,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         _acceleration_structure: &super::AccelerationStructure,
         _buf: &super::Buffer,
-        _offset: wgt::BufferAddress,
     ) {
         todo!()
     }

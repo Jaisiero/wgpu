@@ -325,7 +325,6 @@ impl crate::CommandEncoder<Api> for Encoder {
         &mut self,
         acceleration_structure: &Resource,
         buf: &Resource,
-        offset: wgt::BufferAddress,
     ) {
     }
     unsafe fn reset_queries(&mut self, set: &Resource, range: Range<u32>) {}

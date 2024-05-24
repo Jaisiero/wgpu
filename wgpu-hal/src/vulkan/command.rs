@@ -387,7 +387,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         &mut self,
         acceleration_structure: &super::AccelerationStructure,
         buffer: &super::Buffer,
-        offset: wgt::BufferAddress,
     ) {
         let query_pool = acceleration_structure
             .compacted_size_query
@@ -400,7 +399,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
                 0,
                 1,
                 buffer.raw,
-                offset,
+                0,
                 wgt::QUERY_SIZE as vk::DeviceSize,
                 vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
             )
