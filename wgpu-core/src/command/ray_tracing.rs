@@ -1575,7 +1575,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                     cmd_buf_raw.read_acceleration_structure_compact_size(
                         blas.raw.as_ref().unwrap(),
                         buf,
-                        0,
                     )
                 }
             }
