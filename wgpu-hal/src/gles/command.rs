@@ -457,6 +457,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         let query = set.queries[index as usize];
         self.cmd_buffer.commands.push(C::TimestampQuery(query));
     }
+
     unsafe fn reset_queries(&mut self, _set: &super::QuerySet, _range: Range<u32>) {
         //TODO: what do we do here?
     }
@@ -1192,6 +1193,10 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         _dst: &(),
         _copy: AccelerationStructureCopy,
     ) {
+        unimplemented!()
+    }
+
+    unsafe fn read_acceleration_structure_compact_size(&mut self, _acceleration_structure: &(), _buf: &super::Buffer, _offset: wgt::BufferAddress) {
         unimplemented!()
     }
 }

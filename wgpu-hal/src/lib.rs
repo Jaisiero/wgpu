@@ -396,10 +396,6 @@ pub trait Device<A: Api>: WasmNotSendSync {
         &self,
         desc: &GetAccelerationStructureBuildSizesDescriptor<A>,
     ) -> AccelerationStructureBuildSizes;
-    unsafe fn get_acceleration_structure_compact_size(
-        &self,
-        acceleration_structure: &A::AccelerationStructure,
-    ) -> wgt::BufferAddress;
     unsafe fn get_acceleration_structure_device_address(
         &self,
         acceleration_structure: &A::AccelerationStructure,
@@ -662,6 +658,8 @@ pub trait CommandEncoder<A: Api>: WasmNotSendSync + fmt::Debug {
         &mut self,
         barrier: AccelerationStructureBarrier,
     );
+    // modeled of dx12, because this is able to be polyfilled in vulkan as opposed to the other way round
+    unsafe fn read_acceleration_structure_compact_size(&mut self, acceleration_structure: &A::AccelerationStructure, buf:&A::Buffer, offset: wgt::BufferAddress);
 }
 
 bitflags!(
@@ -1487,6 +1485,7 @@ pub struct AccelerationStructureDescriptor<'a> {
     pub label: Label<'a>,
     pub size: wgt::BufferAddress,
     pub format: AccelerationStructureFormat,
+    pub allow_compaction: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

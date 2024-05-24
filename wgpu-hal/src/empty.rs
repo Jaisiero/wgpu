@@ -251,13 +251,6 @@ impl crate::Device<Api> for Context {
         Default::default()
     }
 
-    unsafe fn get_acceleration_structure_compact_size(
-        &self,
-        acceleration_structure: &Resource,
-    ) -> wgt::BufferAddress {
-        Default::default()
-    }
-
     unsafe fn get_acceleration_structure_device_address(
         &self,
         _acceleration_structure: &Resource,
@@ -328,6 +321,7 @@ impl crate::CommandEncoder<Api> for Encoder {
     unsafe fn begin_query(&mut self, set: &Resource, index: u32) {}
     unsafe fn end_query(&mut self, set: &Resource, index: u32) {}
     unsafe fn write_timestamp(&mut self, set: &Resource, index: u32) {}
+    unsafe fn read_acceleration_structure_compact_size(&mut self, acceleration_structure: &Resource, buf: &Resource, offset: wgt::BufferAddress) {}
     unsafe fn reset_queries(&mut self, set: &Resource, range: Range<u32>) {}
     unsafe fn copy_query_results(
         &mut self,

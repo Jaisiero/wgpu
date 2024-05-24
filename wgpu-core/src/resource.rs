@@ -1475,6 +1475,7 @@ pub struct Blas<A: HalApi> {
     pub(crate) update_mode: wgt::AccelerationStructureUpdateMode,
     pub(crate) built_index: RwLock<Option<NonZeroU64>>,
     pub(crate) handle: u64,
+    pub(crate) compacted_size_buffer: Option<A::Buffer>,
 }
 
 impl<A: HalApi> Drop for Blas<A> {

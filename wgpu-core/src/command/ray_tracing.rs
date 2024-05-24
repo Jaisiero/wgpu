@@ -16,7 +16,7 @@ use crate::{
     FastHashSet,
 };
 
-use wgt::{math::align_to, BlasGeometrySizeDescriptors, BufferUsages};
+use wgt::{math::align_to, BlasGeometrySizeDescriptors, BufferUsages, AccelerationStructureFlags, BufferAddress};
 
 use crate::identity::Input;
 use crate::ray_tracing::{BlasTriangleGeometry, CompactBlasError};
@@ -26,7 +26,7 @@ use hal::{BufferUses, CommandEncoder, Device};
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::{cmp::max, iter, num::NonZeroU64, ops::Range, ptr};
+use std::{cmp::max, iter, mem, num::NonZeroU64, ops::Range, ptr};
 
 use super::BakedCommands;
 
@@ -41,9 +41,20 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         cmd_buf: &Arc<CommandBuffer<A>>,
     ) -> Result<Blas<A>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
-
+        let mut cmd_buf_data = cmd_buf.data.lock();
+        let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
+        let encoder = cmd_buf_data
+            .encoder
+            .open()
+            .map_err(CompactBlasError::from)?;
+        let buffer = src_blas.compacted_size_buffer.as_ref().expect("already check for the flag that causes this to be created");
         let acc_struct_size = unsafe {
-            raw_device.get_acceleration_structure_compact_size(src_blas.raw.as_ref().unwrap())
+            let buf_mapping = raw_device.map_buffer(
+                buffer,
+                0..mem::size_of::<BufferAddress>() as BufferAddress,
+            ).map_err(CompactBlasError::from)?;
+            assert!(buf_mapping.is_coherent);
+            *(buf_mapping.ptr.as_ptr() as *mut BufferAddress)
         };
 
         let acc_struct = unsafe {
@@ -52,16 +63,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                     label: None,
                     size: acc_struct_size,
                     format: hal::AccelerationStructureFormat::BottomLevel,
+                    allow_compaction: false,
                 })
                 .map_err(CompactBlasError::from)?
         };
-
-        let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
-        let encoder = cmd_buf_data
-            .encoder
-            .open()
-            .map_err(CompactBlasError::from)?;
 
         let ty = match &src_blas.sizes {
             BlasGeometrySizeDescriptors::Triangles { .. } => {
@@ -87,10 +92,11 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             info: ResourceInfo::new(src_blas.info.label.as_str()),
             size_info: src_blas.size_info,
             sizes: src_blas.sizes.clone(),
-            flags: src_blas.flags,
+            flags: src_blas.flags & !AccelerationStructureFlags::ALLOW_COMPACTION,
             update_mode: src_blas.update_mode,
             built_index: RwLock::new(*src_blas.built_index.read()),
             handle,
+            compacted_size_buffer: None,
         };
         blas.size_info.acceleration_structure_size = acc_struct_size;
         log::info!(
@@ -1547,6 +1553,12 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
                 cmd_buf_raw
                     .build_acceleration_structures(blas_storage.len() as u32, blas_descriptors);
+            }
+        }
+
+        for (blas, _, _) in &blas_storage {
+            if let Some(buf) = &blas.compacted_size_buffer {
+                unsafe { cmd_buf_raw.read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf, 0) }
             }
         }
 

@@ -480,9 +480,9 @@ impl crate::framework::Example for Example {
                 }]),
             }),
             iter::empty(),
-            //iter::once(&tlas_package),
         );
-
+        queue.submit(Some(encoder.finish()));
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         let blas = encoder.compact_blas(&blas);
 
         for x in 0..side_count {
@@ -508,20 +508,7 @@ impl crate::framework::Example for Example {
         }
 
         encoder.build_acceleration_structures(
-            iter::once(&rt::BlasBuildEntry {
-                blas: &blas,
-                geometry: rt::BlasGeometries::TriangleGeometries(vec![rt::BlasTriangleGeometry {
-                    size: &blas_geo_size_desc,
-                    vertex_buffer: &vertex_buf,
-                    first_vertex: 0,
-                    vertex_stride: mem::size_of::<Vertex>() as u64,
-                    index_buffer: Some(&index_buf),
-                    index_buffer_offset: Some(0),
-                    transform_buffer: None,
-                    transform_buffer_offset: None,
-                }]),
-            }),
-            //iter::empty(),
+            iter::empty(),
             iter::once(&tlas_package),
         );
 

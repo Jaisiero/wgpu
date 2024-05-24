@@ -5,7 +5,6 @@ use ash::{extensions::ext, vk};
 
 use crate::AccelerationStructureCopy;
 use std::{mem, ops::Range, slice};
-use wgt::AccelerationStructureType;
 
 const ALLOCATION_GRANULARITY: u32 = 16;
 const DST_IMAGE_LAYOUT: vk::ImageLayout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
@@ -384,6 +383,21 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             )
         };
     }
+    unsafe fn read_acceleration_structure_compact_size(&mut self, acceleration_structure: &super::AccelerationStructure, buffer: &super::Buffer, offset: wgt::BufferAddress) {
+        let query_pool = acceleration_structure.compacted_size_query.as_ref().unwrap();
+        unsafe {
+            self.device.raw.cmd_copy_query_pool_results(
+                self.active,
+                *query_pool,
+                0,
+                1,
+                buffer.raw,
+                offset,
+                wgt::QUERY_SIZE as vk::DeviceSize,
+                vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
+            )
+        };
+    }
     unsafe fn reset_queries(&mut self, set: &super::QuerySet, range: Range<u32>) {
         unsafe {
             self.device.raw.cmd_reset_query_pool(
@@ -424,7 +438,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         const CAPACITY_OUTER: usize = 8;
         const CAPACITY_INNER: usize = 1;
         let descriptor_count = descriptor_count as usize;
-
+        let iter = descriptors.into_iter();
         let ray_tracing_functions = self
             .device
             .extension_fns
@@ -461,7 +475,11 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             [&[vk::AccelerationStructureBuildRangeInfoKHR]; CAPACITY_OUTER],
         >::with_capacity(descriptor_count);
 
-        for desc in descriptors {
+        // stores the size query pool and raw acceleration structures because the queries need to happen after the structure is built
+        let mut raw_acceleration_structures =  smallvec::SmallVec::<
+            [(vk::AccelerationStructureKHR, vk::QueryPool); CAPACITY_OUTER],
+        >::with_capacity(descriptor_count);
+        for desc in iter {
             let (geometries, ranges) = match *desc.entries {
                 crate::AccelerationStructureEntries::Instances(ref instances) => {
                     let instance_data = vk::AccelerationStructureGeometryInstancesDataKHR::builder(
@@ -614,6 +632,9 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             }
 
             geometry_infos.push(*geometry_info);
+            if let Some(query) = desc.destination_acceleration_structure.compacted_size_query {
+                raw_acceleration_structures.push((desc.destination_acceleration_structure.raw, query));
+            }
         }
 
         for (i, geometry_info) in geometry_infos.iter_mut().enumerate() {
@@ -626,6 +647,27 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             ray_tracing_functions
                 .acceleration_structure
                 .cmd_build_acceleration_structures(self.active, &geometry_infos, &ranges_ptrs);
+        }
+        for (acceleration_structure, query) in raw_acceleration_structures {
+            unsafe {
+                unsafe {
+                    self.device.raw.cmd_reset_query_pool(
+                        self.active,
+                        query,
+                        0,
+                        1,
+                    )
+                };
+                ray_tracing_functions
+                    .acceleration_structure
+                    .cmd_write_acceleration_structures_properties(
+                        self.active,
+                        &[acceleration_structure],
+                        vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+                        query,
+                        0,
+                    )
+            }
         }
     }
 
@@ -1147,18 +1189,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             .as_ref()
             .expect("Feature `RAY_TRACING` not enabled");
 
-        let structure_type = match copy.type_flags {
-            AccelerationStructureType::Triangles => {
-                vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
-            }
-            AccelerationStructureType::AABBs => {
-                vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR
-            }
-            AccelerationStructureType::Instances => {
-                vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR
-            }
-        };
-
         let mode = match copy.copy_flags {
             wgt::AccelerationStructureCopy::Clone => vk::CopyAccelerationStructureModeKHR::CLONE,
             wgt::AccelerationStructureCopy::Compact => {
@@ -1169,17 +1199,16 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         unsafe {
             ray_tracing_functions
                 .acceleration_structure
-                .copy_acceleration_structure(
-                    vk::DeferredOperationKHR::null(),
+                .cmd_copy_acceleration_structure(
+                    self.active,
                     &vk::CopyAccelerationStructureInfoKHR {
-                        s_type: structure_type,
+                        s_type: vk::StructureType::COPY_ACCELERATION_STRUCTURE_INFO_KHR,
                         p_next: std::ptr::null(),
                         src: src.raw,
                         dst: dst.raw,
                         mode,
                     },
-                )
-                .expect("Copy Failed");
+                );
         }
     }
 }

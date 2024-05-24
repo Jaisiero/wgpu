@@ -1488,14 +1488,6 @@ impl crate::Device<super::Api> for super::Device {
     ) -> crate::AccelerationStructureBuildSizes {
         unimplemented!()
     }
-
-    unsafe fn get_acceleration_structure_compact_size(
-        &self,
-        _acceleration_structure: &(),
-    ) -> wgt::BufferAddress {
-        todo!()
-    }
-
     unsafe fn get_acceleration_structure_device_address(
         &self,
         _acceleration_structure: &(),

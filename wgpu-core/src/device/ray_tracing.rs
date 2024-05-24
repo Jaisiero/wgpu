@@ -1,3 +1,4 @@
+use std::mem;
 #[cfg(feature = "trace")]
 use crate::device::trace;
 use crate::{
@@ -13,7 +14,8 @@ use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
 use crate::resource::{ResourceInfo, StagingBuffer};
-use hal::{AccelerationStructureTriangleIndices, Device as _};
+use hal::{AccelerationStructureTriangleIndices, BufferDescriptor, BufferUses, Device as _, MemoryFlags};
+use wgt::{AccelerationStructureFlags, BufferAddress, BufferUsages};
 
 impl<A: HalApi> Device<A> {
     fn create_blas(
@@ -68,11 +70,26 @@ impl<A: HalApi> Device<A> {
                     label: blas_desc.label.borrow_option(),
                     size: size_info.acceleration_structure_size,
                     format: hal::AccelerationStructureFormat::BottomLevel,
+                    allow_compaction: blas_desc.flags.contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION),
                 })
         }
         .map_err(DeviceError::from)?;
 
         let handle = unsafe { self.raw().get_acceleration_structure_device_address(&raw) };
+
+        let compacted_size_buffer = if blas_desc.flags.contains(AccelerationStructureFlags::ALLOW_COMPACTION) {
+            let buf = unsafe {
+                self.raw().create_buffer(&BufferDescriptor {
+                    label: None,
+                    size: mem::size_of::<BufferAddress>() as BufferAddress,
+                    usage: BufferUses::MAP_READ | BufferUses::COPY_DST,
+                    memory_flags: MemoryFlags::PREFER_COHERENT,
+                }).map_err(DeviceError::from).map_err(CreateBlasError::from)?
+            };
+            Some(buf)
+        } else {
+            None
+        };
 
         Ok(resource::Blas {
             raw: Some(raw),
@@ -89,6 +106,7 @@ impl<A: HalApi> Device<A> {
             update_mode: blas_desc.update_mode,
             handle,
             built_index: RwLock::new(None),
+            compacted_size_buffer,
         })
     }
 
@@ -120,6 +138,7 @@ impl<A: HalApi> Device<A> {
                     label: desc.label.borrow_option(),
                     size: size_info.acceleration_structure_size,
                     format: hal::AccelerationStructureFormat::TopLevel,
+                    allow_compaction: false,
                 })
         }
         .map_err(DeviceError::from)?;

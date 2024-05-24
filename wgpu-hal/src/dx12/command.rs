@@ -651,6 +651,9 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             )
         };
     }
+    unsafe fn read_acceleration_structure_compact_size(&mut self, _acceleration_structure: &super::AccelerationStructure, _buf: &super::Buffer, _offset: wgt::BufferAddress) {
+        todo!()
+    }
     unsafe fn reset_queries(&mut self, _set: &super::QuerySet, _range: Range<u32>) {
         // nothing to do here
     }

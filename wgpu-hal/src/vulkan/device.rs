@@ -2200,32 +2200,6 @@ impl crate::Device<super::Api> for super::Device {
         }
     }
 
-    unsafe fn get_acceleration_structure_compact_size(
-        &self,
-        acceleration_structure: &super::AccelerationStructure,
-    ) -> wgt::BufferAddress {
-        let ray_tracing_functions = self
-            .shared
-            .extension_fns
-            .ray_tracing
-            .as_ref()
-            .expect("Feature `RAY_TRACING` not enabled");
-        let mut size = vk::DeviceSize::default().to_ne_bytes();
-
-        unsafe {
-            ray_tracing_functions
-                .acceleration_structure
-                .write_acceleration_structures_properties(
-                    &[acceleration_structure.raw],
-                    vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
-                    &mut size,
-                    std::mem::size_of::<vk::DeviceSize>(),
-                )
-                .expect("getting properties failed");
-        }
-        wgt::BufferAddress::from_ne_bytes(size)
-    }
-
     unsafe fn get_acceleration_structure_device_address(
         &self,
         acceleration_structure: &super::AccelerationStructure,
@@ -2266,7 +2240,7 @@ impl crate::Device<super::Api> for super::Device {
         unsafe {
             let raw_buffer = self.shared.raw.create_buffer(&vk_buffer_info, None)?;
             let req = self.shared.raw.get_buffer_memory_requirements(raw_buffer);
-
+            debug_assert_ne!(desc.size, 0);
             let block = self.mem_allocator.lock().alloc(
                 &*self.shared,
                 gpu_alloc::Request {
@@ -2304,10 +2278,23 @@ impl crate::Device<super::Api> for super::Device {
                 );
             }
 
+            let pool = if desc.allow_compaction {
+                let vk_info = vk::QueryPoolCreateInfo::builder()
+                    .query_type(vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR)
+                    .query_count(1)
+                    .build();
+
+                let raw = unsafe { self.shared.raw.create_query_pool(&vk_info, None) }?;
+                Some(raw)
+            } else {
+                None
+            };
+            
             Ok(super::AccelerationStructure {
                 raw: raw_acceleration_structure,
                 buffer: raw_buffer,
                 block: Mutex::new(block),
+                compacted_size_query: pool,
             })
         }
     }
