@@ -16,7 +16,10 @@ use crate::{
     FastHashSet,
 };
 
-use wgt::{math::align_to, BlasGeometrySizeDescriptors, BufferUsages, AccelerationStructureFlags, BufferAddress};
+use wgt::{
+    math::align_to, AccelerationStructureFlags, BlasGeometrySizeDescriptors, BufferAddress,
+    BufferUsages,
+};
 
 use crate::identity::Input;
 use crate::ray_tracing::{BlasTriangleGeometry, CompactBlasError};
@@ -50,12 +53,14 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .encoder
             .open()
             .map_err(CompactBlasError::from)?;
-        let buffer = src_blas.compacted_size_buffer.as_ref().expect("already check for the flag that causes this to be created");
+        let buffer = src_blas
+            .compacted_size_buffer
+            .as_ref()
+            .expect("already check for the flag that causes this to be created");
         let acc_struct_size = unsafe {
-            let buf_mapping = raw_device.map_buffer(
-                buffer,
-                0..mem::size_of::<BufferAddress>() as BufferAddress,
-            ).map_err(CompactBlasError::from)?;
+            let buf_mapping = raw_device
+                .map_buffer(buffer, 0..mem::size_of::<BufferAddress>() as BufferAddress)
+                .map_err(CompactBlasError::from)?;
             assert!(buf_mapping.is_coherent);
             *(buf_mapping.ptr.as_ptr() as *mut BufferAddress)
         };
@@ -1566,7 +1571,13 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         for (blas, _, _) in &blas_storage {
             if let Some(buf) = &blas.compacted_size_buffer {
-                unsafe { cmd_buf_raw.read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf, 0) }
+                unsafe {
+                    cmd_buf_raw.read_acceleration_structure_compact_size(
+                        blas.raw.as_ref().unwrap(),
+                        buf,
+                        0,
+                    )
+                }
             }
         }
 

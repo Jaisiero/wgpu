@@ -1,4 +1,3 @@
-use std::mem;
 #[cfg(feature = "trace")]
 use crate::device::trace;
 use crate::{
@@ -11,6 +10,7 @@ use crate::{
     resource, LabelHelpers,
 };
 use parking_lot::{Mutex, RwLock};
+use std::mem;
 use std::sync::Arc;
 
 use crate::resource::{ResourceInfo, StagingBuffer};
@@ -70,21 +70,29 @@ impl<A: HalApi> Device<A> {
                     label: blas_desc.label.borrow_option(),
                     size: size_info.acceleration_structure_size,
                     format: hal::AccelerationStructureFormat::BottomLevel,
-                    allow_compaction: blas_desc.flags.contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION),
+                    allow_compaction: blas_desc
+                        .flags
+                        .contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION),
                 })
         }
         .map_err(DeviceError::from)?;
 
         let handle = unsafe { self.raw().get_acceleration_structure_device_address(&raw) };
 
-        let compacted_size_buffer = if blas_desc.flags.contains(AccelerationStructureFlags::ALLOW_COMPACTION) {
+        let compacted_size_buffer = if blas_desc
+            .flags
+            .contains(AccelerationStructureFlags::ALLOW_COMPACTION)
+        {
             let buf = unsafe {
-                self.raw().create_buffer(&hal::BufferDescriptor {
-                    label: None,
-                    size: mem::size_of::<BufferAddress>() as BufferAddress,
-                    usage: BufferUses::MAP_READ | BufferUses::COPY_DST,
-                    memory_flags: MemoryFlags::PREFER_COHERENT,
-                }).map_err(DeviceError::from).map_err(CreateBlasError::from)?
+                self.raw()
+                    .create_buffer(&hal::BufferDescriptor {
+                        label: None,
+                        size: mem::size_of::<BufferAddress>() as BufferAddress,
+                        usage: BufferUses::MAP_READ | BufferUses::COPY_DST,
+                        memory_flags: MemoryFlags::PREFER_COHERENT,
+                    })
+                    .map_err(DeviceError::from)
+                    .map_err(CreateBlasError::from)?
             };
             Some(buf)
         } else {

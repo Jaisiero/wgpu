@@ -2289,7 +2289,7 @@ impl crate::Device<super::Api> for super::Device {
             } else {
                 None
             };
-            
+
             Ok(super::AccelerationStructure {
                 raw: raw_acceleration_structure,
                 buffer: raw_buffer,

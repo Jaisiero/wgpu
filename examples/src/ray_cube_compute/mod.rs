@@ -507,10 +507,7 @@ impl crate::framework::Example for Example {
             }
         }
 
-        encoder.build_acceleration_structures(
-            iter::empty(),
-            iter::once(&tlas_package),
-        );
+        encoder.build_acceleration_structures(iter::empty(), iter::once(&tlas_package));
 
         queue.submit(Some(encoder.finish()));
 

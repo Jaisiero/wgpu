@@ -659,7 +659,12 @@ pub trait CommandEncoder<A: Api>: WasmNotSendSync + fmt::Debug {
         barrier: AccelerationStructureBarrier,
     );
     // modeled of dx12, because this is able to be polyfilled in vulkan as opposed to the other way round
-    unsafe fn read_acceleration_structure_compact_size(&mut self, acceleration_structure: &A::AccelerationStructure, buf:&A::Buffer, offset: wgt::BufferAddress);
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        acceleration_structure: &A::AccelerationStructure,
+        buf: &A::Buffer,
+        offset: wgt::BufferAddress,
+    );
 }
 
 bitflags!(

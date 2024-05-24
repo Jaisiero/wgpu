@@ -1196,7 +1196,12 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         unimplemented!()
     }
 
-    unsafe fn read_acceleration_structure_compact_size(&mut self, _acceleration_structure: &(), _buf: &super::Buffer, _offset: wgt::BufferAddress) {
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        _acceleration_structure: &(),
+        _buf: &super::Buffer,
+        _offset: wgt::BufferAddress,
+    ) {
         unimplemented!()
     }
 }
