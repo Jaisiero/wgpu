@@ -1572,10 +1572,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         for (blas, _, _) in &blas_storage {
             if let Some(buf) = &blas.compacted_size_buffer {
                 unsafe {
-                    cmd_buf_raw.read_acceleration_structure_compact_size(
-                        blas.raw.as_ref().unwrap(),
-                        buf,
-                    )
+                    cmd_buf_raw
+                        .read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf)
                 }
             }
         }
