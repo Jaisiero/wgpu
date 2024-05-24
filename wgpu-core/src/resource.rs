@@ -1476,6 +1476,7 @@ pub struct Blas<A: HalApi> {
     pub(crate) built_index: RwLock<Option<NonZeroU64>>,
     pub(crate) handle: u64,
     pub(crate) compacted_size_buffer: Option<A::Buffer>,
+    pub(crate) being_built: RwLock<bool>,
 }
 
 impl<A: HalApi> Drop for Blas<A> {

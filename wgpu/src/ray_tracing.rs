@@ -441,6 +441,8 @@ pub trait CommandEncoderRayTracing {
         tlas: impl IntoIterator<Item = &'a TlasBuildEntry<'a>>,
     );
     /// Creates a new blas and copies (in a compacting way) the contents of the provided blas into the new one (compaction flag must be set).
+    ///
+    /// The blas that is being compacted must have been built in a previously submitted command buffer
     fn compact_blas(&mut self, blas: &Blas) -> Blas;
 }
 

@@ -650,14 +650,12 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         }
         for (acceleration_structure, query) in raw_acceleration_structures {
             unsafe {
-                unsafe {
-                    self.device.raw.cmd_reset_query_pool(
-                        self.active,
-                        query,
-                        0,
-                        1,
-                    )
-                };
+                self.device.raw.cmd_reset_query_pool(
+                    self.active,
+                    query,
+                    0,
+                    1,
+                );
                 ray_tracing_functions
                     .acceleration_structure
                     .cmd_write_acceleration_structures_properties(

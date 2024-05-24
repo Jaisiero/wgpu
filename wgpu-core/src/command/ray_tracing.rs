@@ -41,6 +41,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         cmd_buf: &Arc<CommandBuffer<A>>,
     ) -> Result<Blas<A>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
+        if *src_blas.being_built.read() {
+            return Err(CompactBlasError::BlasBeingBuilt);
+        }
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
         let encoder = cmd_buf_data
@@ -97,10 +100,11 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             built_index: RwLock::new(*src_blas.built_index.read()),
             handle,
             compacted_size_buffer: None,
+            being_built: RwLock::default(),
         };
         blas.size_info.acceleration_structure_size = acc_struct_size;
         log::info!(
-            "src: {}, compacted: {}",
+            "compacted blas of size: {}, to: {}",
             src_blas.size_info.acceleration_structure_size,
             blas.size_info.acceleration_structure_size
         );
@@ -1542,6 +1546,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             cmd_buf_raw.transition_buffers(input_barriers.into_iter());
         }
 
+        for (blas, _, _) in &blas_storage {
+            *blas.being_built.write() = true;
+        }
+
         if blas_present {
             unsafe {
                 cmd_buf_raw.place_acceleration_structure_barrier(
@@ -1691,6 +1699,7 @@ impl<A: HalApi> BakedCommands<A> {
                         .get(action.id)
                         .map_err(|_| ValidateBlasActionsError::InvalidBlas(action.id))?;
                     *blas.built_index.write() = Some(id);
+                    *blas.being_built.write() = false;
                 }
                 crate::ray_tracing::BlasActionKind::Use => {
                     if !built.contains(&action.id) {

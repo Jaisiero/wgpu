@@ -14,8 +14,8 @@ use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
 use crate::resource::{ResourceInfo, StagingBuffer};
-use hal::{AccelerationStructureTriangleIndices, BufferDescriptor, BufferUses, Device as _, MemoryFlags};
-use wgt::{AccelerationStructureFlags, BufferAddress, BufferUsages};
+use hal::{AccelerationStructureTriangleIndices, BufferUses, Device as _, MemoryFlags};
+use wgt::{AccelerationStructureFlags, BufferAddress};
 
 impl<A: HalApi> Device<A> {
     fn create_blas(
@@ -79,7 +79,7 @@ impl<A: HalApi> Device<A> {
 
         let compacted_size_buffer = if blas_desc.flags.contains(AccelerationStructureFlags::ALLOW_COMPACTION) {
             let buf = unsafe {
-                self.raw().create_buffer(&BufferDescriptor {
+                self.raw().create_buffer(&hal::BufferDescriptor {
                     label: None,
                     size: mem::size_of::<BufferAddress>() as BufferAddress,
                     usage: BufferUses::MAP_READ | BufferUses::COPY_DST,
@@ -107,6 +107,7 @@ impl<A: HalApi> Device<A> {
             handle,
             built_index: RwLock::new(None),
             compacted_size_buffer,
+            being_built: RwLock::default(),
         })
     }
 

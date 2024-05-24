@@ -2284,7 +2284,7 @@ impl crate::Device<super::Api> for super::Device {
                     .query_count(1)
                     .build();
 
-                let raw = unsafe { self.shared.raw.create_query_pool(&vk_info, None) }?;
+                let raw = self.shared.raw.create_query_pool(&vk_info, None)?;
                 Some(raw)
             } else {
                 None
