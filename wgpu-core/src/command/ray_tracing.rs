@@ -45,7 +45,10 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
     ) -> Result<Blas<A>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
         if *src_blas.being_built.read() {
-            return Err(CompactBlasError::BlasBeingBuilt);
+            return Err(CompactBlasError::BlasBeingBuilt(src_blas.info.id()));
+        }
+        if let None = src_blas.built_index.read().clone() {
+            return Err(CompactBlasError::UsedUnbuilt(src_blas.info.id()))
         }
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
@@ -133,7 +136,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 .flags
                 .contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION)
             {
-                break CompactBlasError::BlasMissingAllowCompaction;
+                break CompactBlasError::BlasMissingAllowCompaction(blas_id);
             }
             let cmd_buf = match CommandBuffer::get_encoder(hub, encoder_id) {
                 Ok(cmd_buf) => cmd_buf,
