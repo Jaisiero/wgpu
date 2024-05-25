@@ -30,6 +30,7 @@ impl wgc::identity::GlobalIdentityHandlerFactory for IdentityPassThroughFactory 
 pub trait GlobalPlay {
     fn encode_commands<A: wgc::hal_api::HalApi>(
         &self,
+        device: wgc::id::DeviceId,
         encoder: wgc::id::CommandEncoderId,
         commands: Vec<trace::Command>,
     ) -> wgc::id::CommandBufferId;
@@ -45,6 +46,7 @@ pub trait GlobalPlay {
 impl GlobalPlay for wgc::global::Global<IdentityPassThroughFactory> {
     fn encode_commands<A: wgc::hal_api::HalApi>(
         &self,
+        device: wgc::id::DeviceId,
         encoder: wgc::id::CommandEncoderId,
         commands: Vec<trace::Command>,
     ) -> wgc::id::CommandBufferId {
@@ -225,6 +227,13 @@ impl GlobalPlay for wgc::global::Global<IdentityPassThroughFactory> {
                         encoder, blas_iter, tlas_iter,
                     )
                     .unwrap();
+                }
+                trace::Command::CompactBlas {
+                    blas,
+                    compacted_blas,
+                } => {
+                    self.device_maintain_ids::<A>(device).unwrap();
+                    self.command_encoder_compact_blas::<A>(encoder, blas, compacted_blas);
                 }
             }
         }
@@ -468,7 +477,7 @@ impl GlobalPlay for wgc::global::Global<IdentityPassThroughFactory> {
                 if let Some(e) = error {
                     panic!("{e}");
                 }
-                let cmdbuf = self.encode_commands::<A>(encoder, commands);
+                let cmdbuf = self.encode_commands::<A>(device, encoder, commands);
                 self.queue_submit::<A>(device, &[cmdbuf]).unwrap();
             }
             Action::CreateBlas { id, desc, sizes } => {

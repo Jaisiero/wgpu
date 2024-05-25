@@ -206,6 +206,10 @@ pub enum Command {
         blas: Vec<crate::ray_tracing::TraceBlasBuildEntry>,
         tlas: Vec<crate::ray_tracing::TraceTlasPackage>,
     },
+    CompactBlas {
+        blas: id::BlasId,
+        compacted_blas: id::BlasId,
+    },
 }
 
 #[cfg(feature = "trace")]

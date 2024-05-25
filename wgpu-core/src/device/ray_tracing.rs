@@ -88,7 +88,9 @@ impl<A: HalApi> Device<A> {
                     .create_buffer(&hal::BufferDescriptor {
                         label: None,
                         size: mem::size_of::<BufferAddress>() as BufferAddress,
-                        usage: BufferUses::MAP_READ | BufferUses::COPY_DST | BufferUses::ACCELERATION_STRUCTURE_QUERY,
+                        usage: BufferUses::MAP_READ
+                            | BufferUses::COPY_DST
+                            | BufferUses::ACCELERATION_STRUCTURE_QUERY,
                         memory_flags: MemoryFlags::PREFER_COHERENT,
                     })
                     .map_err(DeviceError::from)

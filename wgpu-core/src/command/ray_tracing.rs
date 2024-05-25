@@ -47,8 +47,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         if *src_blas.being_built.read() {
             return Err(CompactBlasError::BlasBeingBuilt(src_blas.info.id()));
         }
-        if let None = src_blas.built_index.read().clone() {
-            return Err(CompactBlasError::UsedUnbuilt(src_blas.info.id()))
+        if let None = *src_blas.built_index.read() {
+            return Err(CompactBlasError::UsedUnbuilt(src_blas.info.id()));
         }
         let encoder = cmd_buf_data
             .encoder
@@ -64,7 +64,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 .map_err(CompactBlasError::from)?;
             assert!(buf_mapping.is_coherent);
             let result = *(buf_mapping.ptr.as_ptr() as *mut BufferAddress);
-            raw_device.unmap_buffer(buffer).map_err(CompactBlasError::from)?;
+            raw_device
+                .unmap_buffer(buffer)
+                .map_err(CompactBlasError::from)?;
             result
         };
 
@@ -150,16 +152,29 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
             let device = &mut &cmd_buf.device;
             let raw_device = device.raw();
-            return match self.internal_command_encoder_compact_blas(&src_blas, raw_device, cmd_buf_data)
-            {
+            return match self.internal_command_encoder_compact_blas(
+                &src_blas,
+                raw_device,
+                cmd_buf_data,
+            ) {
                 Ok(blas) => {
                     let handle = blas.handle;
                     let (id, resource) = fid.assign(blas);
-                    device.trackers.lock().blas_s.insert_single(id, resource.clone());
-                    cmd_buf_data
+
+                    #[cfg(feature = "trace")]
+                    if let Some(ref mut list) = cmd_buf.data.lock().as_mut().unwrap().commands {
+                        list.push(crate::device::trace::Command::CompactBlas {
+                            blas: blas_id,
+                            compacted_blas: id,
+                        });
+                    }
+
+                    device
                         .trackers
+                        .lock()
                         .blas_s
-                        .insert_single(id, resource);
+                        .insert_single(id, resource.clone());
+                    cmd_buf_data.trackers.blas_s.insert_single(id, resource);
                     let build_command_index = NonZeroU64::new(
                         device
                             .last_acceleration_structure_build_command_index
@@ -1596,14 +1611,18 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         for (blas, _, _) in &blas_storage {
             if let Some(buf) = &blas.compacted_size_buffer {
                 unsafe {
-                    cmd_buf_raw.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                        usage: hal::AccelerationStructureUses::BUILD_OUTPUT..hal::AccelerationStructureUses::QUERY_INPUT,
-                    });
+                    cmd_buf_raw.place_acceleration_structure_barrier(
+                        hal::AccelerationStructureBarrier {
+                            usage: hal::AccelerationStructureUses::BUILD_OUTPUT
+                                ..hal::AccelerationStructureUses::QUERY_INPUT,
+                        },
+                    );
                     cmd_buf_raw
                         .read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf);
                     cmd_buf_raw.transition_buffers(iter::once(hal::BufferBarrier::<A> {
                         buffer: buf,
-                        usage: hal::BufferUses::QUERY_RESOLVE | hal::BufferUses::COPY_DST..hal::BufferUses::MAP_READ,
+                        usage: hal::BufferUses::QUERY_RESOLVE | hal::BufferUses::COPY_DST
+                            ..hal::BufferUses::MAP_READ,
                     }));
                 }
             }

@@ -486,7 +486,7 @@ impl crate::framework::Example for Example {
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         let blas = encoder.compact_blas(&blas);
         queue.submit(Some(encoder.finish()));
-        println!("{}",timer.elapsed().as_micros());
+        println!("{}", timer.elapsed().as_micros());
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         for x in 0..side_count {
             for y in 0..side_count {
