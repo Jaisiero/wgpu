@@ -53,6 +53,8 @@ pub enum CompactBlasError {
     CreateBlasError(#[from] CreateBlasError),
     #[error(transparent)]
     EncoderError(#[from] CommandEncoderError),
+    #[error("Blas {0:?} is invalid or destroyed")]
+    InvalidBlas(BlasId),
     #[error("Blas {0:?} is missing 'ALLOW_COMPACTION' flag")]
     BlasMissingAllowCompaction(BlasId),
     #[error("Blas {0:?} is still being build, submit the command buffer in queue.submit before compacting")]

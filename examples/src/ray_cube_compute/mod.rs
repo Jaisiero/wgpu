@@ -513,7 +513,6 @@ impl crate::framework::Example for Example {
 
         let start_inst = Instant::now();
 
-        println!("finish");
         Example {
             rt_target,
             rt_view,

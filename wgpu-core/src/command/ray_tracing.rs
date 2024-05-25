@@ -31,7 +31,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{cmp::max, iter, mem, num::NonZeroU64, ops::Range, ptr};
 
-use super::BakedCommands;
+use super::{BakedCommands, CommandBufferMutable};
 
 // This should be queried from the device, maybe the the hal api should pre aline it, since I am unsure how else we can idiomatically get this value.
 const SCRATCH_BUFFER_ALIGNMENT: u32 = 256;
@@ -41,7 +41,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         &self,
         src_blas: &Arc<Blas<A>>,
         raw_device: &A::Device,
-        cmd_buf: &Arc<CommandBuffer<A>>,
+        cmd_buf_data: &mut CommandBufferMutable<A>,
     ) -> Result<Blas<A>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
         if *src_blas.being_built.read() {
@@ -50,8 +50,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         if let None = src_blas.built_index.read().clone() {
             return Err(CompactBlasError::UsedUnbuilt(src_blas.info.id()))
         }
-        let mut cmd_buf_data = cmd_buf.data.lock();
-        let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
         let encoder = cmd_buf_data
             .encoder
             .open()
@@ -59,13 +57,15 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let buffer = src_blas
             .compacted_size_buffer
             .as_ref()
-            .expect("already check for the flag that causes this to be created");
+            .expect("already checked for the flag that causes this to be created");
         let acc_struct_size = unsafe {
             let buf_mapping = raw_device
                 .map_buffer(buffer, 0..mem::size_of::<BufferAddress>() as BufferAddress)
                 .map_err(CompactBlasError::from)?;
             assert!(buf_mapping.is_coherent);
-            *(buf_mapping.ptr.as_ptr() as *mut BufferAddress)
+            let result = *(buf_mapping.ptr.as_ptr() as *mut BufferAddress);
+            raw_device.unmap_buffer(buffer).map_err(CompactBlasError::from)?;
+            result
         };
 
         let acc_struct = unsafe {
@@ -105,16 +105,18 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             sizes: src_blas.sizes.clone(),
             flags: src_blas.flags & !AccelerationStructureFlags::ALLOW_COMPACTION,
             update_mode: src_blas.update_mode,
-            built_index: RwLock::new(*src_blas.built_index.read()),
+            // not built until after queue.submit
+            built_index: RwLock::new(None),
             handle,
             compacted_size_buffer: None,
             being_built: RwLock::default(),
         };
         blas.size_info.acceleration_structure_size = acc_struct_size;
         log::info!(
-            "compacted blas of size: {}, to: {}",
+            "Compacted Blas {:?} of size: {}, to: {}",
+            src_blas.info.id(),
             src_blas.size_info.acceleration_structure_size,
-            blas.size_info.acceleration_structure_size
+            blas.size_info.acceleration_structure_size,
         );
         Ok(blas)
     }
@@ -142,14 +144,32 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                 Ok(cmd_buf) => cmd_buf,
                 Err(err) => break CompactBlasError::from(err),
             };
+            let mut cmd_buf_data = cmd_buf.data.lock();
+            let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
             let device = &mut &cmd_buf.device;
             let raw_device = device.raw();
-            return match self.internal_command_encoder_compact_blas(&src_blas, raw_device, &cmd_buf)
+            return match self.internal_command_encoder_compact_blas(&src_blas, raw_device, cmd_buf_data)
             {
                 Ok(blas) => {
                     let handle = blas.handle;
                     let (id, resource) = fid.assign(blas);
-                    device.trackers.lock().blas_s.insert_single(id, resource);
+                    device.trackers.lock().blas_s.insert_single(id, resource.clone());
+                    cmd_buf_data
+                        .trackers
+                        .blas_s
+                        .insert_single(id, resource);
+                    let build_command_index = NonZeroU64::new(
+                        device
+                            .last_acceleration_structure_build_command_index
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                            + 1,
+                    )
+                    .unwrap();
+                    cmd_buf_data.blas_actions.push(BlasAction {
+                        id,
+                        // this counts as a build because the old blas is guaranteed to be built
+                        kind: crate::ray_tracing::BlasActionKind::Build(build_command_index),
+                    });
                     log::info!("Compacted Blas {:?}", blas_id);
                     (id, Some(handle), None)
                 }

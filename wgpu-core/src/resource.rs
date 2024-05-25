@@ -1491,6 +1491,11 @@ impl<A: HalApi> Drop for Blas<A> {
                 use hal::Device;
                 self.device.raw().destroy_acceleration_structure(structure);
             }
+            if let Some(buf) = self.compacted_size_buffer.take() {
+                resource_log!("Destroy raw Blas {:?}", self.info.label());
+                use hal::Device;
+                self.device.raw().destroy_buffer(buf);
+            }
         }
     }
 }
