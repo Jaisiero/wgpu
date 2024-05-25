@@ -2240,7 +2240,6 @@ impl crate::Device<super::Api> for super::Device {
         unsafe {
             let raw_buffer = self.shared.raw.create_buffer(&vk_buffer_info, None)?;
             let req = self.shared.raw.get_buffer_memory_requirements(raw_buffer);
-            debug_assert_ne!(desc.size, 0);
             let block = self.mem_allocator.lock().alloc(
                 &*self.shared,
                 gpu_alloc::Request {

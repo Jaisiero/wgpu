@@ -68,6 +68,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             result
         };
 
+        assert_ne!(acc_struct_size, 0);
+
         let acc_struct = unsafe {
             raw_device
                 .create_acceleration_structure(&hal::AccelerationStructureDescriptor {
@@ -170,7 +172,6 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
                         // this counts as a build because the old blas is guaranteed to be built
                         kind: crate::ray_tracing::BlasActionKind::Build(build_command_index),
                     });
-                    log::info!("Compacted Blas {:?}", blas_id);
                     (id, Some(handle), None)
                 }
                 Err(err) => {
@@ -1595,8 +1596,15 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         for (blas, _, _) in &blas_storage {
             if let Some(buf) = &blas.compacted_size_buffer {
                 unsafe {
+                    cmd_buf_raw.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
+                        usage: hal::AccelerationStructureUses::BUILD_OUTPUT..hal::AccelerationStructureUses::QUERY_INPUT,
+                    });
                     cmd_buf_raw
-                        .read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf)
+                        .read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf);
+                    cmd_buf_raw.transition_buffers(iter::once(hal::BufferBarrier::<A> {
+                        buffer: buf,
+                        usage: hal::BufferUses::QUERY_RESOLVE | hal::BufferUses::COPY_DST..hal::BufferUses::MAP_READ,
+                    }));
                 }
             }
         }

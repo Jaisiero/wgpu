@@ -482,9 +482,12 @@ impl crate::framework::Example for Example {
             iter::empty(),
         );
         queue.submit(Some(encoder.finish()));
+        let timer = Instant::now();
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         let blas = encoder.compact_blas(&blas);
-
+        queue.submit(Some(encoder.finish()));
+        println!("{}",timer.elapsed().as_micros());
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         for x in 0..side_count {
             for y in 0..side_count {
                 *tlas_package

@@ -388,11 +388,29 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         acceleration_structure: &super::AccelerationStructure,
         buffer: &super::Buffer,
     ) {
+        let ray_tracing_functions = self
+            .device
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
         let query_pool = acceleration_structure
             .compacted_size_query
             .as_ref()
             .unwrap();
         unsafe {
+            self.device
+                .raw
+                .cmd_reset_query_pool(self.active, *query_pool, 0, 1);
+            ray_tracing_functions
+                .acceleration_structure
+                .cmd_write_acceleration_structures_properties(
+                    self.active,
+                    &[acceleration_structure.raw],
+                    vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+                    *query_pool,
+                    0,
+                );
             self.device.raw.cmd_copy_query_pool_results(
                 self.active,
                 *query_pool,
@@ -482,10 +500,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             [&[vk::AccelerationStructureBuildRangeInfoKHR]; CAPACITY_OUTER],
         >::with_capacity(descriptor_count);
 
-        // stores the size query pool and raw acceleration structures because the queries need to happen after the structure is built
-        let mut raw_acceleration_structures = smallvec::SmallVec::<
-            [(vk::AccelerationStructureKHR, vk::QueryPool); CAPACITY_OUTER],
-        >::with_capacity(descriptor_count);
         for desc in iter {
             let (geometries, ranges) = match *desc.entries {
                 crate::AccelerationStructureEntries::Instances(ref instances) => {
@@ -639,10 +653,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             }
 
             geometry_infos.push(*geometry_info);
-            if let Some(query) = desc.destination_acceleration_structure.compacted_size_query {
-                raw_acceleration_structures
-                    .push((desc.destination_acceleration_structure.raw, query));
-            }
         }
 
         for (i, geometry_info) in geometry_infos.iter_mut().enumerate() {
@@ -655,22 +665,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             ray_tracing_functions
                 .acceleration_structure
                 .cmd_build_acceleration_structures(self.active, &geometry_infos, &ranges_ptrs);
-        }
-        for (acceleration_structure, query) in raw_acceleration_structures {
-            unsafe {
-                self.device
-                    .raw
-                    .cmd_reset_query_pool(self.active, query, 0, 1);
-                ray_tracing_functions
-                    .acceleration_structure
-                    .cmd_write_acceleration_structures_properties(
-                        self.active,
-                        &[acceleration_structure],
-                        vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
-                        query,
-                        0,
-                    )
-            }
         }
     }
 
