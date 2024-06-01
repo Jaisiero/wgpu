@@ -527,6 +527,12 @@ fn adjust_expr(new_pos: &[Handle<Expression>], expr: &mut Expression) {
         | Expression::WorkGroupUniformLoadResult { ty: _ }
         | Expression::SubgroupBallotResult
         | Expression::SubgroupOperationResult { .. } => {}
+        Expression::RayQueryVertexPositions {
+            ref mut query,
+            committed: _,
+        } => {
+            adjust(query);
+        }
     }
 }
 

@@ -516,6 +516,10 @@ pub fn create_validator(
         Caps::RAY_QUERY,
         features.intersects(wgt::Features::RAY_QUERY),
     );
+    caps.set(
+        Caps::RAY_HIT_VERTEX_POSITION,
+        features.intersects(wgt::Features::RAY_HIT_VERTEX_RETURN),
+    );
 
     let mut subgroup_stages = naga::valid::ShaderStages::empty();
     subgroup_stages.set(

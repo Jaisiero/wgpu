@@ -105,8 +105,7 @@ pub struct PhysicalDeviceFeatures {
     /// to Vulkan 1.3.
     zero_initialize_workgroup_memory:
         Option<vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures<'static>>,
-    position_fetch: Option<vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR>,
-}
+    position_fetch: Option<vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR<'static>>,
 
     /// Features provided by `VK_EXT_subgroup_size_control`, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlFeatures<'static>>,
@@ -435,12 +434,11 @@ impl PhysicalDeviceFeatures {
                 None
             },
             position_fetch: if enabled_extensions
-                .contains(&vk::KhrRayTracingPositionFetchFn::name())
+                .contains(&khr::ray_tracing_position_fetch::NAME)
             {
                 Some(
-                    vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::builder()
+                    vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::default()
                         .ray_tracing_position_fetch(true)
-                        .build(),
                 )
             } else {
                 None
@@ -587,7 +585,7 @@ impl PhysicalDeviceFeatures {
         );
         features.set(
             F::RAY_HIT_VERTEX_RETURN,
-            caps.supports_extension(vk::KhrRayTracingPositionFetchFn::name()),
+            caps.supports_extension(khr::ray_tracing_position_fetch::NAME),
         );
 
         let intel_windows = caps.properties.vendor_id == db::intel::VENDOR && cfg!(windows);
@@ -971,7 +969,7 @@ impl PhysicalDeviceProperties {
         }
 
         if requested_features.contains(wgt::Features::RAY_HIT_VERTEX_RETURN) {
-            extensions.push(vk::KhrRayTracingPositionFetchFn::name())
+            extensions.push(khr::ray_tracing_position_fetch::NAME)
         }
 
         // Require `VK_EXT_conservative_rasterization` if the associated feature was requested
@@ -1257,11 +1255,11 @@ impl super::InstanceShared {
                 features2 = features2.push_next(next);
             }
 
-            if capabilities.supports_extension(vk::KhrRayTracingPositionFetchFn::name()) {
+            if capabilities.supports_extension(khr::ray_tracing_position_fetch::NAME) {
                 let next = features
                     .position_fetch
                     .insert(vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::default());
-                builder = builder.push_next(next);
+                features2 = features2.push_next(next);
             }
 
             // `VK_KHR_zero_initialize_workgroup_memory` is promoted to 1.3
