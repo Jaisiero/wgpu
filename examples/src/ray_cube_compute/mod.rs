@@ -396,6 +396,8 @@ impl crate::framework::Example for Example {
             layout: None,
             module: &shader,
             entry_point: "main",
+            compilation_options: Default::default(),
+            cache: None,
         });
 
         let compute_bind_group_layout = compute_pipeline.get_bind_group_layout(0);
@@ -425,11 +427,13 @@ impl crate::framework::Example for Example {
             vertex: wgpu::VertexState {
                 module: &blit_shader,
                 entry_point: "vs_main",
+                compilation_options: Default::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &blit_shader,
                 entry_point: "fs_main",
+                compilation_options: Default::default(),
                 targets: &[Some(config.format.into())],
             }),
             primitive: wgpu::PrimitiveState {
@@ -439,6 +443,7 @@ impl crate::framework::Example for Example {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None,
         });
 
         let blit_bind_group_layout = blit_pipeline.get_bind_group_layout(0);
@@ -611,7 +616,7 @@ pub fn main() {
 #[wgpu_test::gpu_test]
 static TEST: crate::framework::ExampleTestParams = crate::framework::ExampleTestParams {
     name: "ray_cube_compute",
-    image_path: "/examples/ray_cube_compute/screenshot.png",
+    image_path: "/examples/src/ray_cube_compute/screenshot.png",
     width: 1024,
     height: 768,
     optional_features: wgpu::Features::default(),

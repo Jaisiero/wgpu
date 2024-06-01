@@ -225,7 +225,7 @@ pub enum BindingZone {
 }
 
 #[derive(Clone, Debug, Error)]
-#[error("Too many bindings of type {kind:?} in {zone}, limit is {limit}, count was {count}")]
+#[error("Too many bindings of type {kind:?} in {zone}, limit is {limit}, count was {count}. Check the limit `{}` passed to `Adapter::request_device`", .kind.to_config_str())]
 pub struct BindingTypeMaxCountError {
     pub kind: BindingTypeMaxCountErrorKind,
     pub zone: BindingZone,
@@ -242,6 +242,28 @@ pub enum BindingTypeMaxCountErrorKind {
     StorageBuffers,
     StorageTextures,
     UniformBuffers,
+}
+
+impl BindingTypeMaxCountErrorKind {
+    fn to_config_str(&self) -> &'static str {
+        match self {
+            BindingTypeMaxCountErrorKind::DynamicUniformBuffers => {
+                "max_dynamic_uniform_buffers_per_pipeline_layout"
+            }
+            BindingTypeMaxCountErrorKind::DynamicStorageBuffers => {
+                "max_dynamic_storage_buffers_per_pipeline_layout"
+            }
+            BindingTypeMaxCountErrorKind::SampledTextures => {
+                "max_sampled_textures_per_shader_stage"
+            }
+            BindingTypeMaxCountErrorKind::Samplers => "max_samplers_per_shader_stage",
+            BindingTypeMaxCountErrorKind::StorageBuffers => "max_storage_buffers_per_shader_stage",
+            BindingTypeMaxCountErrorKind::StorageTextures => {
+                "max_storage_textures_per_shader_stage"
+            }
+            BindingTypeMaxCountErrorKind::UniformBuffers => "max_uniform_buffers_per_shader_stage",
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -447,8 +469,6 @@ pub struct BindGroupLayoutDescriptor<'a> {
     pub entries: Cow<'a, [wgt::BindGroupLayoutEntry]>,
 }
 
-pub type BindGroupLayouts<A> = crate::storage::Storage<BindGroupLayout<A>>;
-
 /// Bind group layout.
 #[derive(Debug)]
 pub struct BindGroupLayout<A: HalApi> {
@@ -501,8 +521,8 @@ impl<A: HalApi> Resource for BindGroupLayout<A> {
         &mut self.info
     }
 
-    fn label(&self) -> String {
-        self.label.clone()
+    fn label(&self) -> &str {
+        &self.label
     }
 }
 impl<A: HalApi> BindGroupLayout<A> {

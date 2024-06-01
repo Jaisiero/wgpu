@@ -274,6 +274,7 @@ bitflags::bitflags! {
         /// - Vulkan (mostly)
         /// - DX12
         /// - Metal
+        /// - OpenGL
         ///
         /// This is a web and native feature.
         const DEPTH32FLOAT_STENCIL8 = 1 << 1;
@@ -336,7 +337,7 @@ bitflags::bitflags! {
         /// For arbitrary timestamp write commands on encoders refer to [`Features::TIMESTAMP_QUERY_INSIDE_ENCODERS`].
         /// For arbitrary timestamp write commands on passes refer to [`Features::TIMESTAMP_QUERY_INSIDE_PASSES`].
         ///
-        /// They must be resolved using [`CommandEncoder::resolve_query_sets`] into a buffer,
+        /// They must be resolved using [`CommandEncoder::resolve_query_set`] into a buffer,
         /// then the result must be multiplied by the timestamp period [`Queue::get_timestamp_period`]
         /// to get the timestamp in nanoseconds. Multiple timestamps can then be diffed to get the
         /// time for operations between them to finish.
@@ -370,7 +371,7 @@ bitflags::bitflags! {
 
         /// Allows shaders to acquire the FP16 ability
         ///
-        /// Note: this is not supported in `naga` yet，only through `spirv-passthrough` right now.
+        /// Note: this is not supported in `naga` yet, only through `spirv-passthrough` right now.
         ///
         /// Supported Platforms:
         /// - Vulkan
@@ -479,10 +480,10 @@ bitflags::bitflags! {
         // API:
 
         /// Enables use of Pipeline Statistics Queries. These queries tell the count of various operations
-        /// performed between the start and stop call. Call [`RenderPassEncoder::begin_pipeline_statistics_query`] to start
-        /// a query, then call [`RenderPassEncoder::end_pipeline_statistics_query`] to stop one.
+        /// performed between the start and stop call. Call [`RenderPass::begin_pipeline_statistics_query`] to start
+        /// a query, then call [`RenderPass::end_pipeline_statistics_query`] to stop one.
         ///
-        /// They must be resolved using [`CommandEncoder::resolve_query_sets`] into a buffer.
+        /// They must be resolved using [`CommandEncoder::resolve_query_set`] into a buffer.
         /// The rules on how these resolve into buffers are detailed in the documentation for [`PipelineStatisticsTypes`].
         ///
         /// Supported Platforms:
@@ -510,8 +511,8 @@ bitflags::bitflags! {
         /// Implies [`Features::TIMESTAMP_QUERY`] & [`Features::TIMESTAMP_QUERY_INSIDE_ENCODERS`] is supported.
         ///
         /// Additionally allows for timestamp queries to be used inside render & compute passes using:
-        /// - [`RenderPassEncoder::write_timestamp`]
-        /// - [`ComputePassEncoder::write_timestamp`]
+        /// - [`RenderPass::write_timestamp`]
+        /// - [`ComputePass::write_timestamp`]
         ///
         /// Supported platforms:
         /// - Vulkan
@@ -681,7 +682,14 @@ bitflags::bitflags! {
         /// Allows the user to call [`RenderPass::set_push_constants`], provide a non-empty array
         /// to [`PipelineLayoutDescriptor`], and provide a non-zero limit to [`Limits::max_push_constant_size`].
         ///
-        /// A block of push constants can be declared with `layout(push_constant) uniform Name {..}` in shaders.
+        /// A block of push constants can be declared in WGSL with `var<push_constant>`:
+        ///
+        /// ```rust,ignore
+        /// struct PushConstants { example: f32, }
+        /// var<push_constant> c: PushConstants;
+        /// ```
+        ///
+        /// In GLSL, this corresponds to `layout(push_constant) uniform Name {..}`.
         ///
         /// Supported platforms:
         /// - DX12
@@ -873,6 +881,48 @@ bitflags::bitflags! {
         /// - Vulkan (with dualSrcBlend)
         /// - DX12
         const DUAL_SOURCE_BLENDING = 1 << 54;
+        /// Allows shaders to use i64 and u64.
+        ///
+        /// Supported platforms:
+        /// - Vulkan
+        /// - DX12 (DXC only)
+        /// - Metal (with MSL 2.3+)
+        ///
+        /// This is a native only feature.
+        const SHADER_INT64 = 1 << 55;
+        /// Allows compute and fragment shaders to use the subgroup operation built-ins
+        ///
+        /// Supported Platforms:
+        /// - Vulkan
+        /// - DX12
+        /// - Metal
+        ///
+        /// This is a native only feature.
+        const SUBGROUP = 1 << 56;
+        /// Allows vertex shaders to use the subgroup operation built-ins
+        ///
+        /// Supported Platforms:
+        /// - Vulkan
+        ///
+        /// This is a native only feature.
+        const SUBGROUP_VERTEX = 1 << 57;
+        /// Allows shaders to use the subgroup barrier
+        ///
+        /// Supported Platforms:
+        /// - Vulkan
+        /// - Metal
+        ///
+        /// This is a native only feature.
+        const SUBGROUP_BARRIER = 1 << 58;
+        /// Allows the use of pipeline cache objects
+        ///
+        /// Supported platforms:
+        /// - Vulkan
+        ///
+        /// Unimplemented Platforms:
+        /// - DX12
+        /// - Metal
+        const PIPELINE_CACHE = 1 << 59;
         /// Allows for returning of hit triangles vertex position on acceleration
         /// structure marked with [`AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN`].
         ///
@@ -1110,7 +1160,7 @@ pub struct Limits {
     /// pipeline output data, across all color attachments.
     pub max_color_attachment_bytes_per_sample: u32,
     /// Maximum number of bytes used for workgroup memory in a compute entry point. Defaults to
-    /// 16352. Higher is "better".
+    /// 16384. Higher is "better".
     pub max_compute_workgroup_storage_size: u32,
     /// Maximum value of the product of the `workgroup_size` dimensions for a compute entry-point.
     /// Defaults to 256. Higher is "better".
@@ -1127,6 +1177,11 @@ pub struct Limits {
     /// The maximum value for each dimension of a `ComputePass::dispatch(x, y, z)` operation.
     /// Defaults to 65535. Higher is "better".
     pub max_compute_workgroups_per_dimension: u32,
+
+    /// Minimal number of invocations in a subgroup. Higher is "better".
+    pub min_subgroup_size: u32,
+    /// Maximal number of invocations in a subgroup. Lower is "better".
+    pub max_subgroup_size: u32,
     /// Amount of storage available for push constants in bytes. Defaults to 0. Higher is "better".
     /// Requesting more than 0 during device creation requires [`Features::PUSH_CONSTANTS`] to be enabled.
     ///
@@ -1137,7 +1192,6 @@ pub struct Limits {
     /// - OpenGL doesn't natively support push constants, and are emulated with uniforms,
     ///   so this number is less useful but likely 256.
     pub max_push_constant_size: u32,
-
     /// Maximum number of live non-sampler bindings.
     ///
     /// This limit only affects the d3d12 backend. Using a large number will allow the device
@@ -1147,6 +1201,14 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Self {
+        Self::defaults()
+    }
+}
+
+impl Limits {
+    // Rust doesn't allow const in trait implementations, so we break this out
+    // to allow reusing these defaults in const contexts like `downlevel_defaults`
+    const fn defaults() -> Self {
         Self {
             max_texture_dimension_1d: 8192,
             max_texture_dimension_2d: 8192,
@@ -1161,10 +1223,10 @@ impl Default for Limits {
             max_storage_buffers_per_shader_stage: 8,
             max_storage_textures_per_shader_stage: 4,
             max_uniform_buffers_per_shader_stage: 12,
-            max_uniform_buffer_binding_size: 64 << 10,
-            max_storage_buffer_binding_size: 128 << 20,
+            max_uniform_buffer_binding_size: 64 << 10, // (64 KiB)
+            max_storage_buffer_binding_size: 128 << 20, // (128 MiB)
             max_vertex_buffers: 8,
-            max_buffer_size: 256 << 20,
+            max_buffer_size: 256 << 20, // (256 MiB)
             max_vertex_attributes: 16,
             max_vertex_buffer_array_stride: 2048,
             min_uniform_buffer_offset_alignment: 256,
@@ -1178,13 +1240,13 @@ impl Default for Limits {
             max_compute_workgroup_size_y: 256,
             max_compute_workgroup_size_z: 64,
             max_compute_workgroups_per_dimension: 65535,
+            min_subgroup_size: 0,
+            max_subgroup_size: 0,
             max_push_constant_size: 0,
             max_non_sampler_bindings: 1_000_000,
         }
     }
-}
 
-impl Limits {
     /// These default limits are guaranteed to be compatible with GLES-3.1, and D3D11
     ///
     /// Those limits are as follows (different from default are marked with *):
@@ -1209,13 +1271,15 @@ impl Limits {
     ///     max_vertex_buffers: 8,
     ///     max_vertex_attributes: 16,
     ///     max_vertex_buffer_array_stride: 2048,
+    ///     min_subgroup_size: 0,
+    ///     max_subgroup_size: 0,
     ///     max_push_constant_size: 0,
     ///     min_uniform_buffer_offset_alignment: 256,
     ///     min_storage_buffer_offset_alignment: 256,
     ///     max_inter_stage_shader_components: 60,
     ///     max_color_attachments: 8,
     ///     max_color_attachment_bytes_per_sample: 32,
-    ///     max_compute_workgroup_storage_size: 16352,
+    ///     max_compute_workgroup_storage_size: 16352, // *
     ///     max_compute_invocations_per_workgroup: 256,
     ///     max_compute_workgroup_size_x: 256,
     ///     max_compute_workgroup_size_y: 256,
@@ -1225,40 +1289,16 @@ impl Limits {
     ///     max_non_sampler_bindings: 1_000_000,
     /// });
     /// ```
-    pub fn downlevel_defaults() -> Self {
+    pub const fn downlevel_defaults() -> Self {
         Self {
             max_texture_dimension_1d: 2048,
             max_texture_dimension_2d: 2048,
             max_texture_dimension_3d: 256,
-            max_texture_array_layers: 256,
-            max_bind_groups: 4,
-            max_bindings_per_bind_group: 1000,
-            max_dynamic_uniform_buffers_per_pipeline_layout: 8,
-            max_dynamic_storage_buffers_per_pipeline_layout: 4,
-            max_sampled_textures_per_shader_stage: 16,
-            max_samplers_per_shader_stage: 16,
             max_storage_buffers_per_shader_stage: 4,
-            max_storage_textures_per_shader_stage: 4,
-            max_uniform_buffers_per_shader_stage: 12,
-            max_uniform_buffer_binding_size: 16 << 10,
-            max_storage_buffer_binding_size: 128 << 20,
-            max_vertex_buffers: 8,
-            max_vertex_attributes: 16,
-            max_vertex_buffer_array_stride: 2048,
-            max_push_constant_size: 0,
-            min_uniform_buffer_offset_alignment: 256,
-            min_storage_buffer_offset_alignment: 256,
-            max_inter_stage_shader_components: 60,
-            max_color_attachments: 8,
-            max_color_attachment_bytes_per_sample: 32,
+            max_uniform_buffer_binding_size: 16 << 10, // (16 KiB)
+            // see: https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf#page=7
             max_compute_workgroup_storage_size: 16352,
-            max_compute_invocations_per_workgroup: 256,
-            max_compute_workgroup_size_x: 256,
-            max_compute_workgroup_size_y: 256,
-            max_compute_workgroup_size_z: 64,
-            max_compute_workgroups_per_dimension: 65535,
-            max_buffer_size: 256 << 20,
-            max_non_sampler_bindings: 1_000_000,
+            ..Self::defaults()
         }
     }
 
@@ -1287,6 +1327,8 @@ impl Limits {
     ///     max_vertex_buffers: 8,
     ///     max_vertex_attributes: 16,
     ///     max_vertex_buffer_array_stride: 255, // +
+    ///     min_subgroup_size: 0,
+    ///     max_subgroup_size: 0,
     ///     max_push_constant_size: 0,
     ///     min_uniform_buffer_offset_alignment: 256,
     ///     min_storage_buffer_offset_alignment: 256,
@@ -1303,7 +1345,7 @@ impl Limits {
     ///     max_non_sampler_bindings: 1_000_000,
     /// });
     /// ```
-    pub fn downlevel_webgl2_defaults() -> Self {
+    pub const fn downlevel_webgl2_defaults() -> Self {
         Self {
             max_uniform_buffers_per_shader_stage: 11,
             max_storage_buffers_per_shader_stage: 0,
@@ -1317,6 +1359,8 @@ impl Limits {
             max_compute_workgroup_size_y: 0,
             max_compute_workgroup_size_z: 0,
             max_compute_workgroups_per_dimension: 0,
+            min_subgroup_size: 0,
+            max_subgroup_size: 0,
 
             // Value supported by Intel Celeron B830 on Windows (OpenGL 3.1)
             max_inter_stage_shader_components: 31,
@@ -1331,7 +1375,7 @@ impl Limits {
     /// This is useful because the swapchain might need to be larger than any other image in the application.
     ///
     /// If your application only needs 512x512, you might be running on a 4k display and need extremely high resolution limits.
-    pub fn using_resolution(self, other: Self) -> Self {
+    pub const fn using_resolution(self, other: Self) -> Self {
         Self {
             max_texture_dimension_1d: other.max_texture_dimension_1d,
             max_texture_dimension_2d: other.max_texture_dimension_2d,
@@ -1343,7 +1387,7 @@ impl Limits {
     /// Modify the current limits to use the buffer alignment limits of the adapter.
     ///
     /// This is useful for when you'd like to dynamically use the "best" supported buffer alignments.
-    pub fn using_alignment(self, other: Self) -> Self {
+    pub const fn using_alignment(self, other: Self) -> Self {
         Self {
             min_uniform_buffer_offset_alignment: other.min_uniform_buffer_offset_alignment,
             min_storage_buffer_offset_alignment: other.min_storage_buffer_offset_alignment,
@@ -1409,6 +1453,10 @@ impl Limits {
         compare!(max_vertex_buffers, Less);
         compare!(max_vertex_attributes, Less);
         compare!(max_vertex_buffer_array_stride, Less);
+        if self.min_subgroup_size > 0 && self.max_subgroup_size > 0 {
+            compare!(min_subgroup_size, Greater);
+            compare!(max_subgroup_size, Less);
+        }
         compare!(max_push_constant_size, Less);
         compare!(min_uniform_buffer_offset_alignment, Greater);
         compare!(min_storage_buffer_offset_alignment, Greater);
@@ -2137,6 +2185,9 @@ pub struct PrimitiveState {
     pub topology: PrimitiveTopology,
     /// When drawing strip topologies with indices, this is the required format for the index buffer.
     /// This has no effect on non-indexed or non-strip draws.
+    ///
+    /// Specifying this value enables primitive restart, allowing individual strips to be separated
+    /// with the index value `0xFFFF` when using `Uint16`, or `0xFFFFFFFF` when using `Uint32`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub strip_index_format: Option<IndexFormat>,
     /// The face to consider the front for the purpose of culling and stencil operations.
@@ -4930,6 +4981,9 @@ pub enum VertexFormat {
     Float64x3 = 32,
     /// Four double-precision floats (f64). `vec4<f32>` in shaders. Requires [`Features::VERTEX_ATTRIBUTE_64BIT`].
     Float64x4 = 33,
+    /// Three unsigned 10-bit integers and one 2-bit integer, packed into a 32-bit integer (u32). [0, 1024] converted to float [0, 1] `vec4<f32>` in shaders.
+    #[cfg_attr(feature = "serde", serde(rename = "unorm10-10-10-2"))]
+    Unorm10_10_10_2 = 34,
 }
 
 impl VertexFormat {
@@ -4948,7 +5002,8 @@ impl VertexFormat {
             | Self::Float16x2
             | Self::Float32
             | Self::Uint32
-            | Self::Sint32 => 4,
+            | Self::Sint32
+            | Self::Unorm10_10_10_2 => 4,
             Self::Uint16x4
             | Self::Sint16x4
             | Self::Unorm16x4
@@ -5459,9 +5514,9 @@ pub enum TextureDimension {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Origin2d {
-    ///
+    #[allow(missing_docs)]
     pub x: u32,
-    ///
+    #[allow(missing_docs)]
     pub y: u32,
 }
 
@@ -7072,7 +7127,7 @@ pub struct InstanceDescriptor {
     pub flags: InstanceFlags,
     /// Which DX12 shader compiler to use.
     pub dx12_shader_compiler: Dx12Compiler,
-    /// Which OpenGL ES 3 minor version to request.
+    /// Which OpenGL ES 3 minor version to request. Will be ignored if OpenGL is available.
     pub gles_minor_version: Gles3MinorVersion,
 }
 
@@ -7295,7 +7350,8 @@ mod send_sync {
 ///
 /// Corresponds to [WebGPU `GPUDeviceLostReason`](https://gpuweb.github.io/gpuweb/#enumdef-gpudevicelostreason).
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DeviceLostReason {
     /// Triggered by driver
     Unknown = 0,
@@ -7315,4 +7371,10 @@ pub enum DeviceLostReason {
     /// exactly once before it is dropped, which helps with managing the
     /// memory owned by the callback.
     ReplacedCallback = 3,
+    /// When setting the callback, but the device is already invalid
+    ///
+    /// As above, when the callback is provided, wgpu guarantees that it
+    /// will eventually be called. If the device is already invalid, wgpu
+    /// will call the callback immediately, with this reason.
+    DeviceInvalid = 4,
 }

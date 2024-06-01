@@ -5,12 +5,13 @@ use crate::{
     global::Global,
     hal_api::HalApi,
     id::{self, BlasId, TlasId},
+    lock::{Mutex, RwLock},
     ray_tracing::{get_raw_tlas_instance_size, CreateBlasError, CreateTlasError},
     resource, LabelHelpers,
 };
-use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
+use crate::lock::rank;
 use crate::resource::{ResourceInfo, StagingBuffer};
 use hal::{AccelerationStructureTriangleIndices, Device as _};
 
@@ -89,13 +90,14 @@ impl<A: HalApi> Device<A> {
                     .label
                     .to_hal(self.instance_flags)
                     .unwrap_or("<BindGroupLayoyt>"),
+                Some(self.tracker_indices.blas_s.clone()),
             ),
             size_info,
             sizes,
             flags: blas_desc.flags,
             update_mode: blas_desc.update_mode,
             handle,
-            built_index: RwLock::new(None),
+            built_index: RwLock::new(rank::BLAS_BUILT_INDEX, None),
         })
     }
 
@@ -159,13 +161,14 @@ impl<A: HalApi> Device<A> {
                 desc.label
                     .to_hal(self.instance_flags)
                     .unwrap_or("<BindGroupLayoyt>"),
+                Some(self.tracker_indices.tlas_s.clone()),
             ),
             size_info,
             flags: desc.flags,
             update_mode: desc.update_mode,
-            built_index: RwLock::new(None),
-            dependencies: RwLock::new(Vec::new()),
-            instance_buffer: RwLock::new(Some(instance_buffer)),
+            built_index: RwLock::new(rank::TLAS_BUILT_INDEX, None),
+            dependencies: RwLock::new(rank::TLAS_DEPENDENCIES, Vec::new()),
+            instance_buffer: RwLock::new(rank::TLAS_INSTANCE_BUFFER, Some(instance_buffer)),
             max_instance_count: desc.max_instances,
         })
     }
@@ -209,10 +212,10 @@ impl Global {
             };
             let handle = blas.handle;
 
-            let (id, resource) = fid.assign(blas);
+            let (id, resource) = fid.assign(Arc::new(blas));
             log::info!("Created blas {:?} with {:?}", id, desc);
 
-            device.trackers.lock().blas_s.insert_single(id, resource);
+            device.trackers.lock().blas_s.insert_single(resource);
 
             return (id, Some(handle), None);
         };
@@ -251,12 +254,12 @@ impl Global {
                 Err(e) => break e,
             };
 
-            let id = fid.assign(tlas);
-            log::info!("Created tlas {:?} with {:?}", id.0, desc);
+            let (id, resource) = fid.assign(Arc::new(tlas));
+            log::info!("Created tlas {:?} with {:?}", id, desc);
 
-            device.trackers.lock().tlas_s.insert_single(id.0, id.1);
+            device.trackers.lock().tlas_s.insert_single(resource);
 
-            return (id.0, None);
+            return (id, None);
         };
 
         let id = fid.assign_error(desc.label.borrow_or_default());
@@ -308,7 +311,7 @@ impl Global {
                 .lock_life()
                 .suspected_resources
                 .blas_s
-                .insert(blas_id, blas.clone());
+                .insert(blas.info.tracker_index(), blas.clone());
 
             if wait {
                 match blas.device.wait_for_submit(last_submit_index) {
@@ -352,10 +355,13 @@ impl Global {
                         .map_err(|_| resource::DestroyError::Invalid)?
                 };
                 Some(TempResource::StagingBuffer(Arc::new(StagingBuffer {
-                    raw: Mutex::new(Some(e)),
+                    raw: Mutex::new(rank::STAGING_BUFFER_RAW, Some(e)),
                     device: device.clone(),
                     size,
-                    info: ResourceInfo::new("Raytracing scratch buffer"),
+                    info: ResourceInfo::new(
+                        "Raytracing scratch buffer",
+                        Some(device.tracker_indices.tlas_s.clone()),
+                    ),
                     is_coherent: mapping.is_coherent,
                 })))
             }
@@ -387,7 +393,7 @@ impl Global {
                 .lock_life()
                 .suspected_resources
                 .tlas_s
-                .insert(tlas_id, tlas.clone());
+                .insert(tlas.info.tracker_index(), tlas.clone());
 
             if wait {
                 match tlas.device.wait_for_submit(last_submit_index) {

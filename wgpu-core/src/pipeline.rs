@@ -1,16 +1,18 @@
 #[cfg(feature = "trace")]
 use crate::device::trace;
+pub use crate::pipeline_cache::PipelineCacheValidationError;
 use crate::{
     binding_model::{CreateBindGroupLayoutError, CreatePipelineLayoutError, PipelineLayout},
     command::ColorAttachmentError,
     device::{Device, DeviceError, MissingDownlevelFlags, MissingFeatures, RenderPassContext},
     hal_api::HalApi,
-    id::{PipelineLayoutId, ShaderModuleId},
+    id::{PipelineCacheId, PipelineLayoutId, ShaderModuleId},
     resource::{Resource, ResourceInfo, ResourceType},
     resource_log, validation, Label,
 };
 use arrayvec::ArrayVec;
-use std::{borrow::Cow, error::Error, fmt, marker::PhantomData, num::NonZeroU32, sync::Arc};
+use naga::error::ShaderError;
+use std::{borrow::Cow, marker::PhantomData, num::NonZeroU32, sync::Arc};
 use thiserror::Error;
 
 /// Information about buffer bindings, which
@@ -83,8 +85,8 @@ impl<A: HalApi> Resource for ShaderModule<A> {
         &mut self.info
     }
 
-    fn label(&self) -> String {
-        self.label.clone()
+    fn label(&self) -> &str {
+        &self.label
     }
 }
 
@@ -92,81 +94,23 @@ impl<A: HalApi> ShaderModule<A> {
     pub(crate) fn raw(&self) -> &A::ShaderModule {
         self.raw.as_ref().unwrap()
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct ShaderError<E> {
-    pub source: String,
-    pub label: Option<String>,
-    pub inner: Box<E>,
-}
-#[cfg(feature = "wgsl")]
-impl fmt::Display for ShaderError<naga::front::wgsl::ParseError> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
-}
-#[cfg(feature = "glsl")]
-impl fmt::Display for ShaderError<naga::front::glsl::ParseError> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
-}
-#[cfg(feature = "spirv")]
-impl fmt::Display for ShaderError<naga::front::spv::Error> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = self.label.as_deref().unwrap_or_default();
-        let string = self.inner.emit_to_string(&self.source);
-        write!(f, "\nShader '{label}' parsing {string}")
-    }
-}
-impl fmt::Display for ShaderError<naga::WithSpan<naga::valid::ValidationError>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use codespan_reporting::{
-            diagnostic::{Diagnostic, Label},
-            files::SimpleFile,
-            term,
-        };
-
-        let label = self.label.as_deref().unwrap_or_default();
-        let files = SimpleFile::new(label, &self.source);
-        let config = term::Config::default();
-        let mut writer = term::termcolor::NoColor::new(Vec::new());
-
-        let diagnostic = Diagnostic::error().with_labels(
-            self.inner
-                .spans()
-                .map(|&(span, ref desc)| {
-                    Label::primary((), span.to_range().unwrap()).with_message(desc.to_owned())
-                })
-                .collect(),
-        );
-
-        term::emit(&mut writer, &config, &files, &diagnostic).expect("cannot write error");
-
-        write!(
-            f,
-            "\nShader validation {}",
-            String::from_utf8_lossy(&writer.into_inner())
-        )
-    }
-}
-impl<E> Error for ShaderError<E>
-where
-    ShaderError<E>: fmt::Display,
-    E: Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.inner)
+    pub(crate) fn finalize_entry_point_name(
+        &self,
+        stage_bit: wgt::ShaderStages,
+        entry_point: Option<&str>,
+    ) -> Result<String, validation::StageError> {
+        match &self.interface {
+            Some(interface) => interface.finalize_entry_point_name(stage_bit, entry_point),
+            None => entry_point
+                .map(|ep| ep.to_string())
+                .ok_or(validation::StageError::NoEntryPointFound),
+        }
     }
 }
 
 //Note: `Clone` would require `WithSpan: Clone`.
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum CreateShaderModuleError {
     #[cfg(feature = "wgsl")]
@@ -174,7 +118,7 @@ pub enum CreateShaderModuleError {
     Parsing(#[from] ShaderError<naga::front::wgsl::ParseError>),
     #[cfg(feature = "glsl")]
     #[error(transparent)]
-    ParsingGlsl(#[from] ShaderError<naga::front::glsl::ParseError>),
+    ParsingGlsl(#[from] ShaderError<naga::front::glsl::ParseErrors>),
     #[cfg(feature = "spirv")]
     #[error(transparent)]
     ParsingSpirV(#[from] ShaderError<naga::front::spv::Error>),
@@ -196,26 +140,34 @@ pub enum CreateShaderModuleError {
     },
 }
 
-impl CreateShaderModuleError {
-    pub fn location(&self, source: &str) -> Option<naga::SourceLocation> {
-        match *self {
-            #[cfg(feature = "wgsl")]
-            CreateShaderModuleError::Parsing(ref err) => err.inner.location(source),
-            CreateShaderModuleError::Validation(ref err) => err.inner.location(source),
-            _ => None,
-        }
-    }
-}
-
 /// Describes a programmable pipeline stage.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProgrammableStageDescriptor<'a> {
     /// The compiled shader module for this stage.
     pub module: ShaderModuleId,
-    /// The name of the entry point in the compiled shader. There must be a function with this name
-    /// in the shader.
-    pub entry_point: Cow<'a, str>,
+    /// The name of the entry point in the compiled shader. The name is selected using the
+    /// following logic:
+    ///
+    /// * If `Some(name)` is specified, there must be a function with this name in the shader.
+    /// * If a single entry point associated with this stage must be in the shader, then proceed as
+    ///   if `Some(…)` was specified with that entry point's name.
+    pub entry_point: Option<Cow<'a, str>>,
+    /// Specifies the values of pipeline-overridable constants in the shader module.
+    ///
+    /// If an `@id` attribute was specified on the declaration,
+    /// the key must be the pipeline constant ID as a decimal ASCII number; if not,
+    /// the key must be the constant's identifier name.
+    ///
+    /// The value may represent any of WGSL's concrete scalar types.
+    pub constants: Cow<'a, naga::back::PipelineConstants>,
+    /// Whether workgroup scoped memory will be initialized with zero values for this stage.
+    ///
+    /// This is required by the WebGPU spec, but may have overhead which can be avoided
+    /// for cross-platform applications
+    pub zero_initialize_workgroup_memory: bool,
+    /// Should the pipeline attempt to transform vertex shaders to use vertex pulling.
+    pub vertex_pulling_transform: bool,
 }
 
 /// Number of implicit bind groups derived at pipeline creation.
@@ -243,6 +195,8 @@ pub struct ComputePipelineDescriptor<'a> {
     pub layout: Option<PipelineLayoutId>,
     /// The compiled compute stage and its entry point.
     pub stage: ProgrammableStageDescriptor<'a>,
+    /// The pipeline cache to use when creating this pipeline.
+    pub cache: Option<PipelineCacheId>,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -310,6 +264,68 @@ impl<A: HalApi> ComputePipeline<A> {
     }
 }
 
+#[derive(Clone, Debug, Error)]
+#[non_exhaustive]
+pub enum CreatePipelineCacheError {
+    #[error(transparent)]
+    Device(#[from] DeviceError),
+    #[error("Pipeline cache validation failed")]
+    Validation(#[from] PipelineCacheValidationError),
+    #[error(transparent)]
+    MissingFeatures(#[from] MissingFeatures),
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
+
+impl From<hal::PipelineCacheError> for CreatePipelineCacheError {
+    fn from(value: hal::PipelineCacheError) -> Self {
+        match value {
+            hal::PipelineCacheError::Device(device) => {
+                CreatePipelineCacheError::Device(device.into())
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PipelineCache<A: HalApi> {
+    pub(crate) raw: Option<A::PipelineCache>,
+    pub(crate) device: Arc<Device<A>>,
+    pub(crate) info: ResourceInfo<PipelineCache<A>>,
+}
+
+impl<A: HalApi> Drop for PipelineCache<A> {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw.take() {
+            resource_log!("Destroy raw PipelineCache {:?}", self.info.label());
+
+            #[cfg(feature = "trace")]
+            if let Some(t) = self.device.trace.lock().as_mut() {
+                t.add(trace::Action::DestroyPipelineCache(self.info.id()));
+            }
+
+            unsafe {
+                use hal::Device;
+                self.device.raw().destroy_pipeline_cache(raw);
+            }
+        }
+    }
+}
+
+impl<A: HalApi> Resource for PipelineCache<A> {
+    const TYPE: ResourceType = "PipelineCache";
+
+    type Marker = crate::id::markers::PipelineCache;
+
+    fn as_info(&self) -> &ResourceInfo<Self> {
+        &self.info
+    }
+
+    fn as_info_mut(&mut self) -> &mut ResourceInfo<Self> {
+        &mut self.info
+    }
+}
+
 /// Describes how the vertex buffer is interpreted.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -366,6 +382,16 @@ pub struct RenderPipelineDescriptor<'a> {
     /// If the pipeline will be used with a multiview render pass, this indicates how many array
     /// layers the attachments will have.
     pub multiview: Option<NonZeroU32>,
+    /// The pipeline cache to use when creating this pipeline.
+    pub cache: Option<PipelineCacheId>,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PipelineCacheDescriptor<'a> {
+    pub label: Label<'a>,
+    pub data: Option<Cow<'a, [u8]>>,
+    pub fallback: bool,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -471,6 +497,11 @@ pub enum CreateRenderPipelineError {
     PipelineExpectsShaderToUseDualSourceBlending,
     #[error("Shader entry point expects the pipeline to make use of dual-source blending.")]
     ShaderExpectsPipelineToUseDualSourceBlending,
+    #[error("{}", concat!(
+        "At least one color attachment or depth-stencil attachment was expected, ",
+        "but no render target for the pipeline was specified."
+    ))]
+    NoTargetSpecified,
 }
 
 bitflags::bitflags! {

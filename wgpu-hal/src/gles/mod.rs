@@ -154,6 +154,7 @@ impl crate::Api for Api {
     type QuerySet = QuerySet;
     type Fence = Fence;
     type AccelerationStructure = ();
+    type PipelineCache = ();
 
     type BindGroupLayout = BindGroupLayout;
     type BindGroup = BindGroup;
@@ -251,6 +252,11 @@ struct AdapterShared {
     next_shader_id: AtomicU32,
     program_cache: Mutex<ProgramCache>,
     es: bool,
+
+    /// Result of `gl.get_parameter_i32(glow::MAX_SAMPLES)`.
+    /// Cached here so it doesn't need to be queried every time texture format capabilities are requested.
+    /// (this has been shown to be a significant enough overhead)
+    max_msaa_samples: i32,
 }
 
 pub struct Adapter {
@@ -264,6 +270,11 @@ pub struct Device {
     render_doc: crate::auxil::renderdoc::RenderDoc,
 }
 
+pub struct ShaderClearProgram {
+    pub program: glow::Program,
+    pub color_uniform_location: glow::UniformLocation,
+}
+
 pub struct Queue {
     shared: Arc<AdapterShared>,
     features: wgt::Features,
@@ -271,9 +282,7 @@ pub struct Queue {
     copy_fbo: glow::Framebuffer,
     /// Shader program used to clear the screen for [`Workarounds::MESA_I915_SRGB_SHADER_CLEAR`]
     /// devices.
-    shader_clear_program: glow::Program,
-    /// The uniform location of the color uniform in the shader clear program
-    shader_clear_program_color_uniform_location: glow::UniformLocation,
+    shader_clear_program: Option<ShaderClearProgram>,
     /// Keep a reasonably large buffer filled with zeroes, so that we can implement `ClearBuffer` of
     /// zeroes by copying from it.
     zero_buffer: glow::Buffer,
@@ -594,6 +603,7 @@ struct ProgramStage {
     naga_stage: naga::ShaderStage,
     shader_id: ShaderId,
     entry_point: String,
+    zero_initialize_workgroup_memory: bool,
 }
 
 #[derive(PartialEq, Eq, Hash)]

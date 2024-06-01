@@ -5,6 +5,7 @@ use crate::{
     hal_api::HalApi,
     id::CommandEncoderId,
     init_tracker::MemoryInitKind,
+    lock::{Mutex, RwLockReadGuard},
     ray_tracing::{
         tlas_instance_into_bytes, BlasAction, BlasBuildEntry, BlasGeometries,
         BuildAccelerationStructureError, TlasAction, TlasBuildEntry, TlasPackage,
@@ -17,11 +18,11 @@ use crate::{
 
 use wgt::{math::align_to, BufferUsages};
 
+use crate::lock::rank;
 use crate::ray_tracing::BlasTriangleGeometry;
 use crate::resource::{Buffer, Resource, ResourceInfo, StagingBuffer};
 use crate::track::PendingTransition;
 use hal::{BufferUses, CommandEncoder, Device};
-use parking_lot::{Mutex, RwLockReadGuard};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{cmp::max, iter, num::NonZeroU64, ops::Range, ptr};
@@ -699,10 +700,13 @@ impl Global {
             .unwrap()
             .temp_resources
             .push(TempResource::StagingBuffer(Arc::new(StagingBuffer {
-                raw: Mutex::new(Some(scratch_buffer)),
+                raw: Mutex::new(rank::BLAS, Some(scratch_buffer)),
                 device: device.clone(),
                 size: max(scratch_buffer_blas_size, scratch_buffer_tlas_size),
-                info: ResourceInfo::new("Raytracing scratch buffer"),
+                info: ResourceInfo::new(
+                    "Raytracing scratch buffer",
+                    Some(device.tracker_indices.tlas_s.clone()),
+                ),
                 is_coherent: scratch_mapping.is_coherent,
             })));
 
@@ -1356,10 +1360,13 @@ impl Global {
                     .map_err(crate::device::DeviceError::from)?;
                 assert!(mapping.is_coherent);
                 let buf = StagingBuffer {
-                    raw: Mutex::new(Some(staging_buffer)),
+                    raw: Mutex::new(rank::STAGING_BUFFER_RAW, Some(staging_buffer)),
                     device: device.clone(),
                     size: instance_buffer_staging_source.len() as u64,
-                    info: ResourceInfo::new("Raytracing staging buffer"),
+                    info: ResourceInfo::new(
+                        "Raytracing scratch buffer",
+                        Some(device.tracker_indices.tlas_s.clone()),
+                    ),
                     is_coherent: mapping.is_coherent,
                 };
                 let staging_fid = hub.staging_buffers.request();
@@ -1490,6 +1497,10 @@ impl Global {
                     continue;
                 }
                 unsafe {
+                    cmd_buf_raw.transition_buffers(iter::once(hal::BufferBarrier::<A> {
+                        buffer: tlas.instance_buffer.read().as_ref().unwrap(),
+                        usage: hal::BufferUses::MAP_READ..hal::BufferUses::COPY_DST,
+                    }));
                     let temp = hal::BufferCopy {
                         src_offset: range.start as u64,
                         dst_offset: 0,
@@ -1544,10 +1555,13 @@ impl Global {
         };
 
         let buf = StagingBuffer {
-            raw: Mutex::new(Some(scratch_buffer)),
+            raw: Mutex::new(rank::STAGING_BUFFER_RAW, Some(scratch_buffer)),
             device: device.clone(),
             size: max(scratch_buffer_blas_size, scratch_buffer_tlas_size),
-            info: ResourceInfo::new("Ratracing scratch buffer"),
+            info: ResourceInfo::new(
+                "Raytracing scratch buffer",
+                Some(device.tracker_indices.tlas_s.clone()),
+            ),
             is_coherent: scratch_mapping.is_coherent,
         };
         let staging_fid = hub.staging_buffers.request();

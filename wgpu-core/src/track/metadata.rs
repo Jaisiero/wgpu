@@ -1,6 +1,6 @@
 //! The `ResourceMetadata` type.
 
-use crate::{resource::Resource, Epoch};
+use crate::resource::Resource;
 use bit_vec::BitVec;
 use std::{borrow::Cow, mem, sync::Arc};
 use wgt::strict_assert;
@@ -37,6 +37,11 @@ impl<T: Resource> ResourceMetadata<T> {
     pub(super) fn set_size(&mut self, size: usize) {
         self.resources.resize(size, None);
         resize_bitvec(&mut self.owned, size);
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.resources.clear();
+        self.owned.clear();
     }
 
     /// Ensures a given index is in bounds for all arrays and does
@@ -82,16 +87,18 @@ impl<T: Resource> ResourceMetadata<T> {
     /// Add the resource with the given index, epoch, and reference count to the
     /// set.
     ///
+    /// Returns a reference to the newly inserted resource.
+    /// (This allows avoiding a clone/reference count increase in many cases.)
+    ///
     /// # Safety
     ///
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) {
+    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) -> &Arc<T> {
         self.owned.set(index, true);
-        unsafe {
-            *self.resources.get_unchecked_mut(index) = Some(resource);
-        }
+        let resource_dst = unsafe { self.resources.get_unchecked_mut(index) };
+        resource_dst.insert(resource)
     }
 
     /// Get the resource with the given index.
@@ -193,15 +200,6 @@ impl<T: Resource> ResourceMetadataProvider<'_, T> {
                 }
             }
         }
-    }
-    /// Get the epoch from this.
-    ///
-    /// # Safety
-    ///
-    /// - The index must be in bounds of the metadata tracker if this uses an indirect source.
-    #[inline(always)]
-    pub(super) unsafe fn get_epoch(self, index: usize) -> Epoch {
-        unsafe { self.get_own(index).as_info().id().unzip().1 }
     }
 }
 
