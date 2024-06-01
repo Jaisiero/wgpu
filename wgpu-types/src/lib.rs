@@ -930,7 +930,7 @@ bitflags::bitflags! {
         /// - Vulkan
         ///
         /// This is a native only feature
-        const RAY_HIT_VERTEX_RETURN = 1 << 55;
+        const RAY_HIT_VERTEX_RETURN = 1 << 60;
     }
 }
 

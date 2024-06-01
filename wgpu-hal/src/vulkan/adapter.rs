@@ -433,12 +433,10 @@ impl PhysicalDeviceFeatures {
             } else {
                 None
             },
-            position_fetch: if enabled_extensions
-                .contains(&khr::ray_tracing_position_fetch::NAME)
-            {
+            position_fetch: if enabled_extensions.contains(&khr::ray_tracing_position_fetch::NAME) {
                 Some(
                     vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR::default()
-                        .ray_tracing_position_fetch(true)
+                        .ray_tracing_position_fetch(true),
                 )
             } else {
                 None
