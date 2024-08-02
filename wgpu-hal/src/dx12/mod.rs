@@ -1,7 +1,7 @@
 /*!
 # DirectX12 API internals.
 
-Generally the mapping is straightforwad.
+Generally the mapping is straightforward.
 
 ## Resource transitions
 
@@ -82,6 +82,7 @@ impl crate::Api for Api {
     type ShaderModule = ShaderModule;
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
+    type PipelineCache = ();
 
     type AccelerationStructure = AccelerationStructure;
 }
@@ -195,6 +196,7 @@ struct PrivateCapabilities {
     heap_create_not_zeroed: bool,
     casting_fully_typed_format_supported: bool,
     suballocation_supported: bool,
+    shader_model: naga::back::hlsl::ShaderModel,
 }
 
 #[derive(Default)]
@@ -238,6 +240,9 @@ struct DeviceShared {
     heap_samplers: descriptor::GeneralHeap,
 }
 
+unsafe impl Send for DeviceShared {}
+unsafe impl Sync for DeviceShared {}
+
 pub struct Device {
     raw: d3d12::Device,
     present_queue: d3d12::CommandQueue,
@@ -252,10 +257,11 @@ pub struct Device {
     // library
     library: Arc<d3d12::D3D12Lib>,
     #[cfg(feature = "renderdoc")]
-    render_doc: crate::auxil::renderdoc::RenderDoc,
+    render_doc: auxil::renderdoc::RenderDoc,
     null_rtv_handle: descriptor::Handle,
     mem_allocator: Option<Mutex<suballocation::GpuAllocatorWrapper>>,
     dxc_container: Option<Arc<shader_compilation::DxcContainer>>,
+    counters: wgt::HalCounters,
 }
 
 unsafe impl Send for Device {}
@@ -327,7 +333,7 @@ struct PassState {
 
 #[test]
 fn test_dirty_mask() {
-    assert_eq!(MAX_ROOT_ELEMENTS, std::mem::size_of::<u64>() * 8);
+    assert_eq!(MAX_ROOT_ELEMENTS, mem::size_of::<u64>() * 8);
 }
 
 impl PassState {
@@ -386,7 +392,6 @@ impl fmt::Debug for CommandEncoder {
 #[derive(Debug)]
 pub struct CommandBuffer {
     raw: d3d12::GraphicsCommandList,
-    closed: bool,
 }
 
 unsafe impl Send for CommandBuffer {}
@@ -437,7 +442,7 @@ impl Texture {
         }
     }
 
-    /// see https://learn.microsoft.com/en-us/windows/win32/direct3d12/subresources#plane-slice
+    /// see <https://learn.microsoft.com/en-us/windows/win32/direct3d12/subresources#plane-slice>
     fn calc_subresource(&self, mip_level: u32, array_layer: u32, plane: u32) -> u32 {
         mip_level + (array_layer + plane * self.array_layer_count()) * self.mip_level_count
     }
@@ -637,7 +642,9 @@ impl SwapChain {
     }
 }
 
-impl crate::Surface<Api> for Surface {
+impl crate::Surface for Surface {
+    type A = Api;
+
     unsafe fn configure(
         &self,
         device: &Device,
@@ -755,8 +762,8 @@ impl crate::Surface<Api> for Surface {
                 };
 
                 match &self.target {
-                    &SurfaceTarget::WndHandle(_) | &SurfaceTarget::SurfaceHandle(_) => {}
-                    &SurfaceTarget::Visual(ref visual) => {
+                    SurfaceTarget::WndHandle(_) | &SurfaceTarget::SurfaceHandle(_) => {}
+                    SurfaceTarget::Visual(visual) => {
                         if let Err(err) =
                             unsafe { visual.SetContent(swap_chain1.as_unknown()) }.into_result()
                         {
@@ -766,7 +773,7 @@ impl crate::Surface<Api> for Surface {
                             ));
                         }
                     }
-                    &SurfaceTarget::SwapChainPanel(ref swap_chain_panel) => {
+                    SurfaceTarget::SwapChainPanel(swap_chain_panel) => {
                         if let Err(err) =
                             unsafe { swap_chain_panel.SetSwapChain(swap_chain1.as_ptr()) }
                                 .into_result()
@@ -851,6 +858,7 @@ impl crate::Surface<Api> for Surface {
     unsafe fn acquire_texture(
         &self,
         timeout: Option<std::time::Duration>,
+        _fence: &Fence,
     ) -> Result<Option<crate::AcquiredSurfaceTexture<Api>>, crate::SurfaceError> {
         let mut swapchain = self.swap_chain.write();
         let sc = swapchain.as_mut().unwrap();
@@ -882,12 +890,14 @@ impl crate::Surface<Api> for Surface {
     }
 }
 
-impl crate::Queue<Api> for Queue {
+impl crate::Queue for Queue {
+    type A = Api;
+
     unsafe fn submit(
         &self,
         command_buffers: &[&CommandBuffer],
         _surface_textures: &[&Texture],
-        signal_fence: Option<(&mut Fence, crate::FenceValue)>,
+        (signal_fence, signal_value): (&mut Fence, crate::FenceValue),
     ) -> Result<(), crate::DeviceError> {
         let mut temp_lists = self.temp_lists.lock();
         temp_lists.clear();
@@ -900,11 +910,9 @@ impl crate::Queue<Api> for Queue {
             self.raw.execute_command_lists(&temp_lists);
         }
 
-        if let Some((fence, value)) = signal_fence {
-            self.raw
-                .signal(&fence.raw, value)
-                .into_device_result("Signal fence")?;
-        }
+        self.raw
+            .signal(&signal_fence.raw, signal_value)
+            .into_device_result("Signal fence")?;
 
         // Note the lack of synchronization here between the main Direct queue
         // and the dedicated presentation queue. This is automatically handled

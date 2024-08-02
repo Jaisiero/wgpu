@@ -159,7 +159,7 @@ static IMAGE_BITMAP_IMPORT: GpuTestConfiguration =
                 // Layer count of the destination texture
                 let mut dest_layers = 1;
 
-                // If the test is suppoed to be valid call to copyExternal.
+                // If the test is supposed to be valid call to copyExternal.
                 let mut valid = true;
                 match case {
                     TestCase::Normal => {}
@@ -264,24 +264,29 @@ static IMAGE_BITMAP_IMPORT: GpuTestConfiguration =
                     view_formats: &[],
                 });
 
-                fail_if(&ctx.device, !valid, || {
-                    ctx.queue.copy_external_image_to_texture(
-                        &wgpu::ImageCopyExternalImage {
-                            source: source.clone(),
-                            origin: src_origin,
-                            flip_y: src_flip_y,
-                        },
-                        wgpu::ImageCopyTextureTagged {
-                            texture: &texture,
-                            mip_level: 0,
-                            origin: dest_origin,
-                            aspect: wgpu::TextureAspect::All,
-                            color_space: dest_color_space,
-                            premultiplied_alpha: dest_premultiplied,
-                        },
-                        copy_size,
-                    );
-                });
+                fail_if(
+                    &ctx.device,
+                    !valid,
+                    || {
+                        ctx.queue.copy_external_image_to_texture(
+                            &wgpu::ImageCopyExternalImage {
+                                source: source.clone(),
+                                origin: src_origin,
+                                flip_y: src_flip_y,
+                            },
+                            wgpu::ImageCopyTextureTagged {
+                                texture: &texture,
+                                mip_level: 0,
+                                origin: dest_origin,
+                                aspect: wgpu::TextureAspect::All,
+                                color_space: dest_color_space,
+                                premultiplied_alpha: dest_premultiplied,
+                            },
+                            copy_size,
+                        );
+                    },
+                    None,
+                );
 
                 let readback_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("readback buffer"),

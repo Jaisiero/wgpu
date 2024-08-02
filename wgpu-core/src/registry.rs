@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use wgt::Backend;
 
 use crate::{
-    id,
-    identity::{IdentityHandlerFactory, IdentityManager},
-    resource::Resource,
-    storage::{Element, InvalidId, Storage},
+    id::Id,
+    identity::IdentityManager,
+    lock::{rank, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    storage::{Element, InvalidId, Storage, StorageItem},
 };
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -37,148 +36,94 @@ impl RegistryReport {
 /// any other dependent resource
 ///
 #[derive(Debug)]
-pub struct Registry<I: id::TypedId, T: Resource<I>> {
-    identity: Arc<IdentityManager<I>>,
-    storage: RwLock<Storage<T, I>>,
+pub(crate) struct Registry<T: StorageItem> {
+    // Must only contain an id which has either never been used or has been released from `storage`
+    identity: Arc<IdentityManager<T::Marker>>,
+    storage: RwLock<Storage<T>>,
     backend: Backend,
 }
 
-impl<I: id::TypedId, T: Resource<I>> Registry<I, T> {
-    pub(crate) fn new<F: IdentityHandlerFactory<I>>(backend: Backend, factory: &F) -> Self {
+impl<T: StorageItem> Registry<T> {
+    pub(crate) fn new(backend: Backend) -> Self {
         Self {
-            identity: factory.spawn(),
-            storage: RwLock::new(Storage::new()),
+            identity: Arc::new(IdentityManager::new()),
+            storage: RwLock::new(rank::REGISTRY_STORAGE, Storage::new()),
             backend,
         }
     }
 
-    pub(crate) fn without_backend<F: IdentityHandlerFactory<I>>(factory: &F) -> Self {
-        Self::new(Backend::Empty, factory)
+    pub(crate) fn without_backend() -> Self {
+        Self::new(Backend::Empty)
     }
 }
 
 #[must_use]
-pub(crate) struct FutureId<'a, I: id::TypedId, T: Resource<I>> {
-    id: I,
-    identity: Arc<IdentityManager<I>>,
-    data: &'a RwLock<Storage<T, I>>,
+pub(crate) struct FutureId<'a, T: StorageItem> {
+    id: Id<T::Marker>,
+    data: &'a RwLock<Storage<T>>,
 }
 
-impl<I: id::TypedId + Copy, T: Resource<I>> FutureId<'_, I, T> {
+impl<T: StorageItem> FutureId<'_, T> {
     #[allow(dead_code)]
-    pub fn id(&self) -> I {
+    pub fn id(&self) -> Id<T::Marker> {
         self.id
     }
 
-    pub fn into_id(self) -> I {
+    pub fn into_id(self) -> Id<T::Marker> {
         self.id
-    }
-
-    pub fn init(&self, mut value: T) -> Arc<T> {
-        value.as_info_mut().set_id(self.id, &self.identity);
-        Arc::new(value)
     }
 
     /// Assign a new resource to this ID.
     ///
-    /// Registers it with the registry, and fills out the resource info.
-    pub fn assign(self, value: T) -> (I, Arc<T>) {
-        let mut data = self.data.write();
-        data.insert(self.id, self.init(value));
-        (self.id, data.get(self.id).unwrap().clone())
-    }
-
-    /// Assign an existing resource to a new ID.
-    ///
     /// Registers it with the registry.
-    ///
-    /// This _will_ leak the ID, and it will not be recycled again.
-    /// See https://github.com/gfx-rs/wgpu/issues/4912.
-    pub fn assign_existing(self, value: &Arc<T>) -> I {
+    pub fn assign(self, value: Arc<T>) -> Id<T::Marker> {
         let mut data = self.data.write();
-        debug_assert!(!data.contains(self.id));
-        data.insert(self.id, value.clone());
+        data.insert(self.id, value);
         self.id
     }
 
-    pub fn assign_error(self, label: &str) -> I {
-        self.data.write().insert_error(self.id, label);
+    pub fn assign_error(self) -> Id<T::Marker> {
+        self.data.write().insert_error(self.id);
         self.id
     }
 }
 
-impl<I: id::TypedId, T: Resource<I>> Registry<I, T> {
-    pub(crate) fn prepare<F>(&self, id_in: F::Input) -> FutureId<I, T>
-    where
-        F: IdentityHandlerFactory<I>,
-    {
+impl<T: StorageItem> Registry<T> {
+    pub(crate) fn prepare(&self, id_in: Option<Id<T::Marker>>) -> FutureId<T> {
         FutureId {
-            id: if F::autogenerate_ids() {
-                self.identity.process(self.backend)
-            } else {
-                self.identity.mark_as_used(F::input_to_id(id_in))
+            id: match id_in {
+                Some(id_in) => {
+                    self.identity.mark_as_used(id_in);
+                    id_in
+                }
+                None => self.identity.process(self.backend),
             },
-            identity: self.identity.clone(),
             data: &self.storage,
         }
     }
-    pub(crate) fn request(&self) -> FutureId<I, T> {
-        FutureId {
-            id: self.identity.process(self.backend),
-            identity: self.identity.clone(),
-            data: &self.storage,
-        }
-    }
-    pub(crate) fn try_get(&self, id: I) -> Result<Option<Arc<T>>, InvalidId> {
-        self.read().try_get(id).map(|o| o.cloned())
-    }
-    pub(crate) fn get(&self, id: I) -> Result<Arc<T>, InvalidId> {
+
+    pub(crate) fn get(&self, id: Id<T::Marker>) -> Result<Arc<T>, InvalidId> {
         self.read().get_owned(id)
     }
-    pub(crate) fn read<'a>(&'a self) -> RwLockReadGuard<'a, Storage<T, I>> {
+    pub(crate) fn read<'a>(&'a self) -> RwLockReadGuard<'a, Storage<T>> {
         self.storage.read()
     }
-    pub(crate) fn write<'a>(&'a self) -> RwLockWriteGuard<'a, Storage<T, I>> {
+    pub(crate) fn write<'a>(&'a self) -> RwLockWriteGuard<'a, Storage<T>> {
         self.storage.write()
     }
-    pub fn unregister_locked(&self, id: I, storage: &mut Storage<T, I>) -> Option<Arc<T>> {
-        storage.remove(id)
-    }
-    pub fn force_replace(&self, id: I, mut value: T) {
-        let mut storage = self.storage.write();
-        value.as_info_mut().set_id(id, &self.identity);
-        storage.force_replace(id, value)
-    }
-    pub fn force_replace_with_error(&self, id: I, label: &str) {
+    pub(crate) fn force_replace_with_error(&self, id: Id<T::Marker>) {
         let mut storage = self.storage.write();
         storage.remove(id);
-        storage.insert_error(id, label);
+        storage.insert_error(id);
     }
-    pub(crate) fn unregister(&self, id: I) -> Option<Arc<T>> {
+    pub(crate) fn unregister(&self, id: Id<T::Marker>) -> Option<Arc<T>> {
         let value = self.storage.write().remove(id);
+        // This needs to happen *after* removing it from the storage, to maintain the
+        // invariant that `self.identity` only contains ids which are actually available
+        // See https://github.com/gfx-rs/wgpu/issues/5372
+        self.identity.free(id);
         //Returning None is legal if it's an error ID
         value
-    }
-
-    pub fn label_for_resource(&self, id: I) -> String {
-        let guard = self.storage.read();
-
-        let type_name = guard.kind();
-        match guard.get(id) {
-            Ok(res) => {
-                let label = res.label();
-                if label.is_empty() {
-                    format!("<{}-{:?}>", type_name, id.unzip())
-                } else {
-                    label
-                }
-            }
-            Err(_) => format!(
-                "<Invalid-{} label={}>",
-                type_name,
-                guard.label_for_invalid_id(id)
-            ),
-        }
     }
 
     pub(crate) fn generate_report(&self) -> RegistryReport {
@@ -192,9 +137,45 @@ impl<I: id::TypedId, T: Resource<I>> Registry<I, T> {
             match *element {
                 Element::Occupied(..) => report.num_kept_from_user += 1,
                 Element::Vacant => report.num_released_from_user += 1,
-                Element::Error(..) => report.num_error += 1,
+                Element::Error(_) => report.num_error += 1,
             }
         }
         report
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::{id::Marker, resource::ResourceType, storage::StorageItem};
+
+    use super::Registry;
+    struct TestData;
+    struct TestDataId;
+    impl Marker for TestDataId {}
+
+    impl ResourceType for TestData {
+        const TYPE: &'static str = "TestData";
+    }
+    impl StorageItem for TestData {
+        type Marker = TestDataId;
+    }
+
+    #[test]
+    fn simultaneous_registration() {
+        let registry = Registry::without_backend();
+        std::thread::scope(|s| {
+            for _ in 0..5 {
+                s.spawn(|| {
+                    for _ in 0..1000 {
+                        let value = Arc::new(TestData);
+                        let new_id = registry.prepare(None);
+                        let id = new_id.assign(value);
+                        registry.unregister(id);
+                    }
+                });
+            }
+        })
     }
 }

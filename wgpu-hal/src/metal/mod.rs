@@ -66,6 +66,7 @@ impl crate::Api for Api {
     type ShaderModule = ShaderModule;
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
+    type PipelineCache = ();
 
     type AccelerationStructure = AccelerationStructure;
 }
@@ -80,7 +81,9 @@ impl Instance {
     }
 }
 
-impl crate::Instance<Api> for Instance {
+impl crate::Instance for Instance {
+    type A = Api;
+
     unsafe fn init(_desc: &crate::InstanceDescriptor) -> Result<Self, crate::InstanceError> {
         profiling::scope!("Init Metal Backend");
         // We do not enable metal validation based on the validation flags as it affects the entire
@@ -118,7 +121,10 @@ impl crate::Instance<Api> for Instance {
         unsafe { surface.dispose() };
     }
 
-    unsafe fn enumerate_adapters(&self) -> Vec<crate::ExposedAdapter<Api>> {
+    unsafe fn enumerate_adapters(
+        &self,
+        _surface_hint: Option<&Surface>,
+    ) -> Vec<crate::ExposedAdapter<Api>> {
         let devices = metal::Device::all();
         let mut adapters: Vec<crate::ExposedAdapter<Api>> = devices
             .into_iter()
@@ -248,6 +254,7 @@ struct PrivateCapabilities {
     max_texture_layers: u64,
     max_fragment_input_components: u64,
     max_color_render_targets: u8,
+    max_color_attachment_bytes_per_sample: u8,
     max_varying_components: u32,
     max_threads_per_group: u32,
     max_total_threadgroup_memory: u32,
@@ -266,6 +273,9 @@ struct PrivateCapabilities {
     supports_shader_primitive_index: bool,
     has_unified_memory: Option<bool>,
     timestamp_query_support: TimestampQuerySupport,
+    supports_simd_scoped_operations: bool,
+    int64: bool,
+    int64_atomics: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -332,6 +342,7 @@ impl Queue {
 pub struct Device {
     shared: Arc<AdapterShared>,
     features: wgt::Features,
+    counters: wgt::HalCounters,
 }
 
 pub struct Surface {
@@ -364,43 +375,44 @@ impl std::borrow::Borrow<Texture> for SurfaceTexture {
 unsafe impl Send for SurfaceTexture {}
 unsafe impl Sync for SurfaceTexture {}
 
-impl crate::Queue<Api> for Queue {
+impl crate::Queue for Queue {
+    type A = Api;
+
     unsafe fn submit(
         &self,
         command_buffers: &[&CommandBuffer],
         _surface_textures: &[&SurfaceTexture],
-        signal_fence: Option<(&mut Fence, crate::FenceValue)>,
+        (signal_fence, signal_value): (&mut Fence, crate::FenceValue),
     ) -> Result<(), crate::DeviceError> {
         objc::rc::autoreleasepool(|| {
-            let extra_command_buffer = match signal_fence {
-                Some((fence, value)) => {
-                    let completed_value = Arc::clone(&fence.completed_value);
-                    let block = block::ConcreteBlock::new(move |_cmd_buf| {
-                        completed_value.store(value, atomic::Ordering::Release);
-                    })
-                    .copy();
+            let extra_command_buffer = {
+                let completed_value = Arc::clone(&signal_fence.completed_value);
+                let block = block::ConcreteBlock::new(move |_cmd_buf| {
+                    completed_value.store(signal_value, atomic::Ordering::Release);
+                })
+                .copy();
 
-                    let raw = match command_buffers.last() {
-                        Some(&cmd_buf) => cmd_buf.raw.to_owned(),
-                        None => {
-                            let queue = self.raw.lock();
-                            queue
-                                .new_command_buffer_with_unretained_references()
-                                .to_owned()
-                        }
-                    };
-                    raw.set_label("(wgpu internal) Signal");
-                    raw.add_completed_handler(&block);
-
-                    fence.maintain();
-                    fence.pending_command_buffers.push((value, raw.to_owned()));
-                    // only return an extra one if it's extra
-                    match command_buffers.last() {
-                        Some(_) => None,
-                        None => Some(raw),
+                let raw = match command_buffers.last() {
+                    Some(&cmd_buf) => cmd_buf.raw.to_owned(),
+                    None => {
+                        let queue = self.raw.lock();
+                        queue
+                            .new_command_buffer_with_unretained_references()
+                            .to_owned()
                     }
+                };
+                raw.set_label("(wgpu internal) Signal");
+                raw.add_completed_handler(&block);
+
+                signal_fence.maintain();
+                signal_fence
+                    .pending_command_buffers
+                    .push((signal_value, raw.to_owned()));
+                // only return an extra one if it's extra
+                match command_buffers.last() {
+                    Some(_) => None,
+                    None => Some(raw),
                 }
-                None => None,
             };
 
             for cmd_buffer in command_buffers {
@@ -455,6 +467,15 @@ unsafe impl Sync for Buffer {}
 impl Buffer {
     fn as_raw(&self) -> BufferPtr {
         unsafe { NonNull::new_unchecked(self.raw.as_ptr()) }
+    }
+}
+
+impl crate::BufferBinding<'_, Api> {
+    fn resolve_size(&self) -> wgt::BufferAddress {
+        match self.size {
+            Some(size) => size.get(),
+            None => self.buffer.size - self.offset,
+        }
     }
 }
 
@@ -664,7 +685,7 @@ struct BufferResource {
     /// Buffers with the [`wgt::BufferBindingType::Storage`] binding type can
     /// hold WGSL runtime-sized arrays. When one does, we must pass its size to
     /// shader entry points to implement bounds checks and WGSL's `arrayLength`
-    /// function. See [`device::CompiledShader::sized_bindings`] for details.
+    /// function. See `device::CompiledShader::sized_bindings` for details.
     ///
     /// [`Storage`]: wgt::BufferBindingType::Storage
     binding_size: Option<wgt::BufferSize>,
@@ -695,13 +716,16 @@ struct PipelineStageInfo {
 
     /// The buffer argument table index at which we pass runtime-sized arrays' buffer sizes.
     ///
-    /// See [`device::CompiledShader::sized_bindings`] for more details.
+    /// See `device::CompiledShader::sized_bindings` for more details.
     sizes_slot: Option<naga::back::msl::Slot>,
 
     /// Bindings of all WGSL `storage` globals that contain runtime-sized arrays.
     ///
-    /// See [`device::CompiledShader::sized_bindings`] for more details.
+    /// See `device::CompiledShader::sized_bindings` for more details.
     sized_bindings: Vec<naga::ResourceBinding>,
+
+    /// Info on all bound vertex buffers.
+    vertex_buffer_mappings: Vec<naga::back::msl::VertexBufferMapping>,
 }
 
 impl PipelineStageInfo {
@@ -709,6 +733,7 @@ impl PipelineStageInfo {
         self.push_constants = None;
         self.sizes_slot = None;
         self.sized_bindings.clear();
+        self.vertex_buffer_mappings.clear();
     }
 
     fn assign_from(&mut self, other: &Self) {
@@ -716,6 +741,9 @@ impl PipelineStageInfo {
         self.sizes_slot = other.sizes_slot;
         self.sized_bindings.clear();
         self.sized_bindings.extend_from_slice(&other.sized_bindings);
+        self.vertex_buffer_mappings.clear();
+        self.vertex_buffer_mappings
+            .extend_from_slice(&other.vertex_buffer_mappings);
     }
 }
 
@@ -816,7 +844,7 @@ struct CommandState {
     ///
     /// Specifically:
     ///
-    /// - The keys are ['ResourceBinding`] values (that is, the WGSL `@group`
+    /// - The keys are [`ResourceBinding`] values (that is, the WGSL `@group`
     ///   and `@binding` attributes) for `var<storage>` global variables in the
     ///   current module that contain runtime-sized arrays.
     ///
@@ -828,10 +856,12 @@ struct CommandState {
     /// of the buffers listed in [`stage_infos.S.sized_bindings`], which we must
     /// pass to the entry point.
     ///
-    /// See [`device::CompiledShader::sized_bindings`] for more details.
+    /// See `device::CompiledShader::sized_bindings` for more details.
     ///
     /// [`ResourceBinding`]: naga::ResourceBinding
     storage_buffer_length_map: rustc_hash::FxHashMap<naga::ResourceBinding, wgt::BufferSize>,
+
+    vertex_buffer_size_map: rustc_hash::FxHashMap<u64, wgt::BufferSize>,
 
     work_group_memory_sizes: Vec<u32>,
     push_constants: Vec<u32>,

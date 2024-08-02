@@ -33,8 +33,7 @@ pub(crate) fn new_render_bundle_encoder_descriptor<'a>(
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-#[cfg_attr(feature = "trace", derive(serde::Serialize))]
-#[cfg_attr(feature = "replay", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Action<'a> {
     Init {
         desc: crate::device::DeviceDescriptor<'a>,
@@ -99,6 +98,11 @@ pub enum Action<'a> {
         implicit_context: Option<super::ImplicitPipelineContext>,
     },
     DestroyRenderPipeline(id::RenderPipelineId),
+    CreatePipelineCache {
+        id: id::PipelineCacheId,
+        desc: crate::pipeline::PipelineCacheDescriptor<'a>,
+    },
+    DestroyPipelineCache(id::PipelineCacheId),
     CreateRenderBundle {
         id: id::RenderBundleId,
         desc: crate::command::RenderBundleEncoderDescriptor<'a>,
@@ -126,8 +130,7 @@ pub enum Action<'a> {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "trace", derive(serde::Serialize))]
-#[cfg_attr(feature = "replay", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Command {
     CopyBufferToBuffer {
         src: id::BufferId,
@@ -176,13 +179,13 @@ pub enum Command {
     InsertDebugMarker(String),
     RunComputePass {
         base: crate::command::BasePass<crate::command::ComputeCommand>,
-        timestamp_writes: Option<crate::command::ComputePassTimestampWrites>,
+        timestamp_writes: Option<crate::command::PassTimestampWrites>,
     },
     RunRenderPass {
         base: crate::command::BasePass<crate::command::RenderCommand>,
         target_colors: Vec<Option<crate::command::RenderPassColorAttachment>>,
         target_depth_stencil: Option<crate::command::RenderPassDepthStencilAttachment>,
-        timestamp_writes: Option<crate::command::RenderPassTimestampWrites>,
+        timestamp_writes: Option<crate::command::PassTimestampWrites>,
         occlusion_query_set_id: Option<id::QuerySetId>,
     },
 }

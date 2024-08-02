@@ -1,9 +1,6 @@
 use std::num::NonZeroU64;
 
-use wgpu_test::{
-    fail, gpu_test, FailureCase, GpuTestConfiguration, TestParameters, TestingContext,
-};
-use wgt::Backends;
+use wgpu_test::{fail, gpu_test, GpuTestConfiguration, TestParameters, TestingContext};
 
 const SHADER_SRC: &str = "
 @group(0) @binding(0)
@@ -93,6 +90,8 @@ async fn bgl_dedupe(ctx: TestingContext) {
             layout: Some(&pipeline_layout),
             module: &module,
             entry_point: "no_resources",
+            compilation_options: Default::default(),
+            cache: None,
         };
 
         let pipeline = ctx.device.create_compute_pipeline(&desc);
@@ -131,8 +130,12 @@ async fn bgl_dedupe(ctx: TestingContext) {
         .panic_on_timeout();
 
     if ctx.adapter_info.backend != wgt::Backend::BrowserWebGpu {
+        // Indices are made reusable as soon as the handle is dropped so we keep them around
+        // for the duration of the loop.
+        let mut bgls = Vec::new();
+        let mut indices = Vec::new();
         // Now all of the BGL ids should be dead, so we should get the same ids again.
-        for i in 0..=2 {
+        for _ in 0..=2 {
             let test_bgl = ctx
                 .device
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -141,15 +144,14 @@ async fn bgl_dedupe(ctx: TestingContext) {
                 });
 
             let test_bgl_idx = test_bgl.global_id().inner() & 0xFFFF_FFFF;
-
-            // https://github.com/gfx-rs/wgpu/issues/4912
-            //
-            // ID 2 is the deduplicated ID, which is never properly recycled.
-            if i == 2 {
-                assert_eq!(test_bgl_idx, 3);
-            } else {
-                assert_eq!(test_bgl_idx, i);
-            }
+            bgls.push(test_bgl);
+            indices.push(test_bgl_idx);
+        }
+        // We don't guarantee that the IDs will appear in the same order. Sort them
+        // and check that they all appear exactly once.
+        indices.sort();
+        for (i, index) in indices.iter().enumerate() {
+            assert_eq!(*index, i as u64);
         }
     }
 }
@@ -218,6 +220,8 @@ fn bgl_dedupe_with_dropped_user_handle(ctx: TestingContext) {
             layout: Some(&pipeline_layout),
             module: &module,
             entry_point: "no_resources",
+            compilation_options: Default::default(),
+            cache: None,
         });
 
     let mut encoder = ctx.device.create_command_encoder(&Default::default());
@@ -263,6 +267,8 @@ fn bgl_dedupe_derived(ctx: TestingContext) {
             layout: None,
             module: &module,
             entry_point: "resources",
+            compilation_options: Default::default(),
+            cache: None,
         });
 
     // We create two bind groups, pulling the bind_group_layout from the pipeline each time.
@@ -307,18 +313,10 @@ fn bgl_dedupe_derived(ctx: TestingContext) {
     ctx.queue.submit(Some(encoder.finish()));
 }
 
-const DX12_VALIDATION_ERROR: &str = "The command allocator cannot be reset because a command list is currently being recorded with the allocator.";
-
 #[gpu_test]
 static SEPARATE_PROGRAMS_HAVE_INCOMPATIBLE_DERIVED_BGLS: GpuTestConfiguration =
     GpuTestConfiguration::new()
-        .parameters(
-            TestParameters::default()
-                .test_features_limits()
-                .expect_fail(
-                    FailureCase::backend(Backends::DX12).validation_error(DX12_VALIDATION_ERROR),
-                ),
-        )
+        .parameters(TestParameters::default().test_features_limits())
         .run_sync(separate_programs_have_incompatible_derived_bgls);
 
 fn separate_programs_have_incompatible_derived_bgls(ctx: TestingContext) {
@@ -341,6 +339,8 @@ fn separate_programs_have_incompatible_derived_bgls(ctx: TestingContext) {
         layout: None,
         module: &module,
         entry_point: "resources",
+        compilation_options: Default::default(),
+        cache: None,
     };
     // Create two pipelines, creating a BG from the second.
     let pipeline1 = ctx.device.create_compute_pipeline(&desc);
@@ -368,21 +368,19 @@ fn separate_programs_have_incompatible_derived_bgls(ctx: TestingContext) {
     pass.set_bind_group(0, &bg2, &[]);
     pass.dispatch_workgroups(1, 1, 1);
 
-    fail(&ctx.device, || {
-        drop(pass);
-    });
+    fail(
+        &ctx.device,
+        || {
+            drop(pass);
+        },
+        None,
+    );
 }
 
 #[gpu_test]
 static DERIVED_BGLS_INCOMPATIBLE_WITH_REGULAR_BGLS: GpuTestConfiguration =
     GpuTestConfiguration::new()
-        .parameters(
-            TestParameters::default()
-                .test_features_limits()
-                .expect_fail(
-                    FailureCase::backend(Backends::DX12).validation_error(DX12_VALIDATION_ERROR),
-                ),
-        )
+        .parameters(TestParameters::default().test_features_limits())
         .run_sync(derived_bgls_incompatible_with_regular_bgls);
 
 fn derived_bgls_incompatible_with_regular_bgls(ctx: TestingContext) {
@@ -408,6 +406,8 @@ fn derived_bgls_incompatible_with_regular_bgls(ctx: TestingContext) {
             layout: None,
             module: &module,
             entry_point: "resources",
+            compilation_options: Default::default(),
+            cache: None,
         });
 
     // Create a matching BGL
@@ -440,7 +440,11 @@ fn derived_bgls_incompatible_with_regular_bgls(ctx: TestingContext) {
     pass.set_bind_group(0, &bg, &[]);
     pass.dispatch_workgroups(1, 1, 1);
 
-    fail(&ctx.device, || {
-        drop(pass);
-    })
+    fail(
+        &ctx.device,
+        || {
+            drop(pass);
+        },
+        None,
+    )
 }

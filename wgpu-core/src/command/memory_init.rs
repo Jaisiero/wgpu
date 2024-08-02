@@ -6,14 +6,13 @@ use crate::{
     device::Device,
     hal_api::HalApi,
     init_tracker::*,
-    resource::{Resource, Texture},
+    resource::{DestroyedResourceError, ParentDevice, Texture, Trackable},
+    snatch::SnatchGuard,
     track::{TextureTracker, Tracker},
     FastHashMap,
 };
 
-use super::{
-    clear::clear_texture, BakedCommands, ClearError, DestroyedBufferError, DestroyedTextureError,
-};
+use super::{clear::clear_texture, BakedCommands, ClearError};
 
 /// Surface that was discarded by `StoreOp::Discard` of a preceding renderpass.
 /// Any read access to this surface needs to be preceded by a texture initialization.
@@ -84,7 +83,7 @@ impl<A: HalApi> CommandBufferTextureMemoryActions<A> {
         // self.discards is empty!)
         let init_actions = &mut self.init_actions;
         self.discards.retain(|discarded_surface| {
-            if discarded_surface.texture.as_info().id() == action.texture.as_info().id()
+            if discarded_surface.texture.is_equal(&action.texture)
                 && action.range.layer_range.contains(&discarded_surface.layer)
                 && action
                     .range
@@ -144,6 +143,7 @@ pub(crate) fn fixup_discarded_surfaces<
     encoder: &mut A::CommandEncoder,
     texture_tracker: &mut TextureTracker<A>,
     device: &Device<A>,
+    snatch_guard: &SnatchGuard<'_>,
 ) {
     for init in inits {
         clear_texture(
@@ -156,6 +156,7 @@ pub(crate) fn fixup_discarded_surfaces<
             texture_tracker,
             &device.alignments,
             device.zero_buffer.as_ref().unwrap(),
+            snatch_guard,
         )
         .unwrap();
     }
@@ -167,7 +168,10 @@ impl<A: HalApi> BakedCommands<A> {
     pub(crate) fn initialize_buffer_memory(
         &mut self,
         device_tracker: &mut Tracker<A>,
-    ) -> Result<(), DestroyedBufferError> {
+        snatch_guard: &SnatchGuard<'_>,
+    ) -> Result<(), DestroyedResourceError> {
+        profiling::scope!("initialize_buffer_memory");
+
         // Gather init ranges for each buffer so we can collapse them.
         // It is not possible to do this at an earlier point since previously
         // executed command buffer change the resource init state.
@@ -187,7 +191,7 @@ impl<A: HalApi> BakedCommands<A> {
             match buffer_use.kind {
                 MemoryInitKind::ImplicitlyInitialized => {}
                 MemoryInitKind::NeedsInitializedMemory => {
-                    match uninitialized_ranges_per_buffer.entry(buffer_use.buffer.as_info().id()) {
+                    match uninitialized_ranges_per_buffer.entry(buffer_use.buffer.tracker_index()) {
                         Entry::Vacant(e) => {
                             e.insert((
                                 buffer_use.buffer.clone(),
@@ -202,7 +206,7 @@ impl<A: HalApi> BakedCommands<A> {
             }
         }
 
-        for (buffer_id, (buffer, mut ranges)) in uninitialized_ranges_per_buffer {
+        for (buffer, mut ranges) in uninitialized_ranges_per_buffer.into_values() {
             // Collapse touching ranges.
             ranges.sort_by_key(|r| r.start);
             for i in (1..ranges.len()).rev() {
@@ -221,20 +225,14 @@ impl<A: HalApi> BakedCommands<A> {
             // must already know about it.
             let transition = device_tracker
                 .buffers
-                .set_single(&buffer, hal::BufferUses::COPY_DST)
-                .unwrap()
-                .1;
+                .set_single(&buffer, hal::BufferUses::COPY_DST);
 
-            let snatch_guard = buffer.device.snatchable_lock.read();
-            let raw_buf = buffer
-                .raw
-                .get(&snatch_guard)
-                .ok_or(DestroyedBufferError(buffer_id))?;
+            let raw_buf = buffer.try_raw(snatch_guard)?;
 
             unsafe {
                 self.encoder.transition_buffers(
                     transition
-                        .map(|pending| pending.into_hal(&buffer, &snatch_guard))
+                        .map(|pending| pending.into_hal(&buffer, snatch_guard))
                         .into_iter(),
                 );
             }
@@ -271,7 +269,10 @@ impl<A: HalApi> BakedCommands<A> {
         &mut self,
         device_tracker: &mut Tracker<A>,
         device: &Device<A>,
-    ) -> Result<(), DestroyedTextureError> {
+        snatch_guard: &SnatchGuard<'_>,
+    ) -> Result<(), DestroyedResourceError> {
+        profiling::scope!("initialize_texture_memory");
+
         let mut ranges: Vec<TextureInitRange> = Vec::new();
         for texture_use in self.texture_memory_actions.drain_init_actions() {
             let mut initialization_status = texture_use.texture.initialization_status.write();
@@ -310,13 +311,14 @@ impl<A: HalApi> BakedCommands<A> {
                     &mut device_tracker.textures,
                     &device.alignments,
                     device.zero_buffer.as_ref().unwrap(),
+                    snatch_guard,
                 );
 
                 // A Texture can be destroyed between the command recording
                 // and now, this is out of our control so we have to handle
                 // it gracefully.
-                if let Err(ClearError::InvalidTexture(id)) = clear_result {
-                    return Err(DestroyedTextureError(id));
+                if let Err(ClearError::DestroyedResource(e)) = clear_result {
+                    return Err(e);
                 }
 
                 // Other errors are unexpected.

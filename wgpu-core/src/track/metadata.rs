@@ -1,8 +1,7 @@
 //! The `ResourceMetadata` type.
 
-use crate::{hal_api::HalApi, id::TypedId, resource::Resource, Epoch};
 use bit_vec::BitVec;
-use std::{borrow::Cow, marker::PhantomData, mem, sync::Arc};
+use std::{mem, sync::Arc};
 use wgt::strict_assert;
 
 /// A set of resources, holding a `Arc<T>` and epoch for each member.
@@ -13,23 +12,19 @@ use wgt::strict_assert;
 /// members, but a bit vector tracks occupancy, so iteration touches
 /// only occupied elements.
 #[derive(Debug)]
-pub(super) struct ResourceMetadata<A: HalApi, I: TypedId, T: Resource<I>> {
+pub(super) struct ResourceMetadata<T> {
     /// If the resource with index `i` is a member, `owned[i]` is `true`.
     owned: BitVec<usize>,
 
     /// A vector holding clones of members' `T`s.
     resources: Vec<Option<Arc<T>>>,
-
-    /// This tells Rust that this type should be covariant with `A`.
-    _phantom: PhantomData<(A, I)>,
 }
 
-impl<A: HalApi, I: TypedId, T: Resource<I>> ResourceMetadata<A, I, T> {
+impl<T> ResourceMetadata<T> {
     pub(super) fn new() -> Self {
         Self {
             owned: BitVec::default(),
             resources: Vec::new(),
-            _phantom: PhantomData,
         }
     }
 
@@ -41,6 +36,11 @@ impl<A: HalApi, I: TypedId, T: Resource<I>> ResourceMetadata<A, I, T> {
     pub(super) fn set_size(&mut self, size: usize) {
         self.resources.resize(size, None);
         resize_bitvec(&mut self.owned, size);
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.resources.clear();
+        self.owned.clear();
     }
 
     /// Ensures a given index is in bounds for all arrays and does
@@ -86,16 +86,18 @@ impl<A: HalApi, I: TypedId, T: Resource<I>> ResourceMetadata<A, I, T> {
     /// Add the resource with the given index, epoch, and reference count to the
     /// set.
     ///
+    /// Returns a reference to the newly inserted resource.
+    /// (This allows avoiding a clone/reference count increase in many cases.)
+    ///
     /// # Safety
     ///
     /// The given `index` must be in bounds for this `ResourceMetadata`'s
     /// existing tables. See `tracker_assert_in_bounds`.
     #[inline(always)]
-    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) {
+    pub(super) unsafe fn insert(&mut self, index: usize, resource: Arc<T>) -> &Arc<T> {
         self.owned.set(index, true);
-        unsafe {
-            *self.resources.get_unchecked_mut(index) = Some(resource);
-        }
+        let resource_dst = unsafe { self.resources.get_unchecked_mut(index) };
+        resource_dst.insert(resource)
     }
 
     /// Get the resource with the given index.
@@ -172,42 +174,30 @@ impl<A: HalApi, I: TypedId, T: Resource<I>> ResourceMetadata<A, I, T> {
 ///
 /// This is used to abstract over the various places
 /// trackers can get new resource metadata from.
-pub(super) enum ResourceMetadataProvider<'a, A: HalApi, I: TypedId, T: Resource<I>> {
+pub(super) enum ResourceMetadataProvider<'a, T> {
     /// Comes directly from explicit values.
-    Direct { resource: Cow<'a, Arc<T>> },
+    Direct { resource: &'a Arc<T> },
     /// Comes from another metadata tracker.
-    Indirect {
-        metadata: &'a ResourceMetadata<A, I, T>,
-    },
+    Indirect { metadata: &'a ResourceMetadata<T> },
 }
-impl<A: HalApi, I: TypedId, T: Resource<I>> ResourceMetadataProvider<'_, A, I, T> {
-    /// Get the epoch and an owned refcount from this.
+impl<T> ResourceMetadataProvider<'_, T> {
+    /// Get a reference to the resource from this.
     ///
     /// # Safety
     ///
     /// - The index must be in bounds of the metadata tracker if this uses an indirect source.
-    /// - info must be Some if this uses a Resource source.
     #[inline(always)]
-    pub(super) unsafe fn get_own(self, index: usize) -> Arc<T> {
+    pub(super) unsafe fn get(&self, index: usize) -> &Arc<T> {
         match self {
-            ResourceMetadataProvider::Direct { resource } => resource.into_owned(),
+            ResourceMetadataProvider::Direct { resource } => resource,
             ResourceMetadataProvider::Indirect { metadata } => {
                 metadata.tracker_assert_in_bounds(index);
                 {
-                    let resource = unsafe { metadata.resources.get_unchecked(index) };
-                    unsafe { resource.clone().unwrap_unchecked() }
+                    let resource = unsafe { metadata.resources.get_unchecked(index) }.as_ref();
+                    unsafe { resource.unwrap_unchecked() }
                 }
             }
         }
-    }
-    /// Get the epoch from this.
-    ///
-    /// # Safety
-    ///
-    /// - The index must be in bounds of the metadata tracker if this uses an indirect source.
-    #[inline(always)]
-    pub(super) unsafe fn get_epoch(self, index: usize) -> Epoch {
-        unsafe { self.get_own(index).as_info().id().unzip().1 }
     }
 }
 

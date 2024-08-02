@@ -3,36 +3,8 @@
 //! into other language-specific user-friendly libraries.
 //!
 //! ## Feature flags
-// NOTE: feature docs. below should be kept in sync. with `Cargo.toml`!
+#![doc = document_features::document_features!()]
 //!
-//! - **`api_log_info`** --- Log all API entry points at info instead of trace level.
-//! - **`resource_log_info`** --- Log resource lifecycle management at info instead of trace level.
-//! - **`link`** _(enabled by default)_ --- Use static linking for libraries. Disale to manually
-//!   link. Enabled by default.
-//! - **`renderdoc`** --- Support the Renderdoc graphics debugger:
-//!   [https://renderdoc.org/](https://renderdoc.org/)
-//! - **`strict_asserts`** --- Apply run-time checks, even in release builds. These are in addition
-//!   to the validation carried out at public APIs in all builds.
-//! - **`trace`** --- Enable API tracing.
-//! - **`replay`** --- Enable API replaying
-//! - **`serial-pass`** --- Enable serializable compute/render passes, and bundle encoders.
-//! - **`wgsl`** --- Enable `ShaderModuleSource::Wgsl`
-//! - **`fragile-send-sync-non-atomic-wasm`** --- Implement `Send` and `Sync` on Wasm, but only if
-//!   atomics are not enabled.
-//!
-//!   WebGL/WebGPU objects can not be shared between threads. However, it can be useful to
-//!   artificially mark them as `Send` and `Sync` anyways to make it easier to write cross-platform
-//!   code. This is technically _very_ unsafe in a multithreaded environment, but on a wasm binary
-//!   compiled without atomics we know we are definitely not in a multithreaded environment.
-//!
-//!  ### Backends, passed through to wgpu-hal
-//!
-//!  - **`metal`** --- Enable the `metal` backend.
-//!  - **`vulkan`** --- Enable the `vulkan` backend.
-//!  - **`gles`** --- Enable the `GLES` backend.
-//!
-//!    This is used for all of GLES, OpenGL, and WebGL.
-//!  - **`dx12`** --- Enable the `dx12` backend.
 
 // When we have no backends, we end up with a lot of dead or otherwise unreachable code.
 #![cfg_attr(
@@ -48,8 +20,6 @@
 #![allow(
     // It is much clearer to assert negative conditions with eq! false
     clippy::bool_assert_comparison,
-    // We use loops for getting early-out of scope without closures.
-    clippy::never_loop,
     // We don't use syntax sugar where it's not necessary.
     clippy::match_like_matches_macro,
     // Redundant matching is more explicit.
@@ -58,7 +28,7 @@
     clippy::needless_lifetimes,
     // No need for defaults in the internal types.
     clippy::new_without_default,
-    // Needless updates are more scaleable, easier to play with features.
+    // Needless updates are more scalable, easier to play with features.
     clippy::needless_update,
     // Need many arguments for some core functions to be able to re-use code in many situations.
     clippy::too_many_arguments,
@@ -67,6 +37,8 @@
     unused_braces,
     // It gets in the way a lot and does not prevent bugs in practice.
     clippy::pattern_type_mismatch,
+    // `wgpu-core` isn't entirely user-facing, so it's useful to document internal items.
+    rustdoc::private_intra_doc_links
 )]
 #![warn(
     trivial_casts,
@@ -76,7 +48,6 @@
     unused_qualifications
 )]
 
-pub mod any_surface;
 pub mod binding_model;
 pub mod command;
 mod conv;
@@ -90,7 +61,9 @@ pub mod id;
 pub mod identity;
 mod init_tracker;
 pub mod instance;
+mod lock;
 pub mod pipeline;
+mod pipeline_cache;
 mod pool;
 pub mod present;
 pub mod registry;
@@ -123,14 +96,10 @@ pub type RawString = *const c_char;
 pub type Label<'a> = Option<Cow<'a, str>>;
 
 trait LabelHelpers<'a> {
-    fn borrow_option(&'a self) -> Option<&'a str>;
     fn to_hal(&'a self, flags: wgt::InstanceFlags) -> Option<&'a str>;
-    fn borrow_or_default(&'a self) -> &'a str;
+    fn to_string(&self) -> String;
 }
 impl<'a> LabelHelpers<'a> for Label<'a> {
-    fn borrow_option(&'a self) -> Option<&'a str> {
-        self.as_ref().map(|cow| cow.as_ref())
-    }
     fn to_hal(&'a self, flags: wgt::InstanceFlags) -> Option<&'a str> {
         if flags.contains(wgt::InstanceFlags::DISCARD_HAL_LABELS) {
             return None;
@@ -138,8 +107,8 @@ impl<'a> LabelHelpers<'a> for Label<'a> {
 
         self.as_ref().map(|cow| cow.as_ref())
     }
-    fn borrow_or_default(&'a self) -> &'a str {
-        self.borrow_option().unwrap_or_default()
+    fn to_string(&self) -> String {
+        self.as_ref().map(|cow| cow.to_string()).unwrap_or_default()
     }
 }
 
@@ -289,7 +258,7 @@ define_backend_caller! { gfx_if_empty, gfx_if_empty_hidden, "empty" if all(
 /// where the `device_create_buffer` method is defined like this:
 ///
 /// ```ignore
-/// impl<...> Global<...> {
+/// impl Global {
 ///    pub fn device_create_buffer<A: HalApi>(&self, ...) -> ...
 ///    { ... }
 /// }

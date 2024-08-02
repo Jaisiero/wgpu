@@ -112,7 +112,7 @@ impl crate::framework::Example for Example {
             }
         };
         let non_uniform_shader_module;
-        // TODO: Because naga's capibilities are evaluated on validate, not on write, we cannot make a shader module with unsupported
+        // TODO: Because naga's capabilities are evaluated on validate, not on write, we cannot make a shader module with unsupported
         // capabilities even if we don't use it. So for now put it in a separate module.
         let fragment_shader_module = if !uniform_workaround {
             non_uniform_shader_module =
@@ -321,6 +321,7 @@ impl crate::framework::Example for Example {
             vertex: wgpu::VertexState {
                 module: &base_shader_module,
                 entry_point: "vert_main",
+                compilation_options: Default::default(),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: vertex_size as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -330,6 +331,7 @@ impl crate::framework::Example for Example {
             fragment: Some(wgpu::FragmentState {
                 module: fragment_shader_module,
                 entry_point: fragment_entry_point,
+                compilation_options: Default::default(),
                 targets: &[Some(config.view_formats[0].into())],
             }),
             primitive: wgpu::PrimitiveState {
@@ -339,6 +341,7 @@ impl crate::framework::Example for Example {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None
         });
 
         Self {

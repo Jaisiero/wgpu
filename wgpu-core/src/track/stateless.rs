@@ -4,80 +4,65 @@
  * distinction between a usage scope and a full tracker.
 !*/
 
-use std::{marker::PhantomData, sync::Arc};
-
-use parking_lot::Mutex;
+use std::sync::Arc;
 
 use crate::{
-    hal_api::HalApi, id::TypedId, resource::Resource, resource_log, storage::Storage,
+    lock::{rank, Mutex},
+    resource::Trackable,
+    resource_log,
     track::ResourceMetadata,
 };
 
-use super::ResourceTracker;
+use super::{ResourceTracker, TrackerIndex};
 
 /// Stores all the resources that a bind group stores.
 #[derive(Debug)]
-pub(crate) struct StatelessBindGroupSate<Id: TypedId, T: Resource<Id>> {
-    resources: Mutex<Vec<(Id, Arc<T>)>>,
+pub(crate) struct StatelessBindGroupState<T: Trackable> {
+    resources: Mutex<Vec<Arc<T>>>,
 }
 
-impl<Id: TypedId, T: Resource<Id>> StatelessBindGroupSate<Id, T> {
+impl<T: Trackable> StatelessBindGroupState<T> {
     pub fn new() -> Self {
         Self {
-            resources: Mutex::new(Vec::new()),
+            resources: Mutex::new(rank::STATELESS_BIND_GROUP_STATE_RESOURCES, Vec::new()),
         }
     }
 
     /// Optimize the buffer bind group state by sorting it by ID.
     ///
     /// When this list of states is merged into a tracker, the memory
-    /// accesses will be in a constant assending order.
+    /// accesses will be in a constant ascending order.
     pub(crate) fn optimize(&self) {
         let mut resources = self.resources.lock();
-        resources.sort_unstable_by_key(|&(id, _)| id.unzip().0);
+        resources.sort_unstable_by_key(|resource| resource.tracker_index());
     }
 
     /// Returns a list of all resources tracked. May contain duplicates.
     pub fn used_resources(&self) -> impl Iterator<Item = Arc<T>> + '_ {
         let resources = self.resources.lock();
-        resources
-            .iter()
-            .map(|(_, resource)| resource.clone())
-            .collect::<Vec<_>>()
-            .into_iter()
+        resources.iter().cloned().collect::<Vec<_>>().into_iter()
     }
 
     /// Returns a list of all resources tracked. May contain duplicates.
     pub fn drain_resources(&self) -> impl Iterator<Item = Arc<T>> + '_ {
         let mut resources = self.resources.lock();
-        resources
-            .drain(..)
-            .map(|(_, r)| r)
-            .collect::<Vec<_>>()
-            .into_iter()
+        resources.drain(..).collect::<Vec<_>>().into_iter()
     }
 
     /// Adds the given resource.
-    pub fn add_single<'a>(&self, storage: &'a Storage<T, Id>, id: Id) -> Option<&'a T> {
-        let resource = storage.get(id).ok()?;
-
+    pub fn add_single(&self, resource: &Arc<T>) {
         let mut resources = self.resources.lock();
-        resources.push((id, resource.clone()));
-
-        Some(resource)
+        resources.push(resource.clone());
     }
 }
 
 /// Stores all resource state within a command buffer or device.
 #[derive(Debug)]
-pub(crate) struct StatelessTracker<A: HalApi, Id: TypedId, T: Resource<Id>> {
-    metadata: ResourceMetadata<A, Id, T>,
-    _phantom: PhantomData<Id>,
+pub(crate) struct StatelessTracker<T: Trackable> {
+    metadata: ResourceMetadata<T>,
 }
 
-impl<A: HalApi, Id: TypedId, T: Resource<Id>> ResourceTracker<Id, T>
-    for StatelessTracker<A, Id, T>
-{
+impl<T: Trackable> ResourceTracker for StatelessTracker<T> {
     /// Try to remove the given resource from the tracker iff we have the last reference to the
     /// resource and the epoch matches.
     ///
@@ -85,14 +70,12 @@ impl<A: HalApi, Id: TypedId, T: Resource<Id>> ResourceTracker<Id, T>
     ///
     /// If the ID is higher than the length of internal vectors,
     /// false will be returned.
-    fn remove_abandoned(&mut self, id: Id) -> bool {
-        let index = id.unzip().0 as usize;
+    fn remove_abandoned(&mut self, index: TrackerIndex) -> bool {
+        let index = index.as_usize();
 
         if index >= self.metadata.size() {
             return false;
         }
-
-        resource_log!("StatelessTracker::remove_abandoned {id:?}");
 
         self.tracker_assert_in_bounds(index);
 
@@ -102,29 +85,40 @@ impl<A: HalApi, Id: TypedId, T: Resource<Id>> ResourceTracker<Id, T>
                 //RefCount 2 means that resource is hold just by DeviceTracker and this suspected resource itself
                 //so it's already been released from user and so it's not inside Registry\Storage
                 if existing_ref_count <= 2 {
-                    self.metadata.remove(index);
-                    log::trace!("{} {:?} is not tracked anymore", T::TYPE, id,);
-                    return true;
-                } else {
-                    log::trace!(
-                        "{} {:?} is still referenced from {}",
+                    resource_log!(
+                        "StatelessTracker<{}>::remove_abandoned: removing {}",
                         T::TYPE,
-                        id,
-                        existing_ref_count
+                        self.metadata.get_resource_unchecked(index).error_ident()
                     );
-                    return false;
+
+                    self.metadata.remove(index);
+                    return true;
                 }
+
+                resource_log!(
+                    "StatelessTracker<{}>::remove_abandoned: not removing {}, ref count {}",
+                    T::TYPE,
+                    self.metadata.get_resource_unchecked(index).error_ident(),
+                    existing_ref_count
+                );
+
+                return false;
             }
         }
+
+        resource_log!(
+            "StatelessTracker<{}>::remove_abandoned: does not contain index {index:?}",
+            T::TYPE,
+        );
+
         true
     }
 }
 
-impl<A: HalApi, Id: TypedId, T: Resource<Id>> StatelessTracker<A, Id, T> {
+impl<T: Trackable> StatelessTracker<T> {
     pub fn new() -> Self {
         Self {
             metadata: ResourceMetadata::new(),
-            _phantom: PhantomData,
         }
     }
 
@@ -164,38 +158,17 @@ impl<A: HalApi, Id: TypedId, T: Resource<Id>> StatelessTracker<A, Id, T> {
     ///
     /// If the ID is higher than the length of internal vectors,
     /// the vectors will be extended. A call to set_size is not needed.
-    pub fn insert_single(&mut self, id: Id, resource: Arc<T>) {
-        let (index32, _epoch, _) = id.unzip();
-        let index = index32 as usize;
-
-        self.allow_index(index);
-
-        self.tracker_assert_in_bounds(index);
-
-        unsafe {
-            self.metadata.insert(index, resource);
-        }
-    }
-
-    /// Adds the given resource to the tracker.
     ///
-    /// If the ID is higher than the length of internal vectors,
-    /// the vectors will be extended. A call to set_size is not needed.
-    pub fn add_single<'a>(&mut self, storage: &'a Storage<T, Id>, id: Id) -> Option<&'a Arc<T>> {
-        let resource = storage.get(id).ok()?;
-
-        let (index32, _epoch, _) = id.unzip();
-        let index = index32 as usize;
+    /// Returns a reference to the newly inserted resource.
+    /// (This allows avoiding a clone/reference count increase in many cases.)
+    pub fn insert_single(&mut self, resource: Arc<T>) -> &Arc<T> {
+        let index = resource.tracker_index().as_usize();
 
         self.allow_index(index);
 
         self.tracker_assert_in_bounds(index);
 
-        unsafe {
-            self.metadata.insert(index, resource.clone());
-        }
-
-        Some(resource)
+        unsafe { self.metadata.insert(index, resource) }
     }
 
     /// Adds the given resources from the given tracker.
@@ -220,19 +193,5 @@ impl<A: HalApi, Id: TypedId, T: Resource<Id>> StatelessTracker<A, Id, T> {
                 }
             }
         }
-    }
-
-    pub fn get(&self, id: Id) -> Option<&Arc<T>> {
-        let index = id.unzip().0 as usize;
-        if index > self.metadata.size() {
-            return None;
-        }
-        self.tracker_assert_in_bounds(index);
-        unsafe {
-            if self.metadata.contains_unchecked(index) {
-                return Some(self.metadata.get_resource_unchecked(index));
-            }
-        }
-        None
     }
 }

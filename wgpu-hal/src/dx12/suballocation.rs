@@ -111,12 +111,17 @@ mod placed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(),
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
 
         null_comptr_check(resource)?;
+
+        device
+            .counters
+            .buffer_memory
+            .add(allocation.size() as isize);
 
         Ok((hr, Some(AllocationWrapper { allocation })))
     }
@@ -160,20 +165,30 @@ mod placed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(), // clear value
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
 
         null_comptr_check(resource)?;
 
+        device
+            .counters
+            .texture_memory
+            .add(allocation.size() as isize);
+
         Ok((hr, Some(AllocationWrapper { allocation })))
     }
 
     pub(crate) fn free_buffer_allocation(
+        device: &crate::dx12::Device,
         allocation: AllocationWrapper,
         allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
+        device
+            .counters
+            .buffer_memory
+            .sub(allocation.allocation.size() as isize);
         match allocator.lock().allocator.free(allocation.allocation) {
             Ok(_) => (),
             // TODO: Don't panic here
@@ -182,9 +197,14 @@ mod placed {
     }
 
     pub(crate) fn free_texture_allocation(
+        device: &crate::dx12::Device,
         allocation: AllocationWrapper,
         allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
+        device
+            .counters
+            .texture_memory
+            .sub(allocation.allocation.size() as isize);
         match allocator.lock().allocator.free(allocation.allocation) {
             Ok(_) => (),
             // TODO: Don't panic here
@@ -215,11 +235,16 @@ mod placed {
                     );
                     Self::Lost
                 }
+
                 gpu_allocator::AllocationError::Internal(e) => {
                     log::error!("DX12 gpu-allocator: Internal Error: {}", e);
                     Self::Lost
                 }
-                gpu_allocator::AllocationError::BarrierLayoutNeedsDevice10 => todo!(),
+                gpu_allocator::AllocationError::BarrierLayoutNeedsDevice10
+                | gpu_allocator::AllocationError::CastableFormatsRequiresEnhancedBarriers
+                | gpu_allocator::AllocationError::CastableFormatsRequiresAtLeastDevice12 => {
+                    unreachable!()
+                }
             }
         }
     }
@@ -297,7 +322,7 @@ mod committed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(),
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
@@ -335,7 +360,7 @@ mod committed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(), // clear value
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
@@ -347,6 +372,7 @@ mod committed {
 
     #[allow(unused)]
     pub(crate) fn free_buffer_allocation(
+        _device: &crate::dx12::Device,
         _allocation: AllocationWrapper,
         _allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
@@ -355,6 +381,7 @@ mod committed {
 
     #[allow(unused)]
     pub(crate) fn free_texture_allocation(
+        _device: &crate::dx12::Device,
         _allocation: AllocationWrapper,
         _allocator: &Mutex<GpuAllocatorWrapper>,
     ) {

@@ -1,4 +1,4 @@
-// Copyright 2018-2023 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2024 the Deno authors. All rights reserved. MIT license.
 
 use deno_core::error::type_error;
 use deno_core::error::AnyError;
@@ -113,7 +113,7 @@ pub fn op_webgpu_render_bundle_encoder_finish(
     &wgpu_core::command::RenderBundleDescriptor {
       label: Some(label),
     },
-    ()
+    None
   ) => state, WebGpuRenderBundle)
 }
 

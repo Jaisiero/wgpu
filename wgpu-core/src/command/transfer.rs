@@ -2,19 +2,21 @@
 use crate::device::trace::Command as TraceCommand;
 use crate::{
     api_log,
-    command::{clear_texture, CommandBuffer, CommandEncoderError},
+    command::{clear_texture, CommandEncoderError},
     conv,
     device::{Device, DeviceError, MissingDownlevelFlags},
-    error::{ErrorFormatter, PrettyError},
     global::Global,
     hal_api::HalApi,
-    id::{BufferId, CommandEncoderId, DeviceId, TextureId},
-    identity::GlobalIdentityHandlerFactory,
+    id::{BufferId, CommandEncoderId, TextureId},
     init_tracker::{
         has_copy_partial_init_tracker_coverage, MemoryInitKind, TextureInitRange,
         TextureInitTrackerAction,
     },
-    resource::{Resource, Texture, TextureErrorDimension},
+    resource::{
+        DestroyedResourceError, MissingBufferUsageError, MissingTextureUsageError, ParentDevice,
+        Texture, TextureErrorDimension,
+    },
+    snatch::SnatchGuard,
     track::{TextureSelector, Tracker},
 };
 
@@ -41,18 +43,16 @@ pub enum CopySide {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum TransferError {
-    #[error("Device {0:?} is invalid")]
-    InvalidDevice(DeviceId),
-    #[error("Buffer {0:?} is invalid or destroyed")]
-    InvalidBuffer(BufferId),
-    #[error("Texture {0:?} is invalid or destroyed")]
-    InvalidTexture(TextureId),
+    #[error("BufferId {0:?} is invalid")]
+    InvalidBufferId(BufferId),
+    #[error("TextureId {0:?} is invalid")]
+    InvalidTextureId(TextureId),
     #[error("Source and destination cannot be the same buffer")]
     SameSourceDestinationBuffer,
-    #[error("Source buffer/texture is missing the `COPY_SRC` usage flag")]
-    MissingCopySrcUsageFlag,
-    #[error("Destination buffer/texture is missing the `COPY_DST` usage flag")]
-    MissingCopyDstUsageFlag(Option<BufferId>, Option<TextureId>),
+    #[error(transparent)]
+    MissingBufferUsage(#[from] MissingBufferUsageError),
+    #[error(transparent)]
+    MissingTextureUsage(#[from] MissingTextureUsageError),
     #[error("Destination texture is missing the `RENDER_ATTACHMENT` usage flag")]
     MissingRenderAttachmentUsageFlag(TextureId),
     #[error("Copy of {start_offset}..{end_offset} would end up overrunning the bounds of the {side:?} buffer of size {buffer_size}")]
@@ -70,7 +70,7 @@ pub enum TransferError {
         dimension: TextureErrorDimension,
         side: CopySide,
     },
-    #[error("Unable to select texture aspect {aspect:?} from fromat {format:?}")]
+    #[error("Unable to select texture aspect {aspect:?} from format {format:?}")]
     InvalidTextureAspect {
         format: wgt::TextureFormat,
         aspect: wgt::TextureAspect,
@@ -125,8 +125,6 @@ pub enum TransferError {
         "Copying to textures with format {0:?} is forbidden when copying from external texture"
     )]
     ExternalCopyToForbiddenTextureFormat(wgt::TextureFormat),
-    #[error("The entire texture must be copied when copying from depth texture")]
-    InvalidDepthTextureExtent,
     #[error(
         "Source format ({src_format:?}) and destination format ({dst_format:?}) are not copy-compatible (they may only differ in srgb-ness)"
     )]
@@ -144,38 +142,6 @@ pub enum TransferError {
     InvalidMipLevel { requested: u32, count: u32 },
 }
 
-impl PrettyError for TransferError {
-    fn fmt_pretty(&self, fmt: &mut ErrorFormatter) {
-        fmt.error(self);
-        match *self {
-            Self::InvalidBuffer(id) => {
-                fmt.buffer_label(&id);
-            }
-            Self::InvalidTexture(id) => {
-                fmt.texture_label(&id);
-            }
-            // Self::MissingCopySrcUsageFlag(buf_opt, tex_opt) => {
-            //     if let Some(buf) = buf_opt {
-            //         let name = crate::gfx_select!(buf => global.buffer_label(buf));
-            //         ret.push_str(&format_label_line("source", &name));
-            //     }
-            //     if let Some(tex) = tex_opt {
-            //         let name = crate::gfx_select!(tex => global.texture_label(tex));
-            //         ret.push_str(&format_label_line("source", &name));
-            //     }
-            // }
-            Self::MissingCopyDstUsageFlag(buf_opt, tex_opt) => {
-                if let Some(buf) = buf_opt {
-                    fmt.buffer_label_with_key(&buf, "destination");
-                }
-                if let Some(tex) = tex_opt {
-                    fmt.texture_label_with_key(&tex, "destination");
-                }
-            }
-            _ => {}
-        };
-    }
-}
 /// Error encountered while attempting to do a copy on a command encoder.
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
@@ -184,6 +150,8 @@ pub enum CopyError {
     Encoder(#[from] CommandEncoderError),
     #[error("Copy error")]
     Transfer(#[from] TransferError),
+    #[error(transparent)]
+    DestroyedResource(#[from] DestroyedResourceError),
 }
 
 impl From<DeviceError> for CopyError {
@@ -253,7 +221,7 @@ pub(crate) fn validate_linear_texture_data(
 ) -> Result<(BufferAddress, BufferAddress), TransferError> {
     // Convert all inputs to BufferAddress (u64) to avoid some of the overflow issues
     // Note: u64 is not always enough to prevent overflow, especially when multiplying
-    // something with a potentially large depth value, so it is preferrable to validate
+    // something with a potentially large depth value, so it is preferable to validate
     // the copy size before calling this function (for example via `validate_texture_copy_range`).
     let copy_width = copy_size.width as BufferAddress;
     let copy_height = copy_size.height as BufferAddress;
@@ -367,10 +335,6 @@ pub(crate) fn validate_texture_copy_range(
     // physical size can be larger than the virtual
     let extent = extent_virtual.physical_size(desc.format);
 
-    if desc.format.is_depth_stencil_format() && *copy_size != extent {
-        return Err(TransferError::InvalidDepthTextureExtent);
-    }
-
     /// Return `Ok` if a run `size` texels long starting at `start_offset` falls
     /// entirely within `texture_size`. Otherwise, return an appropriate a`Err`.
     fn check_dimension(
@@ -453,6 +417,7 @@ fn handle_texture_init<A: HalApi>(
     copy_texture: &ImageCopyTexture,
     copy_size: &Extent3d,
     texture: &Arc<Texture<A>>,
+    snatch_guard: &SnatchGuard<'_>,
 ) -> Result<(), ClearError> {
     let init_action = TextureInitTrackerAction {
         texture: texture.clone(),
@@ -481,6 +446,7 @@ fn handle_texture_init<A: HalApi>(
                 &mut trackers.textures,
                 &device.alignments,
                 device.zero_buffer.as_ref().unwrap(),
+                snatch_guard,
             )?;
         }
     }
@@ -500,6 +466,7 @@ fn handle_src_texture_init<A: HalApi>(
     source: &ImageCopyTexture,
     copy_size: &Extent3d,
     texture: &Arc<Texture<A>>,
+    snatch_guard: &SnatchGuard<'_>,
 ) -> Result<(), TransferError> {
     handle_texture_init(
         MemoryInitKind::NeedsInitializedMemory,
@@ -510,6 +477,7 @@ fn handle_src_texture_init<A: HalApi>(
         source,
         copy_size,
         texture,
+        snatch_guard,
     )?;
     Ok(())
 }
@@ -526,6 +494,7 @@ fn handle_dst_texture_init<A: HalApi>(
     destination: &ImageCopyTexture,
     copy_size: &Extent3d,
     texture: &Arc<Texture<A>>,
+    snatch_guard: &SnatchGuard<'_>,
 ) -> Result<(), TransferError> {
     // Attention: If we don't write full texture subresources, we need to a full
     // clear first since we don't track subrects. This means that in rare cases
@@ -550,11 +519,12 @@ fn handle_dst_texture_init<A: HalApi>(
         destination,
         copy_size,
         texture,
+        snatch_guard,
     )?;
     Ok(())
 }
 
-impl<G: GlobalIdentityHandlerFactory> Global<G> {
+impl Global {
     pub fn command_encoder_copy_buffer_to_buffer<A: HalApi>(
         &self,
         command_encoder_id: CommandEncoderId,
@@ -574,14 +544,20 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
         let hub = A::hub(self);
 
-        let cmd_buf = CommandBuffer::get_encoder(hub, command_encoder_id)?;
+        let cmd_buf = match hub
+            .command_buffers
+            .get(command_encoder_id.into_command_buffer_id())
+        {
+            Ok(cmd_buf) => cmd_buf,
+            Err(_) => return Err(CommandEncoderError::Invalid.into()),
+        };
+        cmd_buf.check_recording()?;
+
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
 
         let device = &cmd_buf.device;
-        if !device.is_valid() {
-            return Err(TransferError::InvalidDevice(cmd_buf.device.as_info().id()).into());
-        }
+        device.check_is_valid()?;
 
         #[cfg(feature = "trace")]
         if let Some(ref mut list) = cmd_buf_data.commands {
@@ -596,45 +572,41 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let snatch_guard = device.snatchable_lock.read();
 
-        let (src_buffer, src_pending) = {
-            let buffer_guard = hub.buffers.read();
-            let src_buffer = buffer_guard
-                .get(source)
-                .map_err(|_| TransferError::InvalidBuffer(source))?;
-            cmd_buf_data
-                .trackers
-                .buffers
-                .set_single(src_buffer, hal::BufferUses::COPY_SRC)
-                .ok_or(TransferError::InvalidBuffer(source))?
-        };
-        let src_raw = src_buffer
-            .raw
-            .get(&snatch_guard)
-            .ok_or(TransferError::InvalidBuffer(source))?;
-        if !src_buffer.usage.contains(BufferUsages::COPY_SRC) {
-            return Err(TransferError::MissingCopySrcUsageFlag.into());
-        }
+        let src_buffer = hub
+            .buffers
+            .get(source)
+            .map_err(|_| TransferError::InvalidBufferId(source))?;
+
+        src_buffer.same_device_as(cmd_buf.as_ref())?;
+
+        let src_pending = cmd_buf_data
+            .trackers
+            .buffers
+            .set_single(&src_buffer, hal::BufferUses::COPY_SRC);
+
+        let src_raw = src_buffer.try_raw(&snatch_guard)?;
+        src_buffer
+            .check_usage(BufferUsages::COPY_SRC)
+            .map_err(TransferError::MissingBufferUsage)?;
         // expecting only a single barrier
         let src_barrier = src_pending.map(|pending| pending.into_hal(&src_buffer, &snatch_guard));
 
-        let (dst_buffer, dst_pending) = {
-            let buffer_guard = hub.buffers.read();
-            let dst_buffer = buffer_guard
-                .get(destination)
-                .map_err(|_| TransferError::InvalidBuffer(destination))?;
-            cmd_buf_data
-                .trackers
-                .buffers
-                .set_single(dst_buffer, hal::BufferUses::COPY_DST)
-                .ok_or(TransferError::InvalidBuffer(destination))?
-        };
-        let dst_raw = dst_buffer
-            .raw
-            .get(&snatch_guard)
-            .ok_or(TransferError::InvalidBuffer(destination))?;
-        if !dst_buffer.usage.contains(BufferUsages::COPY_DST) {
-            return Err(TransferError::MissingCopyDstUsageFlag(Some(destination), None).into());
-        }
+        let dst_buffer = hub
+            .buffers
+            .get(destination)
+            .map_err(|_| TransferError::InvalidBufferId(destination))?;
+
+        dst_buffer.same_device_as(cmd_buf.as_ref())?;
+
+        let dst_pending = cmd_buf_data
+            .trackers
+            .buffers
+            .set_single(&dst_buffer, hal::BufferUses::COPY_DST);
+
+        let dst_raw = dst_buffer.try_raw(&snatch_guard)?;
+        dst_buffer
+            .check_usage(BufferUsages::COPY_DST)
+            .map_err(TransferError::MissingBufferUsage)?;
         let dst_barrier = dst_pending.map(|pending| pending.into_hal(&dst_buffer, &snatch_guard));
 
         if size % wgt::COPY_BUFFER_ALIGNMENT != 0 {
@@ -650,13 +622,13 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .downlevel
             .flags
             .contains(wgt::DownlevelFlags::UNRESTRICTED_INDEX_BUFFER)
-            && (src_buffer.usage.contains(wgt::BufferUsages::INDEX)
-                || dst_buffer.usage.contains(wgt::BufferUsages::INDEX))
+            && (src_buffer.usage.contains(BufferUsages::INDEX)
+                || dst_buffer.usage.contains(BufferUsages::INDEX))
         {
-            let forbidden_usages = wgt::BufferUsages::VERTEX
-                | wgt::BufferUsages::UNIFORM
-                | wgt::BufferUsages::INDIRECT
-                | wgt::BufferUsages::STORAGE;
+            let forbidden_usages = BufferUsages::VERTEX
+                | BufferUsages::UNIFORM
+                | BufferUsages::INDIRECT
+                | BufferUsages::STORAGE;
             if src_buffer.usage.intersects(forbidden_usages)
                 || dst_buffer.usage.intersects(forbidden_usages)
             {
@@ -738,11 +710,17 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let hub = A::hub(self);
 
-        let cmd_buf = CommandBuffer::get_encoder(hub, command_encoder_id)?;
+        let cmd_buf = match hub
+            .command_buffers
+            .get(command_encoder_id.into_command_buffer_id())
+        {
+            Ok(cmd_buf) => cmd_buf,
+            Err(_) => return Err(CommandEncoderError::Invalid.into()),
+        };
+        cmd_buf.check_recording()?;
+
         let device = &cmd_buf.device;
-        if !device.is_valid() {
-            return Err(TransferError::InvalidDevice(cmd_buf.device.as_info().id()).into());
-        }
+        device.check_is_valid()?;
 
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
@@ -769,7 +747,9 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let dst_texture = hub
             .textures
             .get(destination.texture)
-            .map_err(|_| TransferError::InvalidTexture(destination.texture))?;
+            .map_err(|_| TransferError::InvalidTextureId(destination.texture))?;
+
+        dst_texture.same_device_as(cmd_buf.as_ref())?;
 
         let (hal_copy_size, array_layer_count) = validate_texture_copy_range(
             destination,
@@ -779,6 +759,8 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         )?;
 
         let (dst_range, dst_base) = extract_texture_selector(destination, copy_size, &dst_texture)?;
+
+        let snatch_guard = device.snatchable_lock.read();
 
         // Handle texture init *before* dealing with barrier transitions so we
         // have an easier time inserting "immediate-inits" that may be required
@@ -791,41 +773,34 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             destination,
             copy_size,
             &dst_texture,
+            &snatch_guard,
         )?;
 
-        let snatch_guard = device.snatchable_lock.read();
+        let src_buffer = hub
+            .buffers
+            .get(source.buffer)
+            .map_err(|_| TransferError::InvalidBufferId(source.buffer))?;
 
-        let (src_buffer, src_pending) = {
-            let buffer_guard = hub.buffers.read();
-            let src_buffer = buffer_guard
-                .get(source.buffer)
-                .map_err(|_| TransferError::InvalidBuffer(source.buffer))?;
-            tracker
-                .buffers
-                .set_single(src_buffer, hal::BufferUses::COPY_SRC)
-                .ok_or(TransferError::InvalidBuffer(source.buffer))?
-        };
-        let src_raw = src_buffer
-            .raw
-            .get(&snatch_guard)
-            .ok_or(TransferError::InvalidBuffer(source.buffer))?;
-        if !src_buffer.usage.contains(BufferUsages::COPY_SRC) {
-            return Err(TransferError::MissingCopySrcUsageFlag.into());
-        }
+        src_buffer.same_device_as(cmd_buf.as_ref())?;
+
+        let src_pending = tracker
+            .buffers
+            .set_single(&src_buffer, hal::BufferUses::COPY_SRC);
+
+        let src_raw = src_buffer.try_raw(&snatch_guard)?;
+        src_buffer
+            .check_usage(BufferUsages::COPY_SRC)
+            .map_err(TransferError::MissingBufferUsage)?;
         let src_barrier = src_pending.map(|pending| pending.into_hal(&src_buffer, &snatch_guard));
 
-        let dst_pending = tracker
-            .textures
-            .set_single(&dst_texture, dst_range, hal::TextureUses::COPY_DST)
-            .ok_or(TransferError::InvalidTexture(destination.texture))?;
-        let dst_raw = dst_texture
-            .raw(&snatch_guard)
-            .ok_or(TransferError::InvalidTexture(destination.texture))?;
-        if !dst_texture.desc.usage.contains(TextureUsages::COPY_DST) {
-            return Err(
-                TransferError::MissingCopyDstUsageFlag(None, Some(destination.texture)).into(),
-            );
-        }
+        let dst_pending =
+            tracker
+                .textures
+                .set_single(&dst_texture, dst_range, hal::TextureUses::COPY_DST);
+        let dst_raw = dst_texture.try_raw(&snatch_guard)?;
+        dst_texture
+            .check_usage(TextureUsages::COPY_DST)
+            .map_err(TransferError::MissingTextureUsage)?;
         let dst_barrier = dst_pending.map(|pending| pending.into_hal(dst_raw));
 
         if !dst_base.aspect.is_one() {
@@ -899,11 +874,17 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let hub = A::hub(self);
 
-        let cmd_buf = CommandBuffer::get_encoder(hub, command_encoder_id)?;
+        let cmd_buf = match hub
+            .command_buffers
+            .get(command_encoder_id.into_command_buffer_id())
+        {
+            Ok(cmd_buf) => cmd_buf,
+            Err(_) => return Err(CommandEncoderError::Invalid.into()),
+        };
+        cmd_buf.check_recording()?;
+
         let device = &cmd_buf.device;
-        if !device.is_valid() {
-            return Err(TransferError::InvalidDevice(cmd_buf.device.as_info().id()).into());
-        }
+        device.check_is_valid()?;
 
         let mut cmd_buf_data = cmd_buf.data.lock();
         let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
@@ -929,12 +910,16 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let src_texture = hub
             .textures
             .get(source.texture)
-            .map_err(|_| TransferError::InvalidTexture(source.texture))?;
+            .map_err(|_| TransferError::InvalidTextureId(source.texture))?;
+
+        src_texture.same_device_as(cmd_buf.as_ref())?;
 
         let (hal_copy_size, array_layer_count) =
             validate_texture_copy_range(source, &src_texture.desc, CopySide::Source, copy_size)?;
 
         let (src_range, src_base) = extract_texture_selector(source, copy_size, &src_texture)?;
+
+        let snatch_guard = device.snatchable_lock.read();
 
         // Handle texture init *before* dealing with barrier transitions so we
         // have an easier time inserting "immediate-inits" that may be required
@@ -947,20 +932,17 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             source,
             copy_size,
             &src_texture,
+            &snatch_guard,
         )?;
 
-        let snatch_guard = device.snatchable_lock.read();
-
-        let src_pending = tracker
-            .textures
-            .set_single(&src_texture, src_range, hal::TextureUses::COPY_SRC)
-            .ok_or(TransferError::InvalidTexture(source.texture))?;
-        let src_raw = src_texture
-            .raw(&snatch_guard)
-            .ok_or(TransferError::InvalidTexture(source.texture))?;
-        if !src_texture.desc.usage.contains(TextureUsages::COPY_SRC) {
-            return Err(TransferError::MissingCopySrcUsageFlag.into());
-        }
+        let src_pending =
+            tracker
+                .textures
+                .set_single(&src_texture, src_range, hal::TextureUses::COPY_SRC);
+        let src_raw = src_texture.try_raw(&snatch_guard)?;
+        src_texture
+            .check_usage(TextureUsages::COPY_SRC)
+            .map_err(TransferError::MissingTextureUsage)?;
         if src_texture.desc.sample_count != 1 {
             return Err(TransferError::InvalidSampleCount {
                 sample_count: src_texture.desc.sample_count,
@@ -976,25 +958,21 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         }
         let src_barrier = src_pending.map(|pending| pending.into_hal(src_raw));
 
-        let (dst_buffer, dst_pending) = {
-            let buffer_guard = hub.buffers.read();
-            let dst_buffer = buffer_guard
-                .get(destination.buffer)
-                .map_err(|_| TransferError::InvalidBuffer(destination.buffer))?;
-            tracker
-                .buffers
-                .set_single(dst_buffer, hal::BufferUses::COPY_DST)
-                .ok_or(TransferError::InvalidBuffer(destination.buffer))?
-        };
-        let dst_raw = dst_buffer
-            .raw
-            .get(&snatch_guard)
-            .ok_or(TransferError::InvalidBuffer(destination.buffer))?;
-        if !dst_buffer.usage.contains(BufferUsages::COPY_DST) {
-            return Err(
-                TransferError::MissingCopyDstUsageFlag(Some(destination.buffer), None).into(),
-            );
-        }
+        let dst_buffer = hub
+            .buffers
+            .get(destination.buffer)
+            .map_err(|_| TransferError::InvalidBufferId(destination.buffer))?;
+
+        dst_buffer.same_device_as(cmd_buf.as_ref())?;
+
+        let dst_pending = tracker
+            .buffers
+            .set_single(&dst_buffer, hal::BufferUses::COPY_DST);
+
+        let dst_raw = dst_buffer.try_raw(&snatch_guard)?;
+        dst_buffer
+            .check_usage(BufferUsages::COPY_DST)
+            .map_err(TransferError::MissingBufferUsage)?;
         let dst_barrier = dst_pending.map(|pending| pending.into_hal(&dst_buffer, &snatch_guard));
 
         if !src_base.aspect.is_one() {
@@ -1072,11 +1050,17 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
 
         let hub = A::hub(self);
 
-        let cmd_buf = CommandBuffer::get_encoder(hub, command_encoder_id)?;
+        let cmd_buf = match hub
+            .command_buffers
+            .get(command_encoder_id.into_command_buffer_id())
+        {
+            Ok(cmd_buf) => cmd_buf,
+            Err(_) => return Err(CommandEncoderError::Invalid.into()),
+        };
+        cmd_buf.check_recording()?;
+
         let device = &cmd_buf.device;
-        if !device.is_valid() {
-            return Err(TransferError::InvalidDevice(cmd_buf.device.as_info().id()).into());
-        }
+        device.check_is_valid()?;
 
         let snatch_guard = device.snatchable_lock.read();
 
@@ -1103,11 +1087,14 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
         let src_texture = hub
             .textures
             .get(source.texture)
-            .map_err(|_| TransferError::InvalidTexture(source.texture))?;
+            .map_err(|_| TransferError::InvalidTextureId(source.texture))?;
         let dst_texture = hub
             .textures
             .get(destination.texture)
-            .map_err(|_| TransferError::InvalidTexture(source.texture))?;
+            .map_err(|_| TransferError::InvalidTextureId(source.texture))?;
+
+        src_texture.same_device_as(cmd_buf.as_ref())?;
+        dst_texture.same_device_as(cmd_buf.as_ref())?;
 
         // src and dst texture format must be copy-compatible
         // https://gpuweb.github.io/gpuweb/#copy-compatible
@@ -1153,6 +1140,7 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             source,
             copy_size,
             &src_texture,
+            &snatch_guard,
         )?;
         handle_dst_texture_init(
             encoder,
@@ -1162,19 +1150,18 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             destination,
             copy_size,
             &dst_texture,
+            &snatch_guard,
         )?;
 
-        let src_pending = cmd_buf_data
-            .trackers
-            .textures
-            .set_single(&src_texture, src_range, hal::TextureUses::COPY_SRC)
-            .ok_or(TransferError::InvalidTexture(source.texture))?;
-        let src_raw = src_texture
-            .raw(&snatch_guard)
-            .ok_or(TransferError::InvalidTexture(source.texture))?;
-        if !src_texture.desc.usage.contains(TextureUsages::COPY_SRC) {
-            return Err(TransferError::MissingCopySrcUsageFlag.into());
-        }
+        let src_pending = cmd_buf_data.trackers.textures.set_single(
+            &src_texture,
+            src_range,
+            hal::TextureUses::COPY_SRC,
+        );
+        let src_raw = src_texture.try_raw(&snatch_guard)?;
+        src_texture
+            .check_usage(TextureUsages::COPY_SRC)
+            .map_err(TransferError::MissingTextureUsage)?;
 
         //TODO: try to avoid this the collection. It's needed because both
         // `src_pending` and `dst_pending` try to hold `trackers.textures` mutably.
@@ -1182,19 +1169,15 @@ impl<G: GlobalIdentityHandlerFactory> Global<G> {
             .map(|pending| pending.into_hal(src_raw))
             .collect();
 
-        let dst_pending = cmd_buf_data
-            .trackers
-            .textures
-            .set_single(&dst_texture, dst_range, hal::TextureUses::COPY_DST)
-            .ok_or(TransferError::InvalidTexture(destination.texture))?;
-        let dst_raw = dst_texture
-            .raw(&snatch_guard)
-            .ok_or(TransferError::InvalidTexture(destination.texture))?;
-        if !dst_texture.desc.usage.contains(TextureUsages::COPY_DST) {
-            return Err(
-                TransferError::MissingCopyDstUsageFlag(None, Some(destination.texture)).into(),
-            );
-        }
+        let dst_pending = cmd_buf_data.trackers.textures.set_single(
+            &dst_texture,
+            dst_range,
+            hal::TextureUses::COPY_DST,
+        );
+        let dst_raw = dst_texture.try_raw(&snatch_guard)?;
+        dst_texture
+            .check_usage(TextureUsages::COPY_DST)
+            .map_err(TransferError::MissingTextureUsage)?;
 
         barriers.extend(dst_pending.map(|pending| pending.into_hal(dst_raw)));
 
