@@ -6,11 +6,7 @@ use super::{
     storage::StoreValue,
     BackendResult, Error, FragmentEntryPoint, Options,
 };
-use crate::{
-    back::{self, Baked},
-    proc::{self, NameKey},
-    valid, Handle, Module, ScalarKind, ShaderStage, TypeInner,
-};
+use crate::{back::{self, Baked}, proc::{self, NameKey}, valid, Handle, Module, ScalarKind, ShaderStage, TypeInner, RayTracingFunction};
 use std::{fmt, mem};
 
 const LOCATION_SEMANTIC: &str = "LOC";
@@ -857,6 +853,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, "ConstantBuffer<")?;
                 "b"
             }
+            crate::AddressSpace::RayTracing => todo!()
         };
 
         // If the global is a push constant write the type now because it will be a
@@ -2155,6 +2152,15 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 writeln!(self.out, "{level}}}")?
             }
             Statement::RayQuery { .. } => unreachable!(),
+            Statement::RayTracing { acceleration_structure, fun } => {
+                match fun {
+                    RayTracingFunction::TraceRay { descriptor, payload, .. } => {
+                        write!(self.out, "TraceRay(")?;
+                        self.write_expr(module, acceleration_structure, func_ctx)?;
+                        todo!()
+                    }
+                }
+            }
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let name = Baked(result).to_string();

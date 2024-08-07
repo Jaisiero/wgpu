@@ -2,7 +2,7 @@
 
 use crate::{
     arena::{BadHandle, BadRangeError},
-    Handle,
+    Handle, RayTracingFunction,
 };
 
 use crate::non_max_u32::NonMaxU32;
@@ -567,6 +567,23 @@ impl super::Validator {
                         validate_expr(result)?;
                     }
                     crate::RayQueryFunction::Terminate => {}
+                }
+                Ok(())
+            }
+            crate::Statement::RayTracing {
+                acceleration_structure,
+                ref fun,
+            } => {
+                validate_expr(acceleration_structure)?;
+                match *fun {
+                    RayTracingFunction::TraceRay {
+                        descriptor,
+                        payload,
+                        ..
+                    } => {
+                        validate_expr(descriptor)?;
+                        validate_expr(payload)?;
+                    }
                 }
                 Ok(())
             }

@@ -188,7 +188,9 @@ impl crate::BuiltIn {
             | Self::BaseVertex
             | Self::WorkGroupSize
             | Self::LaunchId
-            | Self::LaunchSize => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
+            | Self::LaunchSize
+            | Self::Intersection
+            | Self::Payload => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
             Self::PointSize | Self::ViewIndex | Self::PointCoord => {
                 return Err(Error::Custom(format!("Unsupported builtin {self:?}")))
             }

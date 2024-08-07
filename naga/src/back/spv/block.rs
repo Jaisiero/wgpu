@@ -2044,6 +2044,7 @@ impl<'w> BlockContext<'w> {
         exit: BlockExit,
         loop_context: LoopContext,
         debug_info: Option<&DebugInfoInner>,
+        stage: Option<crate::ShaderStage>,
     ) -> Result<(), Error> {
         let mut block = Block::new(label_id);
         for (statement, span) in naga_block.span_iter() {
@@ -2086,6 +2087,7 @@ impl<'w> BlockContext<'w> {
                         BlockExit::Branch { target: merge_id },
                         loop_context,
                         debug_info,
+                        stage,
                     )?;
 
                     block = Block::new(merge_id);
@@ -2130,6 +2132,7 @@ impl<'w> BlockContext<'w> {
                             BlockExit::Branch { target: merge_id },
                             loop_context,
                             debug_info,
+                            stage,
                         )?;
                     }
                     if let Some(block_id) = reject_id {
@@ -2139,6 +2142,7 @@ impl<'w> BlockContext<'w> {
                             BlockExit::Branch { target: merge_id },
                             loop_context,
                             debug_info,
+                            stage,
                         )?;
                     }
 
@@ -2219,6 +2223,7 @@ impl<'w> BlockContext<'w> {
                             },
                             inner_context,
                             debug_info,
+                            stage,
                         )?;
                     }
 
@@ -2268,6 +2273,7 @@ impl<'w> BlockContext<'w> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
+                        stage,
                     )?;
 
                     let exit = match break_if {
@@ -2289,6 +2295,7 @@ impl<'w> BlockContext<'w> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
+                        stage,
                     )?;
 
                     block = Block::new(merge_id);
@@ -2329,7 +2336,11 @@ impl<'w> BlockContext<'w> {
                     return Ok(());
                 }
                 Statement::Kill => {
-                    self.function.consume(block, Instruction::kill());
+                    if let Some(crate::ShaderStage::AnyHit) = stage {
+                        self.function.consume(block, Instruction::ignore_hit());
+                    } else {
+                        self.function.consume(block, Instruction::kill());
+                    }
                     return Ok(());
                 }
                 Statement::Barrier(flags) => {
@@ -2644,6 +2655,9 @@ impl<'w> BlockContext<'w> {
                 }
                 Statement::RayQuery { query, ref fun } => {
                     self.write_ray_query_function(query, fun, &mut block);
+                }
+                Statement::RayTracing { acceleration_structure, ref fun } => {
+                    self.write_ray_tracing_function(acceleration_structure, fun, &mut block)
                 }
                 Statement::SubgroupBallot {
                     result,

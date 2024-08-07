@@ -78,6 +78,8 @@ impl Writer {
             saved_cached: CachedExpressions::default(),
             gl450_ext_inst_id,
             temp_list: Vec::new(),
+            payload_count: 0,
+            intersection_count: 0,
         })
     }
 
@@ -128,6 +130,8 @@ impl Writer {
             global_variables: take(&mut self.global_variables).recycle(),
             saved_cached: take(&mut self.saved_cached).recycle(),
             temp_list: take(&mut self.temp_list).recycle(),
+            payload_count: 0,
+            intersection_count: 0,
         };
 
         *self = fresh;
@@ -328,6 +332,7 @@ impl Writer {
         ir_module: &crate::Module,
         mut interface: Option<FunctionInterface>,
         debug_info: &Option<DebugInfoInner>,
+        stage: Option<crate::ShaderStage>,
     ) -> Result<Word, Error> {
         let mut function = Function::default();
 
@@ -342,8 +347,11 @@ impl Writer {
 
         let mut parameter_type_ids = Vec::with_capacity(ir_function.arguments.len());
         for argument in ir_function.arguments.iter() {
-            let class = spirv::StorageClass::Input;
+            let mut class = spirv::StorageClass::Input;
             let handle_ty = ir_module.types[argument.ty].inner.is_handle();
+            if let crate::TypeInner::Pointer { space: crate::AddressSpace::RayTracing, ..} = ir_module.types[argument.ty].inner {
+                class = map_storage_class(crate::AddressSpace::RayTracing);
+            }
             let argument_type_id = match handle_ty {
                 true => self.get_pointer_id(
                     &ir_module.types,
@@ -365,11 +373,19 @@ impl Writer {
                         argument.ty,
                         binding,
                     )?;
-                    iface.varying_ids.push(varying_id);
-                    let id = self.id_gen.next();
-                    prelude
-                        .body
-                        .push(Instruction::load(argument_type_id, id, varying_id, None));
+                    let id = match ir_module.types[argument.ty].inner {
+                        crate::TypeInner::Pointer { space: crate::AddressSpace::RayTracing, ..} => {
+                            varying_id
+                        }
+                        _ => {
+                            iface.varying_ids.push(varying_id);
+                            let id = self.id_gen.next();
+                            prelude
+                                .body
+                                .push(Instruction::load(argument_type_id, id, varying_id, None));
+                            id
+                        }
+                    };
 
                     if binding == &crate::Binding::BuiltIn(crate::BuiltIn::LocalInvocationId) {
                         local_invocation_id = Some(id);
@@ -709,6 +725,7 @@ impl Writer {
             super::block::BlockExit::Return,
             LoopContext::default(),
             debug_info.as_ref(),
+            stage,
         )?;
 
         // Consume the `BlockContext`, ending its borrows and letting the
@@ -754,6 +771,7 @@ impl Writer {
                 stage: entry_point.stage,
             }),
             debug_info,
+            Some(entry_point.stage),
         )?;
 
         let exec_model = match entry_point.stage {
@@ -1532,6 +1550,10 @@ impl Writer {
                     self.decorate(id, Decoration::Index, &[1]);
                 }
             }
+            // these are very different between spv and hlsl and wgsl
+            crate::Binding::BuiltIn(built_in) if built_in == crate::BuiltIn::Payload || built_in == crate::BuiltIn::Intersection  => {
+                self.decorate(id, Decoration::Location, &[0]);
+            }
             crate::Binding::BuiltIn(built_in) => {
                 use crate::BuiltIn as Bi;
                 let built_in = match built_in {
@@ -1634,6 +1656,7 @@ impl Writer {
                     }
                     Bi::LaunchId => BuiltIn::LaunchIdKHR,
                     Bi::LaunchSize => BuiltIn::LaunchSizeKHR,
+                    Bi::Payload | Bi::Intersection => unreachable!(),
                 };
 
                 self.decorate(id, Decoration::BuiltIn, &[built_in as u32]);
@@ -1937,6 +1960,14 @@ impl Writer {
             }
         }
 
+        let mut has_ray_tracing = ir_module.special_types.tri_ray_intersection.is_some();
+
+        for entry_point in ir_module.entry_points.iter() {
+            if let crate::ShaderStage::Miss | crate::ShaderStage::ClosestHit | crate::ShaderStage::AnyHit | crate::ShaderStage::RayGeneration = entry_point.stage {
+                has_ray_tracing = true;
+            }
+        }
+
         if self.physical_layout.version < 0x10300 && has_storage_buffers {
             // enable the storage buffer class on < SPV-1.3
             Instruction::extension("SPV_KHR_storage_buffer_storage_class")
@@ -1949,6 +1980,11 @@ impl Writer {
         if has_ray_query {
             Instruction::extension("SPV_KHR_ray_query")
                 .to_words(&mut self.logical_layout.extensions)
+        }
+        if has_ray_tracing {
+            Instruction::extension("SPV_KHR_ray_tracing")
+                .to_words(&mut self.logical_layout.extensions);
+            self.require_any("Ray Tracing", &[spirv::Capability::RayTracingKHR])?;
         }
         Instruction::type_void(self.void_type).to_words(&mut self.logical_layout.declarations);
         Instruction::ext_inst_import(self.gl450_ext_inst_id, "GLSL.std.450")
@@ -2041,7 +2077,8 @@ impl Writer {
                     continue;
                 }
             }
-            let id = self.write_function(ir_function, info, ir_module, None, &debug_info_inner)?;
+            let id =
+                self.write_function(ir_function, info, ir_module, None, &debug_info_inner, None)?;
             self.lookup_function.insert(handle, id);
         }
 

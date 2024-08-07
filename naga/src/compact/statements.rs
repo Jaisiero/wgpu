@@ -99,6 +99,13 @@ impl FunctionTracer<'_> {
                         self.expressions_used.insert(query);
                         self.trace_ray_query_function(fun);
                     }
+                    St::RayTracing {
+                        acceleration_structure,
+                        ref fun,
+                    } => {
+                        self.expressions_used.insert(acceleration_structure);
+                        self.trace_ray_tracing_function(fun);
+                    }
                     St::SubgroupBallot { result, predicate } => {
                         if let Some(predicate) = predicate {
                             self.expressions_used.insert(predicate);
@@ -177,6 +184,19 @@ impl FunctionTracer<'_> {
                 self.expressions_used.insert(result);
             }
             Qf::Terminate => {}
+        }
+    }
+    fn trace_ray_tracing_function(&mut self, fun: &crate::RayTracingFunction) {
+        use crate::RayTracingFunction as Rf;
+        match *fun {
+            Rf::TraceRay {
+                descriptor,
+                payload,
+                ..
+            } => {
+                self.expressions_used.insert(descriptor);
+                self.expressions_used.insert(payload);
+            }
         }
     }
 }
@@ -287,6 +307,13 @@ impl FunctionMap {
                         adjust(query);
                         self.adjust_ray_query_function(fun);
                     }
+                    St::RayTracing {
+                        ref mut acceleration_structure,
+                        ref mut fun,
+                    } => {
+                        adjust(acceleration_structure);
+                        self.adjust_ray_tracing_function(fun);
+                    }
                     St::SubgroupBallot {
                         ref mut result,
                         ref mut predicate,
@@ -366,6 +393,19 @@ impl FunctionMap {
                 self.expressions.adjust(result);
             }
             Qf::Terminate => {}
+        }
+    }
+    fn adjust_ray_tracing_function(&self, fun: &mut crate::RayTracingFunction) {
+        use crate::RayTracingFunction as Rf;
+        match *fun {
+            Rf::TraceRay {
+                ref mut descriptor,
+                ref mut payload,
+                ..
+            } => {
+                self.expressions.adjust(descriptor);
+                self.expressions.adjust(payload);
+            }
         }
     }
 }

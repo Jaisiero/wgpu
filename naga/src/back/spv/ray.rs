@@ -258,4 +258,18 @@ impl<'w> BlockContext<'w> {
         ));
         id
     }
+
+    pub(super) fn write_ray_tracing_function(
+        &mut self,
+        acceleration_structure: Handle<crate::Expression>,
+        function: &crate::RayTracingFunction,
+        block: &mut Block,
+    ) {
+        let acceleration_structure_id = self.cached[acceleration_structure];
+        match *function {
+            crate::RayTracingFunction::TraceRay { descriptor, payload, .. } => {
+
+            }
+        }
+    }
 }

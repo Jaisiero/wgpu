@@ -675,6 +675,8 @@ pub struct Writer {
 
     // Just a temporary list of SPIR-V ids
     temp_list: Vec<Word>,
+    payload_count: u32,
+    intersection_count: u32,
 }
 
 bitflags::bitflags! {

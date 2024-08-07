@@ -35,6 +35,7 @@ pub fn ensure_block_returns(block: &mut crate::Block) {
             | S::ImageStore { .. }
             | S::Call { .. }
             | S::RayQuery { .. }
+            | S::RayTracing { .. }
             | S::Atomic { .. }
             | S::WorkGroupUniformLoad { .. }
             | S::SubgroupBallot { .. }

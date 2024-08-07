@@ -369,6 +369,7 @@ impl StatementGraph {
                         crate::GatherMode::ShuffleXor(_) => "SubgroupShuffleXor",
                     }
                 }
+                S::RayTracing { .. } => todo!(),
             };
             // Set the last node to the merge node
             last_node = merge_id;

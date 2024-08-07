@@ -112,7 +112,8 @@ impl crate::AddressSpace {
             | crate::AddressSpace::Uniform
             | crate::AddressSpace::Storage { .. }
             | crate::AddressSpace::Handle
-            | crate::AddressSpace::PushConstant => false,
+            | crate::AddressSpace::PushConstant
+            | crate::AddressSpace::RayTracing => false,
         }
     }
 }
@@ -1188,6 +1189,7 @@ impl<'a, W: Write> Writer<'a, W> {
             crate::AddressSpace::Function => unreachable!(),
             // Textures and samplers are handled directly in `Writer::write`.
             crate::AddressSpace::Handle => unreachable!(),
+            crate::AddressSpace::RayTracing => todo!()
         }
 
         Ok(())
@@ -2402,7 +2404,7 @@ impl<'a, W: Write> Writer<'a, W> {
                 self.write_expr(value, ctx)?;
                 writeln!(self.out, ");")?;
             }
-            Statement::RayQuery { .. } => unreachable!(),
+            Statement::RayQuery { .. } | Statement::RayTracing { .. } => unreachable!(),
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let res_name = Baked(result).to_string();
@@ -4682,6 +4684,7 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         // raytracing
         Bi::LaunchId => "gl_LaunchIDEXT",
         Bi::LaunchSize => "gl_LaunchSizeEXT",
+        Bi::Payload | Bi::Intersection => unreachable!(),
     }
 }
 
@@ -4697,6 +4700,7 @@ const fn glsl_storage_qualifier(space: crate::AddressSpace) -> Option<&'static s
         As::Handle => Some("uniform"),
         As::WorkGroup => Some("shared"),
         As::PushConstant => Some("uniform"),
+        As::RayTracing => todo!(),
     }
 }
 

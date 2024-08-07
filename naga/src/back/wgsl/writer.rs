@@ -944,7 +944,7 @@ impl<W: Write> Writer<W> {
                     writeln!(self.out, "{level}subgroupBarrier();")?;
                 }
             }
-            Statement::RayQuery { .. } => unreachable!(),
+            Statement::RayQuery { .. } | Statement::RayTracing { .. } => unreachable!(),
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let res_name = Baked(result).to_string();
@@ -1948,7 +1948,9 @@ fn builtin_str(built_in: crate::BuiltIn) -> Result<&'static str, Error> {
         | Bi::PointCoord
         | Bi::WorkGroupSize
         | Bi::LaunchId
-        | Bi::LaunchSize => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
+        | Bi::LaunchSize
+        | Bi::Payload
+        | Bi::Intersection => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
     })
 }
 
@@ -2089,6 +2091,7 @@ const fn address_space_str(
             As::WorkGroup => "workgroup",
             As::Handle => return (None, None),
             As::Function => "function",
+            As::RayTracing => todo!()
         }),
         None,
     )

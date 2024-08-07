@@ -481,6 +481,7 @@ impl crate::AddressSpace {
             | Self::PushConstant
             | Self::Handle => true,
             Self::Function => false,
+            Self::RayTracing => todo!()
         }
     }
 
@@ -498,6 +499,7 @@ impl crate::AddressSpace {
             Self::Uniform | Self::PushConstant => false,
             // Not applicable.
             Self::Handle | Self::Function => false,
+            Self::RayTracing => todo!()
         }
     }
 
@@ -508,6 +510,7 @@ impl crate::AddressSpace {
             Self::Storage { .. } => Some("device"),
             Self::Private | Self::Function => Some("thread"),
             Self::WorkGroup => Some("threadgroup"),
+            Self::RayTracing => todo!()
         }
     }
 }
@@ -3212,6 +3215,7 @@ impl<W: Write> Writer<W> {
                         }
                     }
                 }
+                crate::Statement::RayTracing { .. } => todo!(),
                 crate::Statement::SubgroupBallot { result, predicate } => {
                     write!(self.out, "{level}")?;
                     let name = self.namer.call("");
@@ -4783,6 +4787,7 @@ impl<W: Write> Writer<W> {
                     LocationMode::Uniform,
                     false,
                 ),
+                _ => todo!(),
             };
 
             // Should this entry point be modified to do vertex pulling?
@@ -4852,6 +4857,7 @@ impl<W: Write> Writer<W> {
                         crate::AddressSpace::Function
                         | crate::AddressSpace::Private
                         | crate::AddressSpace::WorkGroup => {}
+                        crate::AddressSpace::RayTracing => todo!()
                     }
                 }
                 if needs_buffer_sizes {

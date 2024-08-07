@@ -407,7 +407,8 @@ impl super::AddressSpace {
         match self {
             crate::AddressSpace::Function
             | crate::AddressSpace::Private
-            | crate::AddressSpace::WorkGroup => Sa::LOAD | Sa::STORE,
+            | crate::AddressSpace::WorkGroup
+            | crate::AddressSpace::RayTracing => Sa::LOAD | Sa::STORE,
             crate::AddressSpace::Uniform => Sa::LOAD,
             crate::AddressSpace::Storage { access } => access,
             crate::AddressSpace::Handle => Sa::LOAD,

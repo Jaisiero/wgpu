@@ -244,6 +244,54 @@ impl crate::Module {
         handle
     }
 
+    /// Populate this module's [`SpecialTypes::tri_ray_intersection`] type.
+    ///
+    /// [`SpecialTypes::tri_ray_intersection`] is the type any hit and closest
+    /// hit shaders are passed. In WGSL, it is a struct type
+    /// referred to as `TriRayIntersection`.
+    ///
+    /// Backends construct values of this type based on platform APIs, so if you
+    /// change any its fields, you must update the backends to match. Look for
+    /// the backend's handling for [`Expression::RayQueryGetIntersection`].
+    ///
+    /// [`SpecialTypes::tri_ray_intersection`]: crate::SpecialTypes::tri_ray_intersection
+    /// [`Expression::RayQueryGetIntersection`]: crate::Expression::RayQueryGetIntersection
+    pub fn generate_tri_ray_intersection_type(&mut self) -> Handle<crate::Type> {
+        if let Some(handle) = self.special_types.ray_intersection {
+            return handle;
+        }
+
+        let ty_barycentrics = self.types.insert(
+            crate::Type {
+                name: None,
+                inner: crate::TypeInner::Vector {
+                    size: crate::VectorSize::Bi,
+                    scalar: crate::Scalar::F32,
+                },
+            },
+            Span::UNDEFINED,
+        );
+
+        let handle = self.types.insert(
+            crate::Type {
+                name: Some("TriRayIntersection".to_string()),
+                inner: crate::TypeInner::Struct {
+                    members: vec![crate::StructMember {
+                        name: Some("barycentrics".to_string()),
+                        ty: ty_barycentrics,
+                        binding: None,
+                        offset: 28,
+                    }],
+                    span: 176,
+                },
+            },
+            Span::UNDEFINED,
+        );
+
+        self.special_types.tri_ray_intersection = Some(handle);
+        handle
+    }
+
     /// Populate this module's [`SpecialTypes::predeclared_types`] type and return the handle.
     ///
     /// [`SpecialTypes::predeclared_types`]: crate::SpecialTypes::predeclared_types

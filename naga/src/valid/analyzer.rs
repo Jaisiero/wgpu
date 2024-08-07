@@ -630,6 +630,7 @@ impl FunctionInfo {
                     // storage data is only uniform when read-only
                     As::Storage { access } => !access.contains(crate::StorageAccess::STORE),
                     As::Handle => false,
+                    As::RayTracing => false,
                 };
                 Uniformity {
                     non_uniform_result: if uniform { None } else { Some(handle) },
@@ -1041,6 +1042,20 @@ impl FunctionInfo {
                         let _ = self.add_ref(acceleration_structure);
                         let _ = self.add_ref(descriptor);
                     }
+                    FunctionUniformity::new()
+                }
+                S::RayTracing {
+                    acceleration_structure,
+                    ref fun,
+                } => {
+                    let _ = self.add_ref(acceleration_structure);
+                    let crate::RayTracingFunction::TraceRay {
+                        descriptor,
+                        payload,
+                        ..
+                    } = *fun;
+                    let _ = self.add_ref(descriptor);
+                    let _ = self.add_ref(payload);
                     FunctionUniformity::new()
                 }
                 S::SubgroupBallot {

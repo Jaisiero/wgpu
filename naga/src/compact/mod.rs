@@ -228,6 +228,7 @@ impl<'module> ModuleTracer<'module> {
         let crate::SpecialTypes {
             ref ray_desc,
             ref ray_intersection,
+            ref tri_ray_intersection,
             ref predeclared_types,
         } = *special_types;
 
@@ -236,6 +237,9 @@ impl<'module> ModuleTracer<'module> {
         }
         if let Some(ray_intersection) = *ray_intersection {
             self.types_used.insert(ray_intersection);
+        }
+        if let Some(tri_ray_intersection) = *tri_ray_intersection {
+            self.types_used.insert(tri_ray_intersection);
         }
         for (_, &handle) in predeclared_types {
             self.types_used.insert(handle);
@@ -298,6 +302,7 @@ impl ModuleMap {
         let crate::SpecialTypes {
             ref mut ray_desc,
             ref mut ray_intersection,
+            ref mut tri_ray_intersection,
             ref mut predeclared_types,
         } = *special;
 
@@ -306,6 +311,9 @@ impl ModuleMap {
         }
         if let Some(ref mut ray_intersection) = *ray_intersection {
             self.types.adjust(ray_intersection);
+        }
+        if let Some(ref mut tri_ray_intersection) = *tri_ray_intersection {
+            self.types.adjust(tri_ray_intersection);
         }
 
         for handle in predeclared_types.values_mut() {

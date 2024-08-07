@@ -759,6 +759,10 @@ impl super::Instruction {
         instruction
     }
 
+    pub(super) const fn ignore_hit() -> Self {
+        Self::new(Op::IgnoreIntersectionKHR)
+    }
+
     //
     //  Conversion Instructions
     //

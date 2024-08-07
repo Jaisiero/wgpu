@@ -12,6 +12,7 @@ pub fn map_address_space(word: &str, span: Span) -> Result<crate::AddressSpace, 
         }),
         "push_constant" => Ok(crate::AddressSpace::PushConstant),
         "function" => Ok(crate::AddressSpace::Function),
+        "ray_tracing" => Ok(crate::AddressSpace::RayTracing),
         _ => Err(Error::UnknownAddressSpace(span)),
     }
 }
@@ -43,6 +44,9 @@ pub fn map_built_in(word: &str, span: Span) -> Result<crate::BuiltIn, Error<'_>>
         // any raytracing
         "launch_id" => crate::BuiltIn::LaunchId,
         "launch_size" => crate::BuiltIn::LaunchSize,
+        // ray_closest or ray_any
+        "payload" => crate::BuiltIn::Payload,
+        "intersection" => crate::BuiltIn::Intersection,
         _ => return Err(Error::UnknownBuiltin(span)),
     })
 }

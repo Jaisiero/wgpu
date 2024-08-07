@@ -707,6 +707,22 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
                 crate::RayQueryFunction::Terminate => {}
             }
         }
+        Statement::RayTracing {
+            ref mut acceleration_structure,
+            ref mut fun
+        } => {
+            adjust(acceleration_structure);
+            match fun {
+                crate::RayTracingFunction::TraceRay {
+                    ref mut descriptor,
+                    ref mut payload,
+                    ..
+                } => {
+                    adjust(descriptor);
+                    adjust(payload);
+                }
+            }
+        }
         Statement::Break | Statement::Continue | Statement::Kill | Statement::Barrier(_) => {}
     }
 }

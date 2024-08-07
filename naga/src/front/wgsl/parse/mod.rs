@@ -1437,6 +1437,7 @@ impl Parser {
             "ray_query" => ast::Type::RayQuery,
             "RayDesc" => ast::Type::RayDesc,
             "RayIntersection" => ast::Type::RayIntersection,
+            "TriRayIntersection" => ast::Type::TriRayIntersection,
             _ => return Ok(None),
         }))
     }
@@ -2219,17 +2220,17 @@ impl Parser {
                     stage.set(ShaderStage::Compute, name_span)?;
                     compute_span = name_span;
                 }
-                ("ray-generation", name_span) => {
-                    stage.set(crate::ShaderStage::RayGeneration, name_span)?;
+                ("ray_gen", name_span) => {
+                    stage.set(ShaderStage::RayGeneration, name_span)?;
                 }
-                ("ray-closest-hit", name_span) => {
-                    stage.set(crate::ShaderStage::ClosestHit, name_span)?;
+                ("ray_closest", name_span) => {
+                    stage.set(ShaderStage::ClosestHit, name_span)?;
                 }
-                ("ray-any-hit", name_span) => {
-                    stage.set(crate::ShaderStage::AnyHit, name_span)?;
+                ("ray_any", name_span) => {
+                    stage.set(ShaderStage::AnyHit, name_span)?;
                 }
-                ("ray-miss", name_span) => {
-                    stage.set(crate::ShaderStage::Miss, name_span)?;
+                ("ray_miss", name_span) => {
+                    stage.set(ShaderStage::Miss, name_span)?;
                 }
                 ("workgroup_size", name_span) => {
                     lexer.expect(Token::Paren('('))?;

@@ -386,6 +386,8 @@ pub enum AddressSpace {
     Handle,
     /// Push constants.
     PushConstant,
+    /// Ray-tracing (only allowed in function input)
+    RayTracing
 }
 
 /// Built-in inputs and outputs.
@@ -426,6 +428,9 @@ pub enum BuiltIn {
     // any raytracing shader
     LaunchId,
     LaunchSize,
+    // ray_closest or ray_any
+    Payload,
+    Intersection,
 }
 
 /// Number of bytes per scalar.
@@ -1759,6 +1764,26 @@ pub enum RayQueryFunction {
     Terminate,
 }
 
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "deserialize", derive(Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
+pub enum RayTracingFunction {
+    TraceRay {
+        #[allow(rustdoc::private_intra_doc_links)]
+        /// A struct of detailed parameters for the ray to be traced.
+        ///
+        /// This expression should have the struct type given in
+        /// [`SpecialTypes::ray_desc`]. This is available in the WGSL
+        /// front end as the `RayDesc` type.
+        descriptor: Handle<Expression>,
+        /// A pointer to a user defined payload
+        payload: Handle<Expression>,
+        /// the type the payload contains
+        payload_ty: Handle<Type>,
+    },
+}
+
 //TODO: consider removing `Clone`. It's not valid to clone `Statement::Emit` anyway.
 /// Instructions which make up an executable block.
 ///
@@ -2024,6 +2049,15 @@ pub enum Statement {
         /// The specific operation we're performing on `query`.
         fun: RayQueryFunction,
     },
+    RayTracing {
+        /// The [`AccelerationStructure`] object this statement operates on.
+        ///
+        /// [`AccelerationStructure`]: TypeInner::AccelerationStructure
+        acceleration_structure: Handle<Expression>,
+
+        /// The specific operation we're performing on `acceleration_structure`.
+        fun: RayTracingFunction,
+    },
     /// Calculate a bitmask using a boolean from each active thread in the subgroup
     SubgroupBallot {
         /// The [`SubgroupBallotResult`] expression representing this load's result.
@@ -2219,6 +2253,12 @@ pub struct SpecialTypes {
     /// Call [`Module::generate_ray_intersection_type`] to populate
     /// this if needed and return the handle.
     pub ray_intersection: Option<Handle<Type>>,
+
+    /// Type for `TriRayIntersection`.
+    ///
+    /// Call [`Module::generate_tri_ray_intersection_type`] to populate
+    /// this if needed and return the handle.
+    pub tri_ray_intersection: Option<Handle<Type>>,
 
     /// Types for predeclared wgsl types instantiated on demand.
     ///

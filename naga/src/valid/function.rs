@@ -1,7 +1,7 @@
+use super::validate_atomic_compare_exchange_struct;
 use crate::arena::{Arena, UniqueArena};
 use crate::arena::{Handle, HandleSet};
-
-use super::validate_atomic_compare_exchange_struct;
+use crate::RayTracingFunction;
 
 use super::{
     analyzer::{UniformityDisruptor, UniformityRequirements},
@@ -915,7 +915,7 @@ impl super::Validator {
                     finished = true;
                 }
                 S::Kill => {
-                    stages &= super::ShaderStages::FRAGMENT;
+                    stages &= super::ShaderStages::FRAGMENT | super::ShaderStages::ANY_HIT;
                     finished = true;
                 }
                 S::Barrier(barrier) => {
@@ -1226,6 +1226,38 @@ impl super::Validator {
                         crate::RayQueryFunction::Terminate => {}
                     }
                 }
+                S::RayTracing {
+                    acceleration_structure,
+                    ref fun,
+                } => {
+                    match *context
+                        .resolve_type(acceleration_structure, &self.valid_expression_set)?
+                    {
+                        Ti::AccelerationStructure => {}
+                        _ => {
+                            return Err(FunctionError::InvalidAccelerationStructure(
+                                acceleration_structure,
+                            )
+                            .with_span_static(span, "invalid acceleration structure"))
+                        }
+                    }
+                    match fun {
+                        RayTracingFunction::TraceRay { descriptor, .. } => {
+                            let desc_ty_given = context
+                                .resolve_type(descriptor.clone(), &self.valid_expression_set)?;
+                            let desc_ty_expected = context
+                                .special_types
+                                .ray_desc
+                                .map(|handle| &context.types[handle].inner);
+                            if Some(desc_ty_given) != desc_ty_expected {
+                                return Err(FunctionError::InvalidRayDescriptor(
+                                    descriptor.clone(),
+                                )
+                                .with_span_static(span, "invalid ray descriptor"));
+                            }
+                        }
+                    }
+                }
                 S::SubgroupBallot { result, predicate } => {
                     stages &= self.subgroup_stages;
                     if !self.capabilities.contains(super::Capabilities::SUBGROUP) {
@@ -1382,7 +1414,7 @@ impl super::Validator {
 
         for (index, argument) in fun.arguments.iter().enumerate() {
             match module.types[argument.ty].inner.pointer_space() {
-                Some(crate::AddressSpace::Private | crate::AddressSpace::Function) | None => {}
+                Some(crate::AddressSpace::Private | crate::AddressSpace::Function | crate::AddressSpace::RayTracing) | None => {}
                 Some(other) => {
                     return Err(FunctionError::InvalidArgumentPointerSpace {
                         index,

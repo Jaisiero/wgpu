@@ -253,6 +253,7 @@ pub enum Type<'a> {
     RayQuery,
     RayDesc,
     RayIntersection,
+    TriRayIntersection,
     BindingArray {
         base: Handle<Type<'a>>,
         size: ArraySize<'a>,

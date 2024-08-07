@@ -2396,6 +2396,34 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 committed: true,
                             }
                         }
+                        "traceRay" => {
+                            let mut args = ctx.prepare_args(arguments, 3, span);
+                            let acceleration_structure = self.expression(args.next()?, ctx)?;
+                            let descriptor = self.expression(args.next()?, ctx)?;
+                            let (payload, payload_ty) =
+                                self.ray_payload_pointer(args.next()?, ctx)?;
+                            args.finish()?;
+
+                            let _ = ctx.module.generate_ray_desc_type();
+                            let fun = crate::RayTracingFunction::TraceRay {
+                                descriptor,
+                                payload,
+                                payload_ty,
+                            };
+
+                            let rctx = ctx.runtime_expression_ctx(span)?;
+                            rctx.block
+                                .extend(rctx.emitter.finish(&rctx.function.expressions));
+                            rctx.emitter.start(&rctx.function.expressions);
+                            rctx.block.push(
+                                crate::Statement::RayTracing {
+                                    acceleration_structure,
+                                    fun,
+                                },
+                                span,
+                            );
+                            return Ok(None);
+                        }
                         "RayDesc" => {
                             let ty = ctx.module.generate_ray_desc_type();
                             let handle = self.construct(
@@ -2888,6 +2916,9 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             ast::Type::RayIntersection => {
                 return Ok(ctx.module.generate_ray_intersection_type());
             }
+            ast::Type::TriRayIntersection => {
+                return Ok(ctx.module.generate_tri_ray_intersection_type());
+            }
             ast::Type::User(ref ident) => {
                 return match ctx.globals.get(ident.name) {
                     Some(&LoweredGlobalDecl::Type(handle)) => Ok(handle),
@@ -2952,6 +2983,22 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     Err(Error::InvalidRayQueryPointer(span))
                 }
             },
+            ref other => {
+                log::error!("Type {:?} passed to ray query op", other);
+                Err(Error::InvalidRayQueryPointer(span))
+            }
+        }
+    }
+    fn ray_payload_pointer(
+        &mut self,
+        expr: Handle<ast::Expression<'source>>,
+        ctx: &mut ExpressionContext<'source, '_, '_>,
+    ) -> Result<(Handle<crate::Expression>, Handle<crate::Type>), Error<'source>> {
+        let span = ctx.ast_expressions.get_span(expr);
+        let pointer = self.expression(expr, ctx)?;
+
+        match *resolve_inner!(ctx, pointer) {
+            crate::TypeInner::Pointer { base, .. } => Ok((pointer, base)),
             ref other => {
                 log::error!("Type {:?} passed to ray query op", other);
                 Err(Error::InvalidRayQueryPointer(span))
