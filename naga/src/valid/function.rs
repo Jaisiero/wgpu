@@ -162,6 +162,8 @@ pub enum FunctionError {
     InvalidRayDescriptor(Handle<crate::Expression>),
     #[error("Ray Query {0:?} does not have a matching type")]
     InvalidRayQueryType(Handle<crate::Type>),
+    #[error("Payload pointer {0:?} is invalid")]
+    InvalidRayPayload(Handle<crate::Expression>),
     #[error("Shader requires capability {0:?}")]
     MissingCapability(super::Capabilities),
     #[error(
@@ -1242,7 +1244,7 @@ impl super::Validator {
                         }
                     }
                     match fun {
-                        RayTracingFunction::TraceRay { descriptor, .. } => {
+                        RayTracingFunction::TraceRay { descriptor, payload, payload_ty } => {
                             let desc_ty_given = context
                                 .resolve_type(descriptor.clone(), &self.valid_expression_set)?;
                             let desc_ty_expected = context
@@ -1254,6 +1256,20 @@ impl super::Validator {
                                     descriptor.clone(),
                                 )
                                 .with_span_static(span, "invalid ray descriptor"));
+                            }
+                            let payload_inner =
+                                context.resolve_type(*payload, &self.valid_expression_set)?;
+                            let expected_pointer_inner = Ti::Pointer {
+                                base: *payload_ty,
+                                space: AddressSpace::RayTracing,
+                            };
+                            let expected_pointer_inner_function = Ti::Pointer {
+                                base: *payload_ty,
+                                space: AddressSpace::Function,
+                            };
+                            if !(expected_pointer_inner.equivalent(payload_inner, context.types) || expected_pointer_inner_function.equivalent(payload_inner, context.types)) {
+                                return Err(FunctionError::InvalidRayPayload(*payload)
+                                    .with_span_static(span, "TraceRay"));
                             }
                         }
                     }

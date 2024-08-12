@@ -514,6 +514,22 @@ impl super::Instruction {
         instruction
     }
 
+    pub(super) fn copy(
+        dst_pointer_id: Word,
+        src_pointer_id: Word,
+        memory_access: Option<spirv::MemoryAccess>,
+    ) -> Self {
+        let mut instruction = Self::new(Op::CopyMemory);
+        instruction.add_operand(dst_pointer_id);
+        instruction.add_operand(src_pointer_id);
+
+        if let Some(memory_access) = memory_access {
+            instruction.add_operand(memory_access.bits());
+        }
+
+        instruction
+    }
+
     pub(super) fn atomic_store(
         pointer_id: Word,
         scope_id: Word,
@@ -761,6 +777,38 @@ impl super::Instruction {
 
     pub(super) const fn ignore_hit() -> Self {
         Self::new(Op::IgnoreIntersectionKHR)
+    }
+
+    //
+    // Ray-tracing functions
+    //
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn trace_ray(
+        acceleration_structure: Word,
+        ray_flags: Word,
+        cull_mask: Word,
+        sbt_offest: Word,
+        sbt_stride:Word,
+        miss_idx: Word,
+        ray_origin: Word,
+        ray_tmin: Word,
+        ray_dir: Word,
+        ray_tmax: Word,
+        payload: Word,
+    ) -> Self {
+        let mut instruction = Self::new(Op::TraceRayKHR);
+        instruction.add_operand(acceleration_structure);
+        instruction.add_operand(ray_flags);
+        instruction.add_operand(cull_mask);
+        instruction.add_operand(sbt_offest);
+        instruction.add_operand(sbt_stride);
+        instruction.add_operand(miss_idx);
+        instruction.add_operand(ray_origin);
+        instruction.add_operand(ray_tmin);
+        instruction.add_operand(ray_dir);
+        instruction.add_operand(ray_tmax);
+        instruction.add_operand(payload);
+        instruction
     }
 
     //

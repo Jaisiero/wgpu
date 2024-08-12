@@ -443,6 +443,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         stage: Option<(ShaderStage, Io)>,
     ) -> BackendResult {
         match *binding {
+            Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload | crate::BuiltIn::Intersection)) => {}
             Some(crate::Binding::BuiltIn(builtin)) if !is_subgroup_builtin_binding(binding) => {
                 let builtin_str = builtin.to_hlsl_str()?;
                 write!(self.out, " : {builtin_str}")?;
@@ -1142,6 +1143,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
     /// # Notes
     /// Adds no trailing or leading whitespace
     pub(super) fn write_type(&mut self, module: &Module, ty: Handle<crate::Type>) -> BackendResult {
+        if let Some(special_ty) = module.special_types.tri_ray_intersection {
+            if special_ty == ty {
+                write!(self.out, "BuiltInTriangleIntersectionAttributes")?;
+                return Ok(());
+            }
+        }
+
         let inner = &module.types[ty].inner;
         match *inner {
             TypeInner::Struct { .. } => write!(self.out, "{}", self.names[&NameKey::Type(ty)])?,
@@ -1209,6 +1217,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             // Base `type` and `name` should be written outside
             TypeInner::Array { base, size, .. } | TypeInner::BindingArray { base, size } => {
                 self.write_array_size(module, base, size)?;
+            }
+            TypeInner::AccelerationStructure => {
+                write!(self.out, "RaytracingAccelerationStructure")?;
+            }
+            TypeInner::Pointer { base, space:crate::AddressSpace::RayTracing } => {
+                write!(self.out, "inout")?;
+                self.write_type(module, base)?;
             }
             _ => return Err(Error::Unimplemented(format!("write_value_type {inner:?}"))),
         }
@@ -2152,12 +2167,36 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 writeln!(self.out, "{level}}}")?
             }
             Statement::RayQuery { .. } => unreachable!(),
-            Statement::RayTracing { acceleration_structure, fun } => {
+            Statement::RayTracing { acceleration_structure, ref fun } => {
                 match fun {
                     RayTracingFunction::TraceRay { descriptor, payload, .. } => {
                         write!(self.out, "TraceRay(")?;
                         self.write_expr(module, acceleration_structure, func_ctx)?;
-                        todo!()
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".flags")?;
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".cull_mask")?;
+                        write!(self.out, ", ")?;
+                        write!(self.out, "0, ")?;
+                        write!(self.out, "0, ")?;
+                        write!(self.out, "0, ")?;
+                        write!(self.out, "{{ ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".origin")?;
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".tmin")?;
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".dir")?;
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, *descriptor, func_ctx)?;
+                        write!(self.out, ".tmax")?;
+                        write!(self.out, "}}, ")?;
+                        self.write_expr(module, *payload, func_ctx)?;
+                        write!(self.out, ");")?;
                     }
                 }
             }

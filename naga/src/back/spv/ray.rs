@@ -4,6 +4,7 @@ Generating SPIR-V for ray query operations.
 
 use super::{Block, BlockContext, Instruction, LocalType, LookupType};
 use crate::arena::Handle;
+use crate::ShaderStage;
 
 impl<'w> BlockContext<'w> {
     pub(super) fn write_ray_query_function(
@@ -264,12 +265,98 @@ impl<'w> BlockContext<'w> {
         acceleration_structure: Handle<crate::Expression>,
         function: &crate::RayTracingFunction,
         block: &mut Block,
-    ) {
-        let acceleration_structure_id = self.cached[acceleration_structure];
+        stage: ShaderStage,
+    ) -> Result<(), super::Error> {
+        let acc_struct_id = self.get_handle_id(acceleration_structure);
         match *function {
-            crate::RayTracingFunction::TraceRay { descriptor, payload, .. } => {
+            crate::RayTracingFunction::TraceRay { descriptor, payload, payload_ty } => {
+                let varying_id = self.writer.write_varying(
+                    self.ir_module,
+                    stage,
+                    spirv::StorageClass::RayPayloadKHR,
+                    None,
+                    payload_ty,
+                    &crate::Binding::BuiltIn(crate::BuiltIn::Payload),
+                )?;
 
+                let payload_id = self.cached[payload];
+                let desc_id = self.cached[descriptor];
+                let flag_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
+                    vector_size: None,
+                    scalar: crate::Scalar::U32,
+                    pointer_space: None,
+                }));
+                let ray_flags_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    flag_type_id,
+                    ray_flags_id,
+                    desc_id,
+                    &[0],
+                ));
+                let cull_mask_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    flag_type_id,
+                    cull_mask_id,
+                    desc_id,
+                    &[1],
+                ));
+
+                let scalar_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
+                    vector_size: None,
+                    scalar: crate::Scalar::F32,
+                    pointer_space: None,
+                }));
+                let tmin_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    scalar_type_id,
+                    tmin_id,
+                    desc_id,
+                    &[2],
+                ));
+                let tmax_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    scalar_type_id,
+                    tmax_id,
+                    desc_id,
+                    &[3],
+                ));
+
+                let vector_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
+                    vector_size: Some(crate::VectorSize::Tri),
+                    scalar: crate::Scalar::F32,
+                    pointer_space: None,
+                }));
+                let ray_origin_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    vector_type_id,
+                    ray_origin_id,
+                    desc_id,
+                    &[4],
+                ));
+                let ray_dir_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    vector_type_id,
+                    ray_dir_id,
+                    desc_id,
+                    &[5],
+                ));
+                block.body.push(Instruction::copy(varying_id, payload_id, None));
+                block.body.push(Instruction::trace_ray(
+                    acc_struct_id,
+                    ray_flags_id,
+                    cull_mask_id,
+                    self.get_index_constant(0),
+                    self.get_index_constant(0),
+                    self.get_index_constant(0),
+                    ray_origin_id,
+                    tmin_id,
+                    ray_dir_id,
+                    tmax_id,
+                    varying_id,
+                ));
+                block.body.push(Instruction::copy(payload_id, varying_id, None));
             }
         }
+        Ok(())
     }
 }

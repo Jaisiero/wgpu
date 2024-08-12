@@ -1476,7 +1476,7 @@ impl Writer {
     /// [`EntryPoint`]: crate::EntryPoint
     /// [`Input`]: spirv::StorageClass::Input
     /// [`Output`]: spirv::StorageClass::Output
-    fn write_varying(
+    pub(super) fn write_varying(
         &mut self,
         ir_module: &crate::Module,
         stage: crate::ShaderStage,

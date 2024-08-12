@@ -2998,9 +2998,9 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
         let pointer = self.expression(expr, ctx)?;
 
         match *resolve_inner!(ctx, pointer) {
-            crate::TypeInner::Pointer { base, .. } => Ok((pointer, base)),
+            crate::TypeInner::Pointer { base, space } if space.access().contains(crate::StorageAccess::STORE | crate::StorageAccess::LOAD) => Ok((pointer, base)),
             ref other => {
-                log::error!("Type {:?} passed to ray query op", other);
+                log::error!("Type {:?} passed to trace ray op", other);
                 Err(Error::InvalidRayQueryPointer(span))
             }
         }
