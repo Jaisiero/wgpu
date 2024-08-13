@@ -1950,7 +1950,19 @@ fn builtin_str(built_in: crate::BuiltIn) -> Result<&'static str, Error> {
         | Bi::LaunchId
         | Bi::LaunchSize
         | Bi::Payload
-        | Bi::Intersection => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
+        | Bi::Intersection
+        | Bi::RayT
+        | Bi::GeometryIndex
+        | Bi::ObjectRayDirection
+        | Bi::ObjectRayOrigin
+        | Bi::HitKind
+        | Bi::ObjectToWorld
+        | Bi::WorldToObject
+        | Bi::InstanceCustomIndex
+        | Bi::RayOrigin
+        | Bi::RayDirection
+        | Bi::RayFlags
+        | Bi::ClosestRayT => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
     })
 }
 

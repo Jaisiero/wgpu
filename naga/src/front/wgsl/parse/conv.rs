@@ -47,6 +47,7 @@ pub fn map_built_in(word: &str, span: Span) -> Result<crate::BuiltIn, Error<'_>>
         // ray_closest or ray_any
         "payload" => crate::BuiltIn::Payload,
         "intersection" => crate::BuiltIn::Intersection,
+        "ray_t" => crate::BuiltIn::RayT,
         _ => return Err(Error::UnknownBuiltin(span)),
     })
 }

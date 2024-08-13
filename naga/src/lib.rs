@@ -410,6 +410,7 @@ pub enum BuiltIn {
     FragDepth,
     PointCoord,
     FrontFacing,
+    // this one is also for ray_closest or ray_any
     PrimitiveIndex,
     SampleIndex,
     SampleMask,
@@ -431,6 +432,20 @@ pub enum BuiltIn {
     // ray_closest or ray_any
     Payload,
     Intersection,
+    RayT,
+    GeometryIndex,
+    ObjectRayOrigin,
+    ObjectRayDirection,
+    HitKind,
+    ObjectToWorld,
+    WorldToObject,
+    InstanceCustomIndex,
+    // any raytracing but ray gen
+    RayOrigin,
+    RayDirection,
+    RayFlags,
+    // intersection
+    ClosestRayT
 }
 
 /// Number of bytes per scalar.

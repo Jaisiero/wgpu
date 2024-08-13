@@ -4684,7 +4684,7 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         // raytracing
         Bi::LaunchId => "gl_LaunchIDEXT",
         Bi::LaunchSize => "gl_LaunchSizeEXT",
-        Bi::Payload | Bi::Intersection => unreachable!(),
+        Bi::Payload | Bi::Intersection | Bi::RayT | Bi::GeometryIndex | Bi::ObjectRayDirection | Bi::ObjectRayOrigin | Bi::HitKind | Bi::ObjectToWorld | Bi::WorldToObject | Bi::InstanceCustomIndex | Bi::RayOrigin | Bi::RayDirection | Bi::RayFlags | Bi::ClosestRayT => unreachable!(),
     }
 }
 

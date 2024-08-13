@@ -306,7 +306,87 @@ impl VaryingContext<'_> {
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
                         // this builtin can be anything
                         true,
-                    )
+                    ),
+                    Bi::RayT => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::F32),
+                    ),
+                    Bi::GeometryIndex => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::ObjectRayOrigin => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Vector {
+                            size: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::ObjectRayDirection => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Vector {
+                            size: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::HitKind => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::ObjectToWorld => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Matrix {
+                            columns: Vs::Quad,
+                            rows: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::WorldToObject => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Matrix {
+                            columns: Vs::Quad,
+                            rows: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::InstanceCustomIndex => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::RayOrigin => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Vector {
+                            size: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::RayDirection => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        *ty_inner
+                            == Ti::Vector {
+                            size: Vs::Tri,
+                            scalar: crate::Scalar::F32,
+                        },
+                    ),
+                    Bi::RayFlags => (
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss) && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::ClosestRayT  => (
+                        todo!() && !self.output,
+                        *ty_inner
+                            == Ti::Scalar(crate::Scalar::F32),
+                    ),
                 };
 
                 if !visible {

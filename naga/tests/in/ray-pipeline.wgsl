@@ -28,13 +28,13 @@ but in hlsl it is `inout vec4<f32>> colour`
 in wgsl a pointer seems to best represent both
 */
 @ray_any
-fn any_hit(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>, @builtin(intersection) intersection: TriRayIntersection) {
+fn any_hit(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>, @builtin(intersection) intersection: TriRayIntersection, @builtin(ray_t) t: f32) {
     *colour = vec4<f32>();
     return;
 }
 
 @ray_closest
-fn closest_hit(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>, @builtin(intersection) intersection: TriRayIntersection) {
+fn closest_hit(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>, @builtin(intersection) intersection: TriRayIntersection, @builtin(ray_t) t: f32) {
     *colour = vec4<f32>(1.0);
     return;
 }

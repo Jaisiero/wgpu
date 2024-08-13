@@ -6,12 +6,7 @@ use super::{
     LocalType, LocalVariable, LogicalLayout, LookupFunctionType, LookupType, LoopContext, Options,
     PhysicalLayout, PipelineOptions, ResultMember, Writer, WriterFlags, BITS_PER_BYTE,
 };
-use crate::{
-    arena::{Handle, HandleVec, UniqueArena},
-    back::spv::BindingInfo,
-    proc::{Alignment, TypeResolution},
-    valid::{FunctionInfo, ModuleInfo},
-};
+use crate::{arena::{Handle, HandleVec, UniqueArena}, back::spv::BindingInfo, proc::{Alignment, TypeResolution}, valid::{FunctionInfo, ModuleInfo}};
 use spirv::Word;
 use std::collections::hash_map::Entry;
 
@@ -1596,6 +1591,7 @@ impl Writer {
                     Bi::FragDepth => BuiltIn::FragDepth,
                     Bi::PointCoord => BuiltIn::PointCoord,
                     Bi::FrontFacing => BuiltIn::FrontFacing,
+                    // this is also the way it works for spirv
                     Bi::PrimitiveIndex => {
                         self.require_any(
                             "`primitive_index` built-in",
@@ -1654,8 +1650,133 @@ impl Writer {
                         )?;
                         BuiltIn::SubgroupLocalInvocationId
                     }
-                    Bi::LaunchId => BuiltIn::LaunchIdKHR,
-                    Bi::LaunchSize => BuiltIn::LaunchSizeKHR,
+                    Bi::LaunchId => {
+                        self.require_any(
+                            "`launch id` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::LaunchIdKHR
+                    },
+                    Bi::LaunchSize => {
+                        self.require_any(
+                            "`launch size` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::LaunchSizeKHR
+                    },
+                    // in the closest hit and any hit shaders this is the case
+                    Bi::RayT => {
+                        self.require_any(
+                            "`ray t max` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::RayTmaxKHR
+                    },
+                    Bi::GeometryIndex => {
+                        self.require_any(
+                            "`geometry index` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::RayGeometryIndexKHR
+                    },
+                    Bi::ObjectRayOrigin => {
+                        self.require_any(
+                            "`object ray origin` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::ObjectRayOriginKHR
+                    },
+                    Bi::ObjectRayDirection => {
+                        self.require_any(
+                            "`object ray direction` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::ObjectRayDirectionKHR
+                    },
+                    Bi::HitKind => {
+                        self.require_any(
+                            "`hit kind` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::HitKindKHR
+                    },
+                    Bi::ObjectToWorld => {
+                        self.require_any(
+                            "`object to world` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::ObjectToWorldKHR
+                    },
+                    Bi::WorldToObject => {
+                        self.require_any(
+                            "`world to object` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::WorldToObjectKHR
+                    },
+                    Bi::InstanceCustomIndex => {
+                        self.require_any(
+                            "`instance custom index` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::InstanceCustomIndexKHR
+                    },
+                    Bi::RayOrigin => {
+                        self.require_any(
+                            "`ray origin` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::WorldRayOriginKHR
+                    },
+                    Bi::RayDirection => {
+                        self.require_any(
+                            "`ray direction` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::WorldRayDirectionKHR
+                    },
+                    Bi::RayFlags  => {
+                        self.require_any(
+                            "`ray flag` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::IncomingRayFlagsKHR
+                    },
+                    Bi::ClosestRayT => {
+                        self.require_any(
+                            "`closest ray t` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR,
+                            ],
+                        )?;
+                        BuiltIn::RayTmaxKHR
+                    },
                     Bi::Payload | Bi::Intersection => unreachable!(),
                 };
 

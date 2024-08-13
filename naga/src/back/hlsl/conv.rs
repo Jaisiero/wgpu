@@ -190,7 +190,19 @@ impl crate::BuiltIn {
             | Self::LaunchId
             | Self::LaunchSize
             | Self::Intersection
-            | Self::Payload => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
+            | Self::Payload
+            | Self::RayT
+            | Self::GeometryIndex
+            | Self::ObjectRayOrigin
+            | Self::ObjectRayDirection
+            | Self::HitKind
+            | Self::ObjectToWorld
+            | Self::WorldToObject
+            | Self::InstanceCustomIndex
+            | Self::RayOrigin
+            | Self::RayDirection
+            | Self::RayFlags
+            | Self::ClosestRayT => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
             Self::PointSize | Self::ViewIndex | Self::PointCoord => {
                 return Err(Error::Custom(format!("Unsupported builtin {self:?}")))
             }
