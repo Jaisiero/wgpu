@@ -53,14 +53,14 @@ pub enum CompactBlasError {
     CreateBlasError(#[from] CreateBlasError),
     #[error(transparent)]
     EncoderError(#[from] CommandEncoderError),
-    #[error("Blas {0:?} is invalid or destroyed")]
-    InvalidBlas(BlasId),
+    #[error("Blas is destroyed")]
+    InvalidBlas,
     #[error("Blas {0:?} is missing 'ALLOW_COMPACTION' flag")]
-    BlasMissingAllowCompaction(BlasId),
+    BlasMissingAllowCompaction(ResourceErrorIdent),
     #[error("Blas {0:?} is still being build, submit the command buffer in queue.submit before compacting")]
-    BlasBeingBuilt(BlasId),
+    BlasBeingBuilt(ResourceErrorIdent),
     #[error("Blas {0:?} is used before it is build")]
-    UsedUnbuilt(BlasId),
+    UsedUnbuilt(ResourceErrorIdent),
     #[error("Unimplemented Compact Blas error: this error is not yet implemented")]
     Unimplemented,
 }

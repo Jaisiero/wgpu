@@ -1,7 +1,7 @@
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
-use hal::AccelerationStructureTriangleIndices;
+use hal::{AccelerationStructureTriangleIndices, BufferUses, MemoryFlags};
 
 #[cfg(feature = "trace")]
 use crate::device::trace;
@@ -16,6 +16,7 @@ use crate::{
     resource, LabelHelpers,
 };
 use std::mem;
+use wgt::{AccelerationStructureFlags, BufferAddress};
 
 impl Device {
     fn create_blas(
@@ -113,9 +114,9 @@ impl Device {
             flags: blas_desc.flags,
             update_mode: blas_desc.update_mode,
             handle,
-            built_index: RwLock::new(None),
+            built_index: RwLock::new(rank::BLAS_BUILT_INDEX, None),
             compacted_size_buffer,
-            being_built: RwLock::default(),
+            being_built: RwLock::new(rank::BLAS_BEING_BUILT, false),
             label: blas_desc.label.to_string(),
             tracking_data: TrackingData::new(self.tracker_indices.blas_s.clone()),
         }))

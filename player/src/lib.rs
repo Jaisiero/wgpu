@@ -10,7 +10,6 @@ use std::{borrow::Cow, fs, path::Path};
 pub trait GlobalPlay {
     fn encode_commands(
         &self,
-        device: wgc::id::DeviceId,
         encoder: wgc::id::CommandEncoderId,
         commands: Vec<trace::Command>,
     ) -> wgc::id::CommandBufferId;
@@ -27,7 +26,6 @@ pub trait GlobalPlay {
 impl GlobalPlay for wgc::global::Global {
     fn encode_commands(
         &self,
-        device: wgc::id::DeviceId,
         encoder: wgc::id::CommandEncoderId,
         commands: Vec<trace::Command>,
     ) -> wgc::id::CommandBufferId {
@@ -213,8 +211,7 @@ impl GlobalPlay for wgc::global::Global {
                     blas,
                     compacted_blas,
                 } => {
-                    self.device_maintain_ids::<A>(device).unwrap();
-                    self.command_encoder_compact_blas::<A>(encoder, blas, compacted_blas);
+                    self.command_encoder_compact_blas(encoder, blas, Some(compacted_blas));
                 }
             }
         }
@@ -458,7 +455,7 @@ impl GlobalPlay for wgc::global::Global {
                 if let Some(e) = error {
                     panic!("{e}");
                 }
-                let cmdbuf = self.encode_commands(device, encoder, commands);
+                let cmdbuf = self.encode_commands(encoder, commands);
                 self.queue_submit(queue, &[cmdbuf]).unwrap();
             }
             Action::CreateBlas { id, desc, sizes } => {

@@ -1203,6 +1203,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                         src: src.raw,
                         dst: dst.raw,
                         mode,
+                        _marker: Default::default(),
                     },
                 );
         }

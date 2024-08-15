@@ -1201,8 +1201,8 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
 
     unsafe fn copy_acceleration_structure_to_acceleration_structure(
         &mut self,
-        src: &A::AccelerationStructure,
-        dst: &A::AccelerationStructure,
+        src: &<Self::A as Api>::AccelerationStructure,
+        dst: &<Self::A as Api>::AccelerationStructure,
         copy: AccelerationStructureCopy,
     );
     // pass common
@@ -1374,8 +1374,8 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     // modeled of dx12, because this is able to be polyfilled in vulkan as opposed to the other way round
     unsafe fn read_acceleration_structure_compact_size(
         &mut self,
-        acceleration_structure: &A::AccelerationStructure,
-        buf: &A::Buffer,
+        acceleration_structure: &<Self::A as Api>::AccelerationStructure,
+        buf: &<Self::A as Api>::Buffer,
     );
 }
 

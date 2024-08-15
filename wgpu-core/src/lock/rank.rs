@@ -135,6 +135,7 @@ define_lock_ranks! {
     rank TEXTURE_INITIALIZATION_STATUS "Texture::initialization_status" followed by { }
     rank TEXTURE_VIEWS "Texture::views" followed by { }
     rank BLAS_BUILT_INDEX "Blas::built_index" followed by { }
+    rank BLAS_BEING_BUILT "Blas::being_built" followed by { }
     rank TLAS_BUILT_INDEX "Tlas::built_index" followed by { }
     rank TLAS_DEPENDENCIES "Tlas::dependencies" followed by { }
 

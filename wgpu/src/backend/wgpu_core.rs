@@ -3411,19 +3411,9 @@ impl crate::Context for ContextWgpuCore {
         blas_id: &Self::BlasId,
     ) -> (Self::BlasId, Option<u64>, Self::BlasData) {
         let global = &self.0;
-        let (id, handle, error) = wgc::gfx_select!(encoder => global.command_encoder_compact_blas(
-            *encoder,
-            *blas_id,
-            ()
-        ));
+        let (id, handle, error) = global.command_encoder_compact_blas(*encoder, *blas_id, None);
         if let Some(cause) = error {
-            self.handle_error(
-                &encoder_data.error_sink,
-                cause,
-                LABEL,
-                None,
-                "Device::create_blas",
-            );
+            self.handle_error(&encoder_data.error_sink, cause, None, "Device::create_blas");
         }
         (id, handle, Blas {})
     }

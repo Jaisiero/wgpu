@@ -2368,10 +2368,9 @@ impl crate::Device for super::Device {
             }
 
             let pool = if desc.allow_compaction {
-                let vk_info = vk::QueryPoolCreateInfo::builder()
+                let vk_info = vk::QueryPoolCreateInfo::default()
                     .query_type(vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR)
-                    .query_count(1)
-                    .build();
+                    .query_count(1);
 
                 let raw = self.shared.raw.create_query_pool(&vk_info, None)?;
                 Some(raw)

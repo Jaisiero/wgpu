@@ -1898,7 +1898,7 @@ pub struct Blas {
     /// The `label` from the descriptor used to create the resource.
     pub(crate) label: String,
     pub(crate) tracking_data: TrackingData,
-    pub(crate) compacted_size_buffer: Option<A::Buffer>,
+    pub(crate) compacted_size_buffer: Option<Box<dyn hal::DynBuffer>>,
     pub(crate) being_built: RwLock<bool>,
 }
 
@@ -1907,10 +1907,12 @@ impl Drop for Blas {
         resource_log!("Destroy raw {}", self.error_ident());
         // SAFETY: We are in the Drop impl, and we don't use self.raw anymore after this point.
         let raw = unsafe { ManuallyDrop::take(&mut self.raw) };
-        let buf = unsafe { ManuallyDrop::take(&mut self.compacted_size_buffer) };
+        let buf = Option::take(&mut self.compacted_size_buffer);
         unsafe {
             self.device.raw().destroy_acceleration_structure(raw);
-            self.device.raw().destroy_buffer(buf);
+            if let Some(buf) = buf {
+                self.device.raw().destroy_buffer(buf);
+            }
         }
     }
 }

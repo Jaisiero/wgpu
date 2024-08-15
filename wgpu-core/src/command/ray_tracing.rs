@@ -19,17 +19,20 @@ use wgt::{
 };
 
 use super::{BakedCommands, CommandBufferMutable, CommandEncoderError};
-use crate::ray_tracing::BlasTriangleGeometry;
+use crate::id::BlasId;
+use crate::lock::{rank, RwLock};
+use crate::ray_tracing::{BlasTriangleGeometry, CompactBlasError};
 use crate::resource::{
-    AccelerationStructure, Buffer, Labeled, ScratchBuffer, StagingBuffer, Trackable,
+    AccelerationStructure, Buffer, Labeled, ScratchBuffer, StagingBuffer, Trackable, TrackingData,
 };
 use crate::snatch::SnatchGuard;
 use crate::storage::Storage;
 use crate::track::PendingTransition;
 use hal::BufferUses;
-use std::ops::Deref;
+use std::mem::ManuallyDrop;
+use std::ops::{Add, Deref};
 use std::sync::Arc;
-use std::{cmp::max, num::NonZeroU64, ops::Range};
+use std::{cmp::max, mem, num::NonZeroU64, ops::Range};
 
 type BufferStorage<'a> = Vec<(
     Arc<Buffer>,
@@ -45,24 +48,23 @@ type BlasStorage<'a> = Vec<(
     hal::AccelerationStructureEntries<'a, dyn hal::DynBuffer>,
     u64,
 )>;
-use super::{BakedCommands, CommandBufferMutable};
 
 // This should be queried from the device, maybe the the hal api should pre aline it, since I am unsure how else we can idiomatically get this value.
 const SCRATCH_BUFFER_ALIGNMENT: u32 = 256;
 
 impl Global {
-    fn internal_command_encoder_compact_blas<A: HalApi>(
+    fn internal_command_encoder_compact_blas(
         &self,
-        src_blas: &Arc<Blas<A>>,
-        raw_device: &A::Device,
-        cmd_buf_data: &mut CommandBufferMutable<A>,
-    ) -> Result<Blas<A>, CompactBlasError> {
+        src_blas: &Arc<Blas>,
+        raw_device: &dyn hal::DynDevice,
+        cmd_buf_data: &mut CommandBufferMutable,
+    ) -> Result<Arc<Blas>, CompactBlasError> {
         profiling::scope!("CommandEncoder::compact_blas");
         if *src_blas.being_built.read() {
-            return Err(CompactBlasError::BlasBeingBuilt(src_blas.info.id()));
+            return Err(CompactBlasError::BlasBeingBuilt(src_blas.error_ident()));
         }
         if let None = *src_blas.built_index.read() {
-            return Err(CompactBlasError::UsedUnbuilt(src_blas.info.id()));
+            return Err(CompactBlasError::UsedUnbuilt(src_blas.error_ident()));
         }
         let encoder = cmd_buf_data
             .encoder
@@ -74,13 +76,14 @@ impl Global {
             .expect("already checked for the flag that causes this to be created");
         let acc_struct_size = unsafe {
             let buf_mapping = raw_device
-                .map_buffer(buffer, 0..mem::size_of::<BufferAddress>() as BufferAddress)
+                .map_buffer(
+                    buffer.as_ref(),
+                    0..mem::size_of::<BufferAddress>() as BufferAddress,
+                )
                 .map_err(CompactBlasError::from)?;
             assert!(buf_mapping.is_coherent);
-            let result = *(buf_mapping.ptr.as_ptr() as *mut BufferAddress);
-            raw_device
-                .unmap_buffer(buffer)
-                .map_err(CompactBlasError::from)?;
+            let result = *buf_mapping.ptr.as_ptr().cast::<BufferAddress>();
+            raw_device.unmap_buffer(buffer.as_ref());
             result
         };
 
@@ -105,62 +108,71 @@ impl Global {
 
         unsafe {
             encoder.copy_acceleration_structure_to_acceleration_structure(
-                src_blas.raw.as_ref().unwrap(),
-                &acc_struct,
+                src_blas.raw.as_ref(),
+                acc_struct.as_ref(),
                 hal::AccelerationStructureCopy {
                     copy_flags: wgt::AccelerationStructureCopy::Compact,
                     type_flags: ty,
                 },
             )
         }
-        let handle = unsafe { raw_device.get_acceleration_structure_device_address(&acc_struct) };
+        let handle =
+            unsafe { raw_device.get_acceleration_structure_device_address(acc_struct.as_ref()) };
 
         let mut blas = Blas {
-            raw: Some(acc_struct),
+            raw: ManuallyDrop::new(acc_struct),
             device: src_blas.device.clone(),
-            info: ResourceInfo::new(src_blas.info.label.as_str()),
             size_info: src_blas.size_info,
             sizes: src_blas.sizes.clone(),
             flags: src_blas.flags & !AccelerationStructureFlags::ALLOW_COMPACTION,
             update_mode: src_blas.update_mode,
             // not built until after queue.submit
-            built_index: RwLock::new(None),
+            built_index: RwLock::new(rank::BLAS_BUILT_INDEX, None),
             handle,
+            label: src_blas.label.clone().add(" compacted"),
+            tracking_data: TrackingData::new(src_blas.device.tracker_indices.blas_s.clone()),
             compacted_size_buffer: None,
-            being_built: RwLock::default(),
+            being_built: RwLock::new(rank::BLAS_BEING_BUILT, false),
         };
         blas.size_info.acceleration_structure_size = acc_struct_size;
         log::info!(
             "Compacted Blas {:?} of size: {}, to: {}",
-            src_blas.info.id(),
+            src_blas.tracker_index(),
             src_blas.size_info.acceleration_structure_size,
             blas.size_info.acceleration_structure_size,
         );
-        Ok(blas)
+        Ok(Arc::new(blas))
     }
 
-    pub fn command_encoder_compact_blas<A: HalApi>(
+    pub fn command_encoder_compact_blas(
         &self,
         encoder_id: CommandEncoderId,
         blas_id: BlasId,
-        id_in: Input<G, BlasId>,
+        id_in: Option<BlasId>,
     ) -> (BlasId, Option<u64>, Option<CompactBlasError>) {
-        let hub = A::hub(self);
-        let fid = hub.blas_s.prepare::<G>(id_in);
-        let blas_guard = hub.blas_s.read();
-        let src_blas = blas_guard.get(blas_id).unwrap().clone();
-        // this removes a deadlock where fid.assign() tries to get the lock while it is in blas_guard
-        drop(blas_guard);
-        let err = loop {
+        let hub = &self.hub;
+        let fid = hub.blas_s.prepare(encoder_id.backend(), id_in);
+        let err = 'err: {
+            let blas_guard = hub.blas_s.read();
+            let src_blas = match blas_guard
+                .get(blas_id)
+                .map_err(|_| CompactBlasError::InvalidBlas)
+            {
+                Ok(blas) => blas.clone(),
+                Err(err) => break 'err err,
+            };
+            // this removes a deadlock where fid.assign() tries to get the lock while it is in blas_guard
+            drop(blas_guard);
+
             if !src_blas
                 .flags
                 .contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION)
             {
-                break CompactBlasError::BlasMissingAllowCompaction(blas_id);
+                break 'err CompactBlasError::BlasMissingAllowCompaction(src_blas.error_ident());
             }
-            let cmd_buf = match CommandBuffer::get_encoder(hub, encoder_id) {
+            let cmd_buf = match hub.command_buffers.get(encoder_id.into_command_buffer_id()) {
                 Ok(cmd_buf) => cmd_buf,
-                Err(err) => break CompactBlasError::from(err),
+                Err(_) => break 'err CommandEncoderError::Invalid.into(),
             };
             let mut cmd_buf_data = cmd_buf.data.lock();
             let cmd_buf_data = cmd_buf_data.as_mut().unwrap();
@@ -173,7 +185,7 @@ impl Global {
             ) {
                 Ok(blas) => {
                     let handle = blas.handle;
-                    let (id, resource) = fid.assign(blas);
+                    let id = fid.assign(blas.clone());
 
                     #[cfg(feature = "trace")]
                     if let Some(ref mut list) = cmd_buf.data.lock().as_mut().unwrap().commands {
@@ -183,32 +195,27 @@ impl Global {
                         });
                     }
 
-                    device
-                        .trackers
-                        .lock()
-                        .blas_s
-                        .insert_single(id, resource.clone());
-                    cmd_buf_data.trackers.blas_s.insert_single(id, resource);
+                    cmd_buf_data.trackers.blas_s.set_single(blas.clone());
                     let build_command_index = NonZeroU64::new(
                         device
                             .last_acceleration_structure_build_command_index
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                             + 1,
                     )
-                        .unwrap();
+                    .unwrap();
                     cmd_buf_data.blas_actions.push(BlasAction {
-                        id,
+                        blas,
                         // this counts as a build because the old blas is guaranteed to be built
                         kind: crate::ray_tracing::BlasActionKind::Build(build_command_index),
                     });
                     (id, Some(handle), None)
                 }
                 Err(err) => {
-                    break err;
+                    break 'err err;
                 }
             };
         };
-        let id = fid.assign_error(src_blas.label().as_str());
+        let id = fid.assign_error();
         (id, None, Some(err))
     }
 
@@ -470,6 +477,7 @@ impl Global {
             input_barriers,
             &blas_descriptors.collect::<Vec<_>>(),
             scratch_buffer_barrier,
+            &blas_storage,
         );
 
         if tlas_present {
@@ -797,6 +805,7 @@ impl Global {
             input_barriers,
             &blas_descriptors.collect::<Vec<_>>(),
             scratch_buffer_barrier,
+            &blas_storage,
         );
 
         if tlas_present {
@@ -892,7 +901,7 @@ impl BakedCommands {
                 crate::ray_tracing::BlasActionKind::Build(id) => {
                     built.insert(action.blas.tracker_index());
                     *action.blas.built_index.write() = Some(id);
-                    *blas.being_built.write() = false;
+                    *action.blas.being_built.write() = false;
                 }
                 crate::ray_tracing::BlasActionKind::Use => {
                     if !built.contains(&action.blas.tracker_index())
@@ -1304,12 +1313,13 @@ fn build_blas<'a>(
         dyn hal::DynAccelerationStructure,
     >],
     scratch_buffer_barrier: hal::BufferBarrier<dyn hal::DynBuffer>,
+    blas_storage: &BlasStorage,
 ) {
     unsafe {
         cmd_buf_raw.transition_buffers(&input_barriers);
     }
 
-    for (blas, _, _) in &blas_storage {
+    for (blas, _, _) in blas_storage {
         *blas.being_built.write() = true;
     }
 
@@ -1324,7 +1334,7 @@ fn build_blas<'a>(
         }
     }
 
-    for (blas, _, _) in &blas_storage {
+    for (blas, _, _) in blas_storage {
         if let Some(buf) = &blas.compacted_size_buffer {
             unsafe {
                 cmd_buf_raw.place_acceleration_structure_barrier(
@@ -1334,12 +1344,12 @@ fn build_blas<'a>(
                     },
                 );
                 cmd_buf_raw
-                    .read_acceleration_structure_compact_size(blas.raw.as_ref().unwrap(), buf);
-                cmd_buf_raw.transition_buffers(iter::once(hal::BufferBarrier::<A> {
-                    buffer: buf,
+                    .read_acceleration_structure_compact_size(blas.raw.as_ref(), buf.as_ref());
+                cmd_buf_raw.transition_buffers(&[hal::BufferBarrier {
+                    buffer: buf.as_ref(),
                     usage: hal::BufferUses::QUERY_RESOLVE | hal::BufferUses::COPY_DST
                         ..hal::BufferUses::MAP_READ,
-                }));
+                }]);
             }
         }
     }
