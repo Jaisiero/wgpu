@@ -378,6 +378,7 @@ impl DeviceRayTracing for Device {
         );
 
         Blas {
+            #[allow(clippy::arc_with_non_send_sync)]
             internal: Arc::new(BlasInternal {
                 context: Arc::clone(&self.context),
                 id,
@@ -573,6 +574,7 @@ impl CommandEncoderRayTracing for CommandEncoder {
             &blas.internal.id,
         );
         Blas {
+            #[allow(clippy::arc_with_non_send_sync)]
             internal: Arc::new(BlasInternal {
                 context: Arc::clone(&self.context),
                 id,
