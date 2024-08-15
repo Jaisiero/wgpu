@@ -3,6 +3,7 @@ use super::conv;
 use arrayvec::ArrayVec;
 use ash::vk;
 
+use crate::AccelerationStructureCopy;
 use std::{mem, ops::Range, slice};
 
 const ALLOCATION_GRANULARITY: u32 = 16;
@@ -373,6 +374,46 @@ impl crate::CommandEncoder for super::CommandEncoder {
             )
         };
     }
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        acceleration_structure: &super::AccelerationStructure,
+        buffer: &super::Buffer,
+    ) {
+        let ray_tracing_functions = self
+            .device
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+        let query_pool = acceleration_structure
+            .compacted_size_query
+            .as_ref()
+            .unwrap();
+        unsafe {
+            self.device
+                .raw
+                .cmd_reset_query_pool(self.active, *query_pool, 0, 1);
+            ray_tracing_functions
+                .acceleration_structure
+                .cmd_write_acceleration_structures_properties(
+                    self.active,
+                    &[acceleration_structure.raw],
+                    vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+                    *query_pool,
+                    0,
+                );
+            self.device.raw.cmd_copy_query_pool_results(
+                self.active,
+                *query_pool,
+                0,
+                1,
+                buffer.raw,
+                0,
+                wgt::QUERY_SIZE as vk::DeviceSize,
+                vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT,
+            )
+        };
+    }
     unsafe fn reset_queries(&mut self, set: &super::QuerySet, range: Range<u32>) {
         unsafe {
             self.device.raw.cmd_reset_query_pool(
@@ -419,7 +460,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         const CAPACITY_OUTER: usize = 8;
         const CAPACITY_INNER: usize = 1;
         let descriptor_count = descriptor_count as usize;
-
+        let iter = descriptors.into_iter();
         let ray_tracing_functions = self
             .device
             .extension_fns
@@ -456,7 +497,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
             [&[vk::AccelerationStructureBuildRangeInfoKHR]; CAPACITY_OUTER],
         >::with_capacity(descriptor_count);
 
-        for desc in descriptors {
+        for desc in iter {
             let (geometries, ranges) = match *desc.entries {
                 crate::AccelerationStructureEntries::Instances(ref instances) => {
                     let instance_data = vk::AccelerationStructureGeometryInstancesDataKHR::default(
@@ -1128,6 +1169,43 @@ impl crate::CommandEncoder for super::CommandEncoder {
             self.device
                 .raw
                 .cmd_dispatch_indirect(self.active, buffer.raw, offset)
+        }
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(
+        &mut self,
+        src: &super::AccelerationStructure,
+        dst: &super::AccelerationStructure,
+        copy: AccelerationStructureCopy,
+    ) {
+        let ray_tracing_functions = self
+            .device
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+
+        let mode = match copy.copy_flags {
+            wgt::AccelerationStructureCopy::Clone => vk::CopyAccelerationStructureModeKHR::CLONE,
+            wgt::AccelerationStructureCopy::Compact => {
+                vk::CopyAccelerationStructureModeKHR::COMPACT
+            }
+        };
+
+        unsafe {
+            ray_tracing_functions
+                .acceleration_structure
+                .cmd_copy_acceleration_structure(
+                    self.active,
+                    &vk::CopyAccelerationStructureInfoKHR {
+                        s_type: vk::StructureType::COPY_ACCELERATION_STRUCTURE_INFO_KHR,
+                        p_next: std::ptr::null(),
+                        src: src.raw,
+                        dst: dst.raw,
+                        mode,
+                        _marker: Default::default(),
+                    },
+                );
         }
     }
 }

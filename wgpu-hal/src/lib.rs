@@ -87,7 +87,7 @@
 //! [`ash`]: https://crates.io/crates/ash
 //! [MoltenVK]: https://github.com/KhronosGroup/MoltenVK
 //! [`metal`]: https://crates.io/crates/metal
-//! [`d3d12`]: https://crates.io/crates/d3d12
+//! [`d3d12`]: ahttps://crates.io/crates/d3d12
 //!
 //! ## Secondary backends
 //!
@@ -1199,6 +1199,12 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     ) where
         T: Iterator<Item = BufferTextureCopy>;
 
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(
+        &mut self,
+        src: &<Self::A as Api>::AccelerationStructure,
+        dst: &<Self::A as Api>::AccelerationStructure,
+        copy: AccelerationStructureCopy,
+    );
     // pass common
 
     /// Sets the bind group at `index` to `group`, assuming the layout
@@ -1364,6 +1370,12 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     unsafe fn place_acceleration_structure_barrier(
         &mut self,
         barrier: AccelerationStructureBarrier,
+    );
+    // modeled of dx12, because this is able to be polyfilled in vulkan as opposed to the other way round
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        acceleration_structure: &<Self::A as Api>::AccelerationStructure,
+        buf: &<Self::A as Api>::Buffer,
     );
 }
 
@@ -1540,6 +1552,8 @@ bitflags::bitflags! {
         const ACCELERATION_STRUCTURE_SCRATCH = 1 << 11;
         const BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT = 1 << 12;
         const TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT = 1 << 13;
+        /// A buffer used to store the compacted size of an acceleration structure
+        const ACCELERATION_STRUCTURE_QUERY = 1 << 14;
         /// The combination of states that a buffer may be in _at the same time_.
         const INCLUSIVE = Self::MAP_READ.bits() | Self::COPY_SRC.bits() |
             Self::INDEX.bits() | Self::VERTEX.bits() | Self::UNIFORM.bits() |
@@ -2174,6 +2188,7 @@ pub struct AccelerationStructureDescriptor<'a> {
     pub label: Label<'a>,
     pub size: wgt::BufferAddress,
     pub format: AccelerationStructureFormat,
+    pub allow_compaction: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -2260,6 +2275,11 @@ pub struct AccelerationStructureAABBs<'a, B: DynBuffer + ?Sized> {
     pub flags: AccelerationStructureGeometryFlags,
 }
 
+pub struct AccelerationStructureCopy {
+    pub copy_flags: wgt::AccelerationStructureCopy,
+    pub type_flags: wgt::AccelerationStructureType,
+}
+
 /// * `offset` - offset in bytes
 #[derive(Clone, Debug)]
 pub struct AccelerationStructureInstances<'a, B: DynBuffer + ?Sized> {
@@ -2296,6 +2316,8 @@ bitflags::bitflags! {
         const BUILD_OUTPUT = 1 << 1;
         // Tlas used in a shader
         const SHADER_INPUT = 1 << 2;
+        // Blas used to query compacted size
+        const QUERY_INPUT = 1 << 3;
     }
 }
 

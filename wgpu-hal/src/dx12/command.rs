@@ -1,6 +1,7 @@
 use crate::auxil::{self, dxgi::result::HResult as _};
 
 use super::conv;
+use crate::AccelerationStructureCopy;
 use std::{mem, ops::Range, ptr};
 use winapi::um::d3d12 as d3d12_ty;
 
@@ -636,6 +637,13 @@ impl crate::CommandEncoder for super::CommandEncoder {
             )
         };
     }
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        _acceleration_structure: &super::AccelerationStructure,
+        _buf: &super::Buffer,
+    ) {
+        todo!()
+    }
     unsafe fn reset_queries(&mut self, _set: &super::QuerySet, _range: Range<u32>) {
         // nothing to do here
     }
@@ -1206,6 +1214,14 @@ impl crate::CommandEncoder for super::CommandEncoder {
     unsafe fn place_acceleration_structure_barrier(
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
+    ) {
+        todo!()
+    }
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(
+        &mut self,
+        _src: &super::AccelerationStructure,
+        _dst: &super::AccelerationStructure,
+        _copy: AccelerationStructureCopy,
     ) {
         todo!()
     }

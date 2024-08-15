@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
 
+use crate::AccelerationStructureCopy;
 use std::ops::Range;
 
 #[derive(Clone, Debug)]
@@ -295,6 +296,7 @@ impl crate::Device for Context {
     ) -> crate::AccelerationStructureBuildSizes {
         Default::default()
     }
+
     unsafe fn get_acceleration_structure_device_address(
         &self,
         _acceleration_structure: &Resource,
@@ -371,6 +373,12 @@ impl crate::CommandEncoder for Encoder {
     unsafe fn begin_query(&mut self, set: &Resource, index: u32) {}
     unsafe fn end_query(&mut self, set: &Resource, index: u32) {}
     unsafe fn write_timestamp(&mut self, set: &Resource, index: u32) {}
+    unsafe fn read_acceleration_structure_compact_size(
+        &mut self,
+        acceleration_structure: &Resource,
+        buf: &Resource,
+    ) {
+    }
     unsafe fn reset_queries(&mut self, set: &Resource, range: Range<u32>) {}
     unsafe fn copy_query_results(
         &mut self,
@@ -501,6 +509,14 @@ impl crate::CommandEncoder for Encoder {
     unsafe fn place_acceleration_structure_barrier(
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
+    ) {
+    }
+
+    unsafe fn copy_acceleration_structure_to_acceleration_structure(
+        &mut self,
+        src: &Resource,
+        dst: &Resource,
+        copy: AccelerationStructureCopy,
     ) {
     }
 }
