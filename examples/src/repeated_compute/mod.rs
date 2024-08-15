@@ -101,7 +101,7 @@ async fn compute(local_buffer: &mut [u32], context: &WgpuContext) {
     // buffered and receiving will just pick that up.
     //
     // It may also be worth noting that although on native, the usage of asynchronous
-    // channels is wholely unnecessary, for the sake of portability to WASM (std channels
+    // channels is wholly unnecessary, for the sake of portability to WASM (std channels
     // don't work on WASM,) we'll use async channels that work on both native and WASM.
     let (sender, receiver) = flume::bounded(1);
     buffer_slice.map_async(wgpu::MapMode::Read, move |r| sender.send(r).unwrap());
@@ -172,6 +172,7 @@ impl WgpuContext {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::downlevel_defaults(),
+                    memory_hints: wgpu::MemoryHints::Performance,
                 },
                 None,
             )
@@ -244,7 +245,9 @@ impl WgpuContext {
             label: None,
             layout: Some(&pipeline_layout),
             module: &shader,
-            entry_point: "main",
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
         });
 
         WgpuContext {

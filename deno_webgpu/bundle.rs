@@ -1,4 +1,4 @@
-// Copyright 2018-2023 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2024 the Deno authors. All rights reserved. MIT license.
 
 use deno_core::error::type_error;
 use deno_core::error::AnyError;
@@ -30,8 +30,7 @@ impl Resource for WebGpuRenderBundle {
     }
 
     fn close(self: Rc<Self>) {
-        let instance = &self.0;
-        gfx_select!(self.1 => instance.render_bundle_drop(self.1));
+        self.0.render_bundle_drop(self.1);
     }
 }
 
@@ -109,12 +108,12 @@ pub fn op_webgpu_render_bundle_encoder_finish(
         .into_inner();
     let instance = state.borrow::<super::Instance>();
 
-    gfx_put!(render_bundle_encoder.parent() => instance.render_bundle_encoder_finish(
+    gfx_put!(instance.render_bundle_encoder_finish(
     render_bundle_encoder,
     &wgpu_core::command::RenderBundleDescriptor {
       label: Some(label),
     },
-    ()
+    None
   ) => state, WebGpuRenderBundle)
 }
 

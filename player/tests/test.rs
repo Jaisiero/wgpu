@@ -1,16 +1,16 @@
-/*! Tester for WebGPU
- *  It enumerates the available backends on the system,
- *  and run the tests through them.
- *
- *  Test requirements:
- *    - all IDs have the backend `Empty`
- *    - all expected buffers have `MAP_READ` usage
- *    - last action is `Submit`
- *    - no swapchain use
-!*/
+//! Tester for WebGPU
+//!  It enumerates the available backends on the system,
+//!  and run the tests through them.
+//!
+//!  Test requirements:
+//!    - all IDs have the backend `Empty`
+//!    - all expected buffers have `MAP_READ` usage
+//!    - last action is `Submit`
+//!    - no swapchain use
+
 #![cfg(not(target_arch = "wasm32"))]
 
-use player::{GlobalPlay, IdentityPassThroughFactory};
+use player::GlobalPlay;
 use std::{
     fs::{read_to_string, File},
     io::{Read, Seek, SeekFrom},
@@ -49,7 +49,6 @@ struct Expectation {
     data: ExpectedData,
 }
 
-#[derive(serde::Deserialize)]
 struct Test<'a> {
     features: wgt::Features,
     expectations: Vec<Expectation>,
@@ -72,29 +71,54 @@ impl Test<'_> {
             _ => unreachable!(),
         };
         let string = read_to_string(path).unwrap().replace("Empty", backend_name);
-        ron::de::from_str(&string).unwrap()
+
+        #[derive(serde::Deserialize)]
+        struct SerializedTest<'a> {
+            features: Vec<String>,
+            expectations: Vec<Expectation>,
+            actions: Vec<wgc::device::trace::Action<'a>>,
+        }
+        let SerializedTest {
+            features,
+            expectations,
+            actions,
+        } = ron::de::from_str(&string).unwrap();
+        let features = features
+            .iter()
+            .map(|feature| {
+                wgt::Features::from_name(feature)
+                    .unwrap_or_else(|| panic!("Invalid feature flag {}", feature))
+            })
+            .fold(wgt::Features::empty(), |a, b| a | b);
+        Test {
+            features,
+            expectations,
+            actions,
+        }
     }
 
     fn run(
         self,
         dir: &Path,
-        global: &wgc::global::Global<IdentityPassThroughFactory>,
+        global: &wgc::global::Global,
         adapter: wgc::id::AdapterId,
         test_num: u32,
     ) {
         let backend = adapter.backend();
-        let device_id = wgc::id::TypedId::zip(test_num, 0, backend);
-        let (_, _, error) = wgc::gfx_select!(adapter => global.adapter_request_device(
+        let device_id = wgc::id::Id::zip(test_num, 0, backend);
+        let queue_id = wgc::id::Id::zip(test_num, 0, backend);
+        let (_, _, error) = global.adapter_request_device(
             adapter,
             &wgt::DeviceDescriptor {
                 label: None,
                 required_features: self.features,
                 required_limits: wgt::Limits::default(),
+                memory_hints: wgt::MemoryHints::default(),
             },
             None,
-            device_id,
-            device_id
-        ));
+            Some(device_id),
+            Some(queue_id),
+        );
         if let Some(e) = error {
             panic!("{:?}", e);
         }
@@ -102,35 +126,48 @@ impl Test<'_> {
         let mut command_buffer_id_manager = wgc::identity::IdentityManager::new();
         println!("\t\t\tRunning...");
         for action in self.actions {
-            wgc::gfx_select!(device_id => global.process(device_id, action, dir, &mut command_buffer_id_manager));
+            global.process(
+                device_id,
+                queue_id,
+                action,
+                dir,
+                &mut command_buffer_id_manager,
+            );
         }
         println!("\t\t\tMapping...");
         for expect in &self.expectations {
-            let buffer = wgc::id::TypedId::zip(expect.buffer.index, expect.buffer.epoch, backend);
-            wgc::gfx_select!(device_id => global.buffer_map_async(
-                buffer,
-                expect.offset .. expect.offset+expect.data.len() as wgt::BufferAddress,
-                wgc::resource::BufferMapOperation {
-                    host: wgc::device::HostMap::Read,
-                    callback: Some(wgc::resource::BufferMapCallback::from_rust(
-                        Box::new(map_callback)
-                    )),
-                }
-            ))
-            .unwrap();
+            let buffer = wgc::id::Id::zip(expect.buffer.index, expect.buffer.epoch, backend);
+            global
+                .buffer_map_async(
+                    buffer,
+                    expect.offset,
+                    Some(expect.data.len() as u64),
+                    wgc::resource::BufferMapOperation {
+                        host: wgc::device::HostMap::Read,
+                        callback: Some(wgc::resource::BufferMapCallback::from_rust(Box::new(
+                            map_callback,
+                        ))),
+                    },
+                )
+                .unwrap();
         }
 
         println!("\t\t\tWaiting...");
-        wgc::gfx_select!(device_id => global.device_poll(device_id, wgt::Maintain::wait()))
+        global
+            .device_poll(device_id, wgt::Maintain::wait())
             .unwrap();
 
         for expect in self.expectations {
             println!("\t\t\tChecking {}", expect.name);
-            let buffer = wgc::id::TypedId::zip(expect.buffer.index, expect.buffer.epoch, backend);
-            let (ptr, size) =
-                wgc::gfx_select!(device_id => global.buffer_get_mapped_range(buffer, expect.offset, Some(expect.data.len() as wgt::BufferAddress)))
-                    .unwrap();
-            let contents = unsafe { slice::from_raw_parts(ptr, size as usize) };
+            let buffer = wgc::id::Id::zip(expect.buffer.index, expect.buffer.epoch, backend);
+            let (ptr, size) = global
+                .buffer_get_mapped_range(
+                    buffer,
+                    expect.offset,
+                    Some(expect.data.len() as wgt::BufferAddress),
+                )
+                .unwrap();
+            let contents = unsafe { slice::from_raw_parts(ptr.as_ptr(), size as usize) };
             let expected_data = match expect.data {
                 ExpectedData::Raw(vec) => vec,
                 ExpectedData::File(name, size) => {
@@ -147,7 +184,6 @@ impl Test<'_> {
                     .collect::<Vec<u8>>(),
             };
 
-            #[allow(unknown_lints, clippy::if_then_panic)]
             if &expected_data[..] != contents {
                 panic!(
                     "Test expectation is not met!\nBuffer content was:\n{:?}\nbut expected:\n{:?}",
@@ -155,8 +191,6 @@ impl Test<'_> {
                 );
             }
         }
-
-        wgc::gfx_select!(device_id => global.clear_backend(()));
     }
 }
 
@@ -179,44 +213,39 @@ impl Corpus {
         let dir = path.parent().unwrap();
         let corpus: Corpus = ron::de::from_reader(File::open(&path).unwrap()).unwrap();
 
-        let global = wgc::global::Global::new(
-            "test",
-            IdentityPassThroughFactory,
-            wgt::InstanceDescriptor {
-                backends: corpus.backends,
-                flags: wgt::InstanceFlags::debugging(),
-                dx12_shader_compiler: wgt::Dx12Compiler::Fxc,
-                gles_minor_version: wgt::Gles3MinorVersion::default(),
-            },
-        );
         for &backend in BACKENDS {
             if !corpus.backends.contains(backend.into()) {
                 continue;
             }
-            let adapter = match global.request_adapter(
-                &wgc::instance::RequestAdapterOptions {
-                    power_preference: wgt::PowerPreference::None,
-                    force_fallback_adapter: false,
-                    compatible_surface: None,
-                },
-                wgc::instance::AdapterInputs::IdSet(
-                    &[wgc::id::TypedId::zip(0, 0, backend)],
-                    |id| id.backend(),
-                ),
-            ) {
-                Ok(adapter) => adapter,
-                Err(_) => continue,
-            };
-
-            println!("\tBackend {:?}", backend);
-            let supported_features =
-                wgc::gfx_select!(adapter => global.adapter_features(adapter)).unwrap();
-            let downlevel_caps =
-                wgc::gfx_select!(adapter => global.adapter_downlevel_capabilities(adapter))
-                    .unwrap();
             let mut test_num = 0;
             for test_path in &corpus.tests {
                 println!("\t\tTest '{:?}'", test_path);
+
+                let global = wgc::global::Global::new(
+                    "test",
+                    wgt::InstanceDescriptor {
+                        backends: backend.into(),
+                        flags: wgt::InstanceFlags::debugging(),
+                        dx12_shader_compiler: wgt::Dx12Compiler::Fxc,
+                        gles_minor_version: wgt::Gles3MinorVersion::default(),
+                    },
+                );
+                let adapter = match global.request_adapter(
+                    &wgc::instance::RequestAdapterOptions {
+                        power_preference: wgt::PowerPreference::None,
+                        force_fallback_adapter: false,
+                        compatible_surface: None,
+                    },
+                    wgc::instance::AdapterInputs::IdSet(&[wgc::id::Id::zip(0, 0, backend)]),
+                ) {
+                    Ok(adapter) => adapter,
+                    Err(_) => continue,
+                };
+
+                println!("\tBackend {:?}", backend);
+                let supported_features = global.adapter_features(adapter).unwrap();
+                let downlevel_caps = global.adapter_downlevel_capabilities(adapter).unwrap();
+
                 let test = Test::load(dir.join(test_path), adapter.backend());
                 if !supported_features.contains(test.features) {
                     println!(

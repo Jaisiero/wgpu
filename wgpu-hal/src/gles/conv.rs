@@ -45,7 +45,7 @@ impl super::AdapterShared {
                 glow::RGBA,
                 glow::UNSIGNED_INT_2_10_10_10_REV,
             ),
-            Tf::Rg11b10Float => (
+            Tf::Rg11b10UFloat => (
                 glow::R11F_G11F_B10F,
                 glow::RGB,
                 glow::UNSIGNED_INT_10F_11F_11F_REV,
@@ -115,12 +115,7 @@ impl super::AdapterShared {
                 glow::RGBA,
                 0,
             ),
-            Tf::Etc2Rgba8Unorm => (
-                //TODO: this is a lie, it's not sRGB
-                glow::COMPRESSED_SRGB8_ALPHA8_ETC2_EAC,
-                glow::RGBA,
-                0,
-            ),
+            Tf::Etc2Rgba8Unorm => (glow::COMPRESSED_RGBA8_ETC2_EAC, glow::RGBA, 0),
             Tf::Etc2Rgba8UnormSrgb => (glow::COMPRESSED_SRGB8_ALPHA8_ETC2_EAC, glow::RGBA, 0),
             Tf::EacR11Unorm => (glow::COMPRESSED_R11_EAC, glow::RED, 0),
             Tf::EacR11Snorm => (glow::COMPRESSED_SIGNED_R11_EAC, glow::RED, 0),
@@ -217,6 +212,7 @@ pub(super) fn describe_vertex_format(vertex_format: wgt::VertexFormat) -> super:
         Vf::Uint32x4 => (4, glow::UNSIGNED_INT, Vak::Integer),
         Vf::Sint32x4 => (4, glow::INT, Vak::Integer),
         Vf::Float32x4 => (4, glow::FLOAT, Vak::Float),
+        Vf::Unorm10_10_10_2 => (4, glow::UNSIGNED_INT_10_10_10_2, Vak::Float),
         Vf::Float64 | Vf::Float64x2 | Vf::Float64x3 | Vf::Float64x4 => unimplemented!(),
     };
 

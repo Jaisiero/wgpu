@@ -37,13 +37,13 @@ env:
   #
   # This needs to be newer to work around https://github.com/gfx-rs/wgpu/issues/4905.
   #
-  # Once 1.76 coes out, we can use that instead of nightly.
+  # Once this fix hits stable Rust, we can use that instead of nightly.
   DOCS_RUST_VERSION: "nightly-2023-12-17"
   # This is the MSRV used by `wgpu` itself and all surrounding infrastructure.
-  REPO_MSRV: "1.71"
+  REPO_MSRV: "1.76"
   # This is the MSRV used by the `wgpu-core`, `wgpu-hal`, and `wgpu-types` crates,
   # to ensure that they can be used with firefox.
-  CORE_MSRV: "1.70"
+  CORE_MSRV: "1.76"
 
   #
   # Environment variables
@@ -55,10 +55,11 @@ env:
   RUST_LOG: info
   RUST_BACKTRACE: full
   PKG_CONFIG_ALLOW_CROSS: 1 # allow android to work
-  RUSTFLAGS: --cfg=web_sys_unstable_apis -D warnings
-  RUSTDOCFLAGS: -Dwarnings
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
   WASM_BINDGEN_TEST_TIMEOUT: 300 # 5 minutes
   CACHE_SUFFIX: c # cache busting
+  WGPU_TESTING: true
 
 # We distinguish the following kinds of builds:
 # - native: build for the same target as we compile on
@@ -76,7 +77,10 @@ env:
 jobs:
   check:
     # runtime is normally 2-8 minutes
-    timeout-minutes: 15
+    #
+    # currently high due to documentation time problems on mac.
+    # https://github.com/rust-lang/rust/issues/114891
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
@@ -90,18 +94,18 @@ jobs:
 
           # MacOS
           - name: MacOS x86_64
-            os: macos-12
+            os: macos-14
             target: x86_64-apple-darwin
             kind: native
 
           - name: MacOS aarch64
-            os: macos-12
+            os: macos-14
             target: aarch64-apple-darwin
             kind: native
 
           # IOS
           - name: IOS aarch64
-            os: macos-12
+            os: macos-14
             target: aarch64-apple-ios
             kind: native
 
@@ -161,8 +165,7 @@ jobs:
           debug = false" >> .cargo/config.toml
 
       - name: caching
-        # Pin to 2.7.1 due to a bug in github actions cache action https://github.com/Swatinem/rust-cache/issues/182
-        uses: Swatinem/rust-cache@3cf7f8cc28d1b4e7d01e3783be10a97d55d483c8
+        uses: Swatinem/rust-cache@v2
         with:
           key: clippy-${{ matrix.target }}-${{ matrix.kind }}-${{ env.CACHE_SUFFIX }}
 
@@ -224,10 +227,24 @@ jobs:
           cargo clippy --target ${{ matrix.target }} --no-default-features
 
           # Check with all features.
-          cargo clippy --target ${{ matrix.target }} --tests --all-features
+          cargo clippy --target ${{ matrix.target }} --tests --benches --all-features
 
           # build docs
           cargo +${{ env.DOCS_RUST_VERSION }} doc --target ${{ matrix.target }} --all-features --no-deps
+      # wgpu-core docs are not feasible due to <https://github.com/gfx-rs/wgpu/issues/4905>
+      #
+      # - name: check private item docs
+      #   if: matrix.kind == 'native'
+      #   shell: bash
+      #   run: |
+      #     set -e
+      #
+      #     # wgpu_core package
+      #     cargo +${{ env.DOCS_RUST_VERSION }} doc --target ${{ matrix.target }} \
+      #           --package wgpu-core \
+      #           --package wgpu-hal \
+      #           --package naga \
+      #           --all-features --no-deps --document-private-items
 
   # We run minimal checks on the MSRV of the core crates, ensuring that
   # its dependency tree does not cause issues for firefox.
@@ -248,7 +265,7 @@ jobs:
 
           # MacOS
           - name: MacOS x86_64
-            os: macos-12
+            os: macos-14
             target: x86_64-apple-darwin
 
           # Linux
@@ -278,8 +295,7 @@ jobs:
           debug = false" >> .cargo/config.toml
 
       - name: caching
-        # Pin to 2.7.1 due to a bug in github actions cache action https://github.com/Swatinem/rust-cache/issues/182
-        uses: Swatinem/rust-cache@3cf7f8cc28d1b4e7d01e3783be10a97d55d483c8
+        uses: Swatinem/rust-cache@v2
         with:
           key: msrv-check-${{ matrix.target }}-${{ env.CACHE_SUFFIX }}
 
@@ -344,7 +360,7 @@ jobs:
   wasm-test:
     # runtime is normally 2 minutes
     timeout-minutes: 10
-    
+
     name: Test WebAssembly
     runs-on: ubuntu-latest
     needs: [check]
@@ -383,7 +399,7 @@ jobs:
 
           # Mac
           - name: Mac aarch64
-            os: macos-13-xlarge
+            os: macos-14
 
           # Linux
           - name: Linux x86_64
@@ -410,8 +426,7 @@ jobs:
         # Cache step must go before warp and mesa install on windows as they write into the
         # target directory, and rust-cache will overwrite the entirety of the target directory.
       - name: caching
-        # Pin to 2.7.1 due to a bug in github actions cache action https://github.com/Swatinem/rust-cache/issues/182
-        uses: Swatinem/rust-cache@3cf7f8cc28d1b4e7d01e3783be10a97d55d483c8
+        uses: Swatinem/rust-cache@v2
         with:
           key: test-${{ matrix.os }}-${{ env.CACHE_SUFFIX }}
           workspaces: |
@@ -531,7 +546,8 @@ jobs:
           cargo xtask test --llvm-cov
 
       - name: check naga snapshots
-        run: git diff --exit-code -- naga/tests/out
+        # git diff doesn't check untracked files, we need to stage those then compare with HEAD.
+        run: git add . && git diff --exit-code HEAD naga/tests/out
 
       - uses: actions/upload-artifact@v4
         if: always() # We want artifacts even if the tests fail.
@@ -555,6 +571,7 @@ jobs:
         if: steps.coverage.outcome == 'success'
         with:
           files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   doctest:
     # runtime is normally 2 minutes
@@ -582,8 +599,7 @@ jobs:
           debug = 1" >> .cargo/config.toml
 
       - name: caching
-        # Pin to 2.7.1 due to a bug in github actions cache action https://github.com/Swatinem/rust-cache/issues/182
-        uses: Swatinem/rust-cache@3cf7f8cc28d1b4e7d01e3783be10a97d55d483c8
+        uses: Swatinem/rust-cache@v2
         with:
           key: doctests-${{ env.CACHE_SUFFIX }}
 
@@ -598,7 +614,7 @@ jobs:
     # runtime is normally 15 seconds
     timeout-minutes: 2
 
-    name: Format
+    name: Format & Typos
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo
@@ -614,6 +630,9 @@ jobs:
         run: |
           cargo fmt -- --check
           cargo fmt --manifest-path xtask/Cargo.toml -- --check
+
+      - name: Check for typos
+        uses: crate-ci/typos@v1.23.6
 
   check-cts-runner:
     # runtime is normally 2 minutes
@@ -640,8 +659,7 @@ jobs:
           debug = 1" >> .cargo/config.toml
 
       - name: caching
-        # Pin to 2.7.1 due to a bug in github actions cache action https://github.com/Swatinem/rust-cache/issues/182
-        uses: Swatinem/rust-cache@3cf7f8cc28d1b4e7d01e3783be10a97d55d483c8
+        uses: Swatinem/rust-cache@v2
         with:
           key: cts-runner-${{ env.CACHE_SUFFIX }}
 
@@ -663,7 +681,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run `cargo deny check`
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories
           arguments: --all-features --workspace
@@ -672,7 +690,7 @@ jobs:
   cargo-deny-check-rest:
     # runtime is normally 1 minute
     timeout-minutes: 5
-    
+
     name: "cargo-deny"
     runs-on: ubuntu-latest
     steps:
@@ -680,7 +698,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run `cargo deny check`
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check bans licenses sources
           arguments: --all-features --workspace

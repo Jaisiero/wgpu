@@ -13,8 +13,7 @@ use std::{
 };
 use winit::window::WindowButtons;
 
-const COMMAND_BUFFER_PER_CONTEXT: usize = 100;
-const DESIRED_FRAMES: u32 = 3;
+const DESIRED_MAX_LATENCY: u32 = 2;
 
 /// [D3D12_RAYTRACING_INSTANCE_DESC](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_raytracing_instance_desc)
 /// [VkAccelerationStructureInstanceKHR](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccelerationStructureInstanceKHR.html)
@@ -238,7 +237,7 @@ impl<A: hal::Api> Example<A> {
         };
 
         let (adapter, features) = unsafe {
-            let mut adapters = instance.enumerate_adapters();
+            let mut adapters = instance.enumerate_adapters(Some(&surface));
             if adapters.is_empty() {
                 panic!("No adapters found");
             }
@@ -250,8 +249,15 @@ impl<A: hal::Api> Example<A> {
             .expect("Surface doesn't support presentation");
         log::info!("Surface caps: {:#?}", surface_caps);
 
-        let hal::OpenDevice { device, queue } =
-            unsafe { adapter.open(features, &wgt::Limits::default()).unwrap() };
+        let hal::OpenDevice { device, queue } = unsafe {
+            adapter
+                .open(
+                    features,
+                    &wgt::Limits::default(),
+                    &wgt::MemoryHints::Performance,
+                )
+                .unwrap()
+        };
 
         let window_size: (u32, u32) = window.inner_size().into();
         dbg!(&surface_caps.formats);
@@ -264,9 +270,9 @@ impl<A: hal::Api> Example<A> {
             *surface_caps.formats.first().unwrap()
         };
         let surface_config = hal::SurfaceConfiguration {
-            swap_chain_size: DESIRED_FRAMES
-                .max(*surface_caps.swap_chain_sizes.start())
-                .min(*surface_caps.swap_chain_sizes.end()),
+            maximum_frame_latency: DESIRED_MAX_LATENCY
+                .max(*surface_caps.maximum_frame_latency.start())
+                .min(*surface_caps.maximum_frame_latency.end()),
             present_mode: wgt::PresentMode::Fifo,
             composite_alpha_mode: wgt::CompositeAlphaMode::Opaque,
             format: surface_format,
@@ -371,7 +377,10 @@ impl<A: hal::Api> Example<A> {
                 stage: hal::ProgrammableStage {
                     module: &shader_module,
                     entry_point: "main",
+                    constants: &Default::default(),
+                    zero_initialize_workgroup_memory: true,
                 },
+                cache: None,
             })
         }
         .unwrap();
@@ -403,7 +412,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 vertices_size_in_bytes,
             );
-            device.unmap_buffer(&vertices_buffer).unwrap();
+            device.unmap_buffer(&vertices_buffer);
             assert!(mapping.is_coherent);
 
             vertices_buffer
@@ -428,7 +437,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 indices_size_in_bytes,
             );
-            device.unmap_buffer(&indices_buffer).unwrap();
+            device.unmap_buffer(&indices_buffer);
             assert!(mapping.is_coherent);
 
             indices_buffer
@@ -529,7 +538,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 uniforms_size,
             );
-            device.unmap_buffer(&uniform_buffer).unwrap();
+            device.unmap_buffer(&uniform_buffer);
             assert!(mapping.is_coherent);
             uniform_buffer
         };
@@ -672,7 +681,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 instances_buffer_size,
             );
-            device.unmap_buffer(&instances_buffer).unwrap();
+            device.unmap_buffer(&instances_buffer);
             assert!(mapping.is_coherent);
 
             instances_buffer
@@ -757,7 +766,7 @@ impl<A: hal::Api> Example<A> {
             let mut fence = device.create_fence().unwrap();
             let init_cmd = cmd_encoder.end_encoding().unwrap();
             queue
-                .submit(&[&init_cmd], Some((&mut fence, init_fence_value)))
+                .submit(&[&init_cmd], &[], (&mut fence, init_fence_value))
                 .unwrap();
             device.wait(&fence, init_fence_value, !0).unwrap();
             cmd_encoder.reset_all(iter::once(init_cmd));
@@ -806,7 +815,13 @@ impl<A: hal::Api> Example<A> {
     fn render(&mut self) {
         let ctx = &mut self.contexts[self.context_index];
 
-        let surface_tex = unsafe { self.surface.acquire_texture(None).unwrap().unwrap().texture };
+        let surface_tex = unsafe {
+            self.surface
+                .acquire_texture(None, &ctx.fence)
+                .unwrap()
+                .unwrap()
+                .texture
+        };
 
         let target_barrier0 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
@@ -834,7 +849,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 instances_buffer_size,
             );
-            self.device.unmap_buffer(&self.instances_buffer).unwrap();
+            self.device.unmap_buffer(&self.instances_buffer);
             assert!(mapping.is_coherent);
         }
 
@@ -907,7 +922,6 @@ impl<A: hal::Api> Example<A> {
         }
 
         ctx.frames_recorded += 1;
-        let do_fence = ctx.frames_recorded > COMMAND_BUFFER_PER_CONTEXT;
 
         let target_barrier1 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
@@ -957,43 +971,42 @@ impl<A: hal::Api> Example<A> {
 
         unsafe {
             let cmd_buf = ctx.encoder.end_encoding().unwrap();
-            let fence_param = if do_fence {
-                Some((&mut ctx.fence, ctx.fence_value))
-            } else {
-                None
-            };
-            self.queue.submit(&[&cmd_buf], fence_param).unwrap();
+            self.queue
+                .submit(
+                    &[&cmd_buf],
+                    &[&surface_tex],
+                    (&mut ctx.fence, ctx.fence_value),
+                )
+                .unwrap();
             self.queue.present(&self.surface, surface_tex).unwrap();
             ctx.used_cmd_bufs.push(cmd_buf);
             ctx.used_views.push(surface_tex_view);
         };
 
-        if do_fence {
-            log::info!("Context switch from {}", self.context_index);
-            let old_fence_value = ctx.fence_value;
-            if self.contexts.len() == 1 {
-                let hal_desc = hal::CommandEncoderDescriptor {
-                    label: None,
-                    queue: &self.queue,
-                };
-                self.contexts.push(unsafe {
-                    ExecutionContext {
-                        encoder: self.device.create_command_encoder(&hal_desc).unwrap(),
-                        fence: self.device.create_fence().unwrap(),
-                        fence_value: 0,
-                        used_views: Vec::new(),
-                        used_cmd_bufs: Vec::new(),
-                        frames_recorded: 0,
-                    }
-                });
-            }
-            self.context_index = (self.context_index + 1) % self.contexts.len();
-            let next = &mut self.contexts[self.context_index];
-            unsafe {
-                next.wait_and_clear(&self.device);
-            }
-            next.fence_value = old_fence_value + 1;
+        log::info!("Context switch from {}", self.context_index);
+        let old_fence_value = ctx.fence_value;
+        if self.contexts.len() == 1 {
+            let hal_desc = hal::CommandEncoderDescriptor {
+                label: None,
+                queue: &self.queue,
+            };
+            self.contexts.push(unsafe {
+                ExecutionContext {
+                    encoder: self.device.create_command_encoder(&hal_desc).unwrap(),
+                    fence: self.device.create_fence().unwrap(),
+                    fence_value: 0,
+                    used_views: Vec::new(),
+                    used_cmd_bufs: Vec::new(),
+                    frames_recorded: 0,
+                }
+            });
         }
+        self.context_index = (self.context_index + 1) % self.contexts.len();
+        let next = &mut self.contexts[self.context_index];
+        unsafe {
+            next.wait_and_clear(&self.device);
+        }
+        next.fence_value = old_fence_value + 1;
     }
 
     fn exit(mut self) {
@@ -1001,7 +1014,7 @@ impl<A: hal::Api> Example<A> {
             {
                 let ctx = &mut self.contexts[self.context_index];
                 self.queue
-                    .submit(&[], Some((&mut ctx.fence, ctx.fence_value)))
+                    .submit(&[], &[], (&mut ctx.fence, ctx.fence_value))
                     .unwrap();
             }
 
@@ -1028,7 +1041,7 @@ impl<A: hal::Api> Example<A> {
 
             self.surface.unconfigure(&self.device);
             self.device.exit(self.queue);
-            self.instance.destroy_surface(self.surface);
+            drop(self.surface);
             drop(self.adapter);
         }
     }

@@ -13,7 +13,7 @@ use crate::{
 };
 
 impl<'source> ParsingContext<'source> {
-    /// Parses an optional array_specifier returning wether or not it's present
+    /// Parses an optional array_specifier returning whether or not it's present
     /// and modifying the type handle if it exists
     pub fn parse_array_specifier(
         &mut self,
@@ -397,7 +397,7 @@ fn map_image_format(word: &str) -> Option<crate::StorageFormat> {
         "rgba16f" => Sf::Rgba16Float,
         "rg32f" => Sf::Rg32Float,
         "rg16f" => Sf::Rg16Float,
-        "r11f_g11f_b10f" => Sf::Rg11b10Float,
+        "r11f_g11f_b10f" => Sf::Rg11b10UFloat,
         "r32f" => Sf::R32Float,
         "r16f" => Sf::R16Float,
         "rgba16" => Sf::Rgba16Unorm,

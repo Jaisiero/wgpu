@@ -1,4 +1,4 @@
-use std::{panic::AssertUnwindSafe, sync::Arc};
+use std::panic::AssertUnwindSafe;
 
 use futures_lite::FutureExt;
 use wgpu::{Adapter, Device, Instance, Queue};
@@ -18,7 +18,7 @@ pub struct TestingContext {
     pub adapter: Adapter,
     pub adapter_info: wgpu::AdapterInfo,
     pub adapter_downlevel_capabilities: wgpu::DownlevelCapabilities,
-    pub device: Arc<Device>,
+    pub device: Device,
     pub device_features: wgpu::Features,
     pub device_limits: wgpu::Limits,
     pub queue: Queue,
@@ -42,7 +42,8 @@ pub async fn execute_test(
 
     let _test_guard = isolation::OneTestPerProcessGuard::new();
 
-    let (instance, adapter, _surface_guard) = initialize_adapter(adapter_index).await;
+    let (instance, adapter, _surface_guard) =
+        initialize_adapter(adapter_index, config.params.force_fxc).await;
 
     let adapter_info = adapter.get_info();
     let adapter_downlevel_capabilities = adapter.get_downlevel_capabilities();
@@ -72,7 +73,7 @@ pub async fn execute_test(
         adapter,
         adapter_info,
         adapter_downlevel_capabilities,
-        device: Arc::new(device),
+        device,
         device_features: config.params.required_features,
         device_limits: config.params.required_limits.clone(),
         queue,
@@ -86,23 +87,29 @@ pub async fn execute_test(
         .await;
 
     if let Err(panic) = panic_res {
-        let panic_str = panic.downcast_ref::<&'static str>();
-        let panic_string = if let Some(&panic_str) = panic_str {
-            Some(panic_str.to_string())
+        let message = panic
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| panic.downcast_ref::<String>().map(String::as_str));
+
+        let result = FailureResult::panic();
+
+        let result = if let Some(panic_str) = message {
+            result.with_message(panic_str)
         } else {
-            panic.downcast_ref::<String>().cloned()
+            result
         };
 
-        failures.push(FailureResult::Panic(panic_string))
+        failures.push(result)
     }
 
     // Check whether any validation errors were reported during the test run.
     cfg_if::cfg_if!(
         if #[cfg(any(not(target_arch = "wasm32"), target_os = "emscripten"))] {
-            failures.extend(wgpu::hal::VALIDATION_CANARY.get_and_reset().into_iter().map(|msg| FailureResult::ValidationError(Some(msg))));
+            failures.extend(wgpu::hal::VALIDATION_CANARY.get_and_reset().into_iter().map(|msg| FailureResult::validation_error().with_message(msg)));
         } else if #[cfg(all(target_arch = "wasm32", feature = "webgl"))] {
             if _surface_guard.unwrap().check_for_unreported_errors() {
-                failures.push(FailureResult::ValidationError(None));
+                failures.push(FailureResult::validation_error());
             }
         } else {
         }
@@ -110,7 +117,10 @@ pub async fn execute_test(
 
     // The call to matches_failure will log.
     if expectations_match_failures(&test_info.failures, failures) == ExpectationMatchResult::Panic {
-        panic!();
+        panic!(
+            "{}: test {:?} did not behave as expected",
+            config.location, config.name
+        );
     }
     // Print the name of the test.
     log::info!("TEST FINISHED: {}", config.name);

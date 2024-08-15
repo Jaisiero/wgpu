@@ -18,11 +18,14 @@ impl super::Adapter {
     }
 }
 
-impl crate::Adapter<super::Api> for super::Adapter {
+impl crate::Adapter for super::Adapter {
+    type A = super::Api;
+
     unsafe fn open(
         &self,
         features: wgt::Features,
         _limits: &wgt::Limits,
+        _memory_hints: &wgt::MemoryHints,
     ) -> Result<crate::OpenDevice<super::Api>, crate::DeviceError> {
         let queue = self
             .shared
@@ -60,6 +63,7 @@ impl crate::Adapter<super::Api> for super::Adapter {
             device: super::Device {
                 shared: Arc::clone(&self.shared),
                 features,
+                counters: Default::default(),
             },
             queue: super::Queue {
                 raw: Arc::new(Mutex::new(queue)),
@@ -80,11 +84,9 @@ impl crate::Adapter<super::Api> for super::Adapter {
         // https://developer.apple.com/documentation/metal/mtlreadwritetexturetier/mtlreadwritetexturetier1?language=objc
         // https://developer.apple.com/documentation/metal/mtlreadwritetexturetier/mtlreadwritetexturetier2?language=objc
         let (read_write_tier1_if, read_write_tier2_if) = match pc.read_write_texture_tier {
-            metal::MTLReadWriteTextureTier::TierNone => (Tfc::empty(), Tfc::empty()),
-            metal::MTLReadWriteTextureTier::Tier1 => (Tfc::STORAGE_READ_WRITE, Tfc::empty()),
-            metal::MTLReadWriteTextureTier::Tier2 => {
-                (Tfc::STORAGE_READ_WRITE, Tfc::STORAGE_READ_WRITE)
-            }
+            MTLReadWriteTextureTier::TierNone => (Tfc::empty(), Tfc::empty()),
+            MTLReadWriteTextureTier::Tier1 => (Tfc::STORAGE_READ_WRITE, Tfc::empty()),
+            MTLReadWriteTextureTier::Tier2 => (Tfc::STORAGE_READ_WRITE, Tfc::STORAGE_READ_WRITE),
         };
         let msaa_count = pc.sample_count_mask;
 
@@ -176,7 +178,7 @@ impl crate::Adapter<super::Api> for super::Adapter {
                 flags.set(Tfc::STORAGE, pc.format_rgb10a2_unorm_all);
                 flags
             }
-            Tf::Rg11b10Float => {
+            Tf::Rg11b10UFloat => {
                 let mut flags = all_caps;
                 flags.set(Tfc::STORAGE, pc.format_rg11b10_all);
                 flags
@@ -320,13 +322,14 @@ impl crate::Adapter<super::Api> for super::Adapter {
         let pc = &self.shared.private_caps;
         Some(crate::SurfaceCapabilities {
             formats,
-            //Note: this is hardcoded in `CAMetalLayer` documentation
-            swap_chain_sizes: if pc.can_set_maximum_drawables_count {
-                2..=3
+            // We use this here to govern the maximum number of drawables + 1.
+            // See https://developer.apple.com/documentation/quartzcore/cametallayer/2938720-maximumdrawablecount
+            maximum_frame_latency: if pc.can_set_maximum_drawables_count {
+                1..=2
             } else {
-                // 3 is the default in `CAMetalLayer` documentation
+                // 3 is the default value for maximum drawables in `CAMetalLayer` documentation
                 // iOS 10.3 was tested to use 3 on iphone5s
-                3..=3
+                2..=2
             },
             present_modes: if pc.can_set_display_sync {
                 vec![wgt::PresentMode::Fifo, wgt::PresentMode::Immediate]
@@ -559,7 +562,11 @@ impl super::PrivateCapabilities {
 
         Self {
             family_check,
-            msl_version: if os_is_xr || version.at_least((12, 0), (15, 0), os_is_mac) {
+            msl_version: if os_is_xr || version.at_least((14, 0), (17, 0), os_is_mac) {
+                MTLLanguageVersion::V3_1
+            } else if version.at_least((13, 0), (16, 0), os_is_mac) {
+                MTLLanguageVersion::V3_0
+            } else if version.at_least((12, 0), (15, 0), os_is_mac) {
                 MTLLanguageVersion::V2_4
             } else if version.at_least((11, 0), (14, 0), os_is_mac) {
                 MTLLanguageVersion::V2_3
@@ -730,6 +737,14 @@ impl super::PrivateCapabilities {
             } else {
                 4
             },
+            // Per https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
+            max_color_attachment_bytes_per_sample: if family_check
+                && device.supports_family(MTLGPUFamily::Apple4)
+            {
+                64
+            } else {
+                32
+            },
             max_varying_components: if device
                 .supports_feature_set(MTLFeatureSet::macOS_GPUFamily1_v1)
             {
@@ -800,6 +815,19 @@ impl super::PrivateCapabilities {
                 None
             },
             timestamp_query_support,
+            supports_simd_scoped_operations: family_check
+                && (device.supports_family(MTLGPUFamily::Metal3)
+                    || device.supports_family(MTLGPUFamily::Mac2)
+                    || device.supports_family(MTLGPUFamily::Apple7)),
+            // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf#page=5
+            int64: family_check
+                && (device.supports_family(MTLGPUFamily::Apple3)
+                    || device.supports_family(MTLGPUFamily::Metal3)),
+            // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf#page=6
+            int64_atomics: family_check
+                && ((device.supports_family(MTLGPUFamily::Apple8)
+                    && device.supports_family(MTLGPUFamily::Mac2))
+                    || device.supports_family(MTLGPUFamily::Apple9)),
         }
     }
 
@@ -832,7 +860,7 @@ impl super::PrivateCapabilities {
             self.indirect_draw_dispatch,
         );
         features.set(
-            F::TIMESTAMP_QUERY,
+            F::TIMESTAMP_QUERY | F::TIMESTAMP_QUERY_INSIDE_ENCODERS,
             self.timestamp_query_support
                 .contains(TimestampQuerySupport::STAGE_BOUNDARIES),
         );
@@ -848,6 +876,7 @@ impl super::PrivateCapabilities {
         features.set(F::TEXTURE_COMPRESSION_ASTC, self.format_astc);
         features.set(F::TEXTURE_COMPRESSION_ASTC_HDR, self.format_astc_hdr);
         features.set(F::TEXTURE_COMPRESSION_BC, self.format_bc);
+        features.set(F::TEXTURE_COMPRESSION_BC_SLICED_3D, self.format_bc); // BC guarantees Sliced 3D
         features.set(F::TEXTURE_COMPRESSION_ETC2, self.format_eac_etc);
 
         features.set(F::DEPTH_CLIP_CONTROL, self.supports_depth_clip_control);
@@ -871,6 +900,14 @@ impl super::PrivateCapabilities {
         {
             features.insert(F::STORAGE_RESOURCE_BINDING_ARRAY);
         }
+        features.set(
+            F::SHADER_INT64,
+            self.int64 && self.msl_version >= MTLLanguageVersion::V2_3,
+        );
+        features.set(
+            F::SHADER_INT64_ATOMIC_MIN_MAX,
+            self.int64_atomics && self.msl_version >= MTLLanguageVersion::V2_4,
+        );
 
         features.set(
             F::ADDRESS_MODE_CLAMP_TO_BORDER,
@@ -879,7 +916,10 @@ impl super::PrivateCapabilities {
         features.set(F::ADDRESS_MODE_CLAMP_TO_ZERO, true);
 
         features.set(F::RG11B10UFLOAT_RENDERABLE, self.format_rg11b10_all);
-        features.set(F::SHADER_UNUSED_VERTEX_OUTPUT, true);
+
+        if self.supports_simd_scoped_operations {
+            features.insert(F::SUBGROUP | F::SUBGROUP_BARRIER);
+        }
 
         features
     }
@@ -935,10 +975,16 @@ impl super::PrivateCapabilities {
                 max_vertex_buffers: self.max_vertex_buffers,
                 max_vertex_attributes: 31,
                 max_vertex_buffer_array_stride: base.max_vertex_buffer_array_stride,
+                min_subgroup_size: 4,
+                max_subgroup_size: 64,
                 max_push_constant_size: 0x1000,
                 min_uniform_buffer_offset_alignment: self.buffer_alignment as u32,
                 min_storage_buffer_offset_alignment: self.buffer_alignment as u32,
                 max_inter_stage_shader_components: self.max_varying_components,
+                max_color_attachments: (self.max_color_render_targets as u32)
+                    .min(crate::MAX_COLOR_ATTACHMENTS as u32),
+                max_color_attachment_bytes_per_sample: self.max_color_attachment_bytes_per_sample
+                    as u32,
                 max_compute_workgroup_storage_size: self.max_total_threadgroup_memory,
                 max_compute_invocations_per_workgroup: self.max_threads_per_group,
                 max_compute_workgroup_size_x: self.max_threads_per_group,
@@ -946,7 +992,7 @@ impl super::PrivateCapabilities {
                 max_compute_workgroup_size_z: self.max_threads_per_group,
                 max_compute_workgroups_per_dimension: 0xFFFF,
                 max_buffer_size: self.max_buffer_size,
-                max_non_sampler_bindings: std::u32::MAX,
+                max_non_sampler_bindings: u32::MAX,
             },
             alignments: crate::Alignments {
                 buffer_copy_offset: wgt::BufferSize::new(self.buffer_alignment).unwrap(),
@@ -990,7 +1036,7 @@ impl super::PrivateCapabilities {
             Tf::Rgba8Sint => RGBA8Sint,
             Tf::Rgb10a2Uint => RGB10A2Uint,
             Tf::Rgb10a2Unorm => RGB10A2Unorm,
-            Tf::Rg11b10Float => RG11B10Float,
+            Tf::Rg11b10UFloat => RG11B10Float,
             Tf::Rg32Uint => RG32Uint,
             Tf::Rg32Sint => RG32Sint,
             Tf::Rg32Float => RG32Float,

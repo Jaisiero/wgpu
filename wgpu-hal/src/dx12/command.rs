@@ -57,13 +57,20 @@ impl super::Temp {
     }
 }
 
+impl Drop for super::CommandEncoder {
+    fn drop(&mut self) {
+        use crate::CommandEncoder;
+        unsafe { self.discard_encoding() }
+    }
+}
+
 impl super::CommandEncoder {
     unsafe fn begin_pass(&mut self, kind: super::PassKind, label: crate::Label) {
         let list = self.list.as_ref().unwrap();
         self.pass.kind = kind;
         if let Some(label) = label {
             let (wide_label, size) = self.temp.prepare_marker(label);
-            unsafe { list.BeginEvent(0, wide_label.as_ptr() as *const _, size) };
+            unsafe { list.BeginEvent(0, wide_label.as_ptr().cast(), size) };
             self.pass.has_label = true;
         }
         self.pass.dirty_root_elements = 0;
@@ -214,7 +221,6 @@ impl super::CommandEncoder {
     }
 
     fn reset_signature(&mut self, layout: &super::PipelineLayoutShared) {
-        log::trace!("Reset signature {:?}", layout.signature);
         if let Some(root_index) = layout.special_constants_root_index {
             self.pass.root_elements[root_index as usize] =
                 super::RootElement::SpecialConstantBuffer {
@@ -243,7 +249,9 @@ impl super::CommandEncoder {
     }
 }
 
-impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
+impl crate::CommandEncoder for super::CommandEncoder {
+    type A = super::Api;
+
     unsafe fn begin_encoding(&mut self, label: crate::Label) -> Result<(), crate::DeviceError> {
         let list = loop {
             if let Some(list) = self.free_lists.pop() {
@@ -290,35 +298,24 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
     }
     unsafe fn end_encoding(&mut self) -> Result<super::CommandBuffer, crate::DeviceError> {
         let raw = self.list.take().unwrap();
-        let closed = raw.close().into_result().is_ok();
-        Ok(super::CommandBuffer { raw, closed })
+        raw.close()
+            .into_device_result("GraphicsCommandList::close")?;
+        Ok(super::CommandBuffer { raw })
     }
     unsafe fn reset_all<I: Iterator<Item = super::CommandBuffer>>(&mut self, command_buffers: I) {
         for cmd_buf in command_buffers {
-            if cmd_buf.closed {
-                self.free_lists.push(cmd_buf.raw);
-            }
+            self.free_lists.push(cmd_buf.raw);
         }
         self.allocator.reset();
     }
 
     unsafe fn transition_buffers<'a, T>(&mut self, barriers: T)
     where
-        T: Iterator<Item = crate::BufferBarrier<'a, super::Api>>,
+        T: Iterator<Item = crate::BufferBarrier<'a, super::Buffer>>,
     {
         self.temp.barriers.clear();
 
-        log::trace!(
-            "List {:p} buffer transitions",
-            self.list.as_ref().unwrap().as_ptr()
-        );
         for barrier in barriers {
-            log::trace!(
-                "\t{:p}: usage {:?}..{:?}",
-                barrier.buffer.resource.as_ptr(),
-                barrier.usage.start,
-                barrier.usage.end
-            );
             let s0 = conv::map_buffer_usage_to_state(barrier.usage.start);
             let s1 = conv::map_buffer_usage_to_state(barrier.usage.end);
             if s0 != s1 {
@@ -363,22 +360,11 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
     unsafe fn transition_textures<'a, T>(&mut self, barriers: T)
     where
-        T: Iterator<Item = crate::TextureBarrier<'a, super::Api>>,
+        T: Iterator<Item = crate::TextureBarrier<'a, super::Texture>>,
     {
         self.temp.barriers.clear();
 
-        log::trace!(
-            "List {:p} texture transitions",
-            self.list.as_ref().unwrap().as_ptr()
-        );
         for barrier in barriers {
-            log::trace!(
-                "\t{:p}: usage {:?}..{:?}, range {:?}",
-                barrier.texture.resource.as_ptr(),
-                barrier.usage.start,
-                barrier.usage.end,
-                barrier.range
-            );
             let s0 = conv::map_texture_usage_to_state(barrier.usage.start);
             let s1 = conv::map_texture_usage_to_state(barrier.usage.end);
             if s0 != s1 {
@@ -683,7 +669,10 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
     // render
 
-    unsafe fn begin_render_pass(&mut self, desc: &crate::RenderPassDescriptor<super::Api>) {
+    unsafe fn begin_render_pass(
+        &mut self,
+        desc: &crate::RenderPassDescriptor<super::QuerySet, super::TextureView>,
+    ) {
         unsafe { self.begin_pass(super::PassKind::Render, desc.label) };
 
         // Start timestamp if any (before all other commands but after debug marker)
@@ -879,13 +868,11 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         group: &super::BindGroup,
         dynamic_offsets: &[wgt::DynamicOffset],
     ) {
-        log::trace!("Set group[{}]", index);
         let info = &layout.bind_group_infos[index as usize];
         let mut root_index = info.base_root_index as usize;
 
         // Bind CBV/SRC/UAV descriptor tables
         if info.tables.contains(super::TableTypes::SRV_CBV_UAV) {
-            log::trace!("\tBind element[{}] = view", root_index);
             self.pass.root_elements[root_index] =
                 super::RootElement::Table(group.handle_views.unwrap().gpu);
             root_index += 1;
@@ -893,7 +880,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
         // Bind Sampler descriptor tables.
         if info.tables.contains(super::TableTypes::SAMPLERS) {
-            log::trace!("\tBind element[{}] = sampler", root_index);
             self.pass.root_elements[root_index] =
                 super::RootElement::Table(group.handle_samplers.unwrap().gpu);
             root_index += 1;
@@ -906,7 +892,6 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             .zip(group.dynamic_buffers.iter())
             .zip(dynamic_offsets)
         {
-            log::trace!("\tBind element[{}] = dynamic", root_index);
             self.pass.root_elements[root_index] = super::RootElement::DynamicOffsetBuffer {
                 kind,
                 address: gpu_base + offset as d3d12::GpuAddress,
@@ -950,7 +935,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             self.list
                 .as_ref()
                 .unwrap()
-                .SetMarker(0, wide_label.as_ptr() as *const _, size)
+                .SetMarker(0, wide_label.as_ptr().cast(), size)
         };
     }
     unsafe fn begin_debug_marker(&mut self, group_label: &str) {
@@ -959,7 +944,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
             self.list
                 .as_ref()
                 .unwrap()
-                .BeginEvent(0, wide_label.as_ptr() as *const _, size)
+                .BeginEvent(0, wide_label.as_ptr().cast(), size)
         };
     }
     unsafe fn end_debug_marker(&mut self) {
@@ -996,7 +981,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
     unsafe fn set_index_buffer<'a>(
         &mut self,
-        binding: crate::BufferBinding<'a, super::Api>,
+        binding: crate::BufferBinding<'a, super::Buffer>,
         format: wgt::IndexFormat,
     ) {
         self.list.as_ref().unwrap().set_index_buffer(
@@ -1008,7 +993,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
     unsafe fn set_vertex_buffer<'a>(
         &mut self,
         index: u32,
-        binding: crate::BufferBinding<'a, super::Api>,
+        binding: crate::BufferBinding<'a, super::Buffer>,
     ) {
         let vb = &mut self.pass.vertex_buffers[index as usize];
         vb.BufferLocation = binding.resolve_address();
@@ -1156,7 +1141,7 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
 
     unsafe fn begin_compute_pass<'a>(
         &mut self,
-        desc: &crate::ComputePassDescriptor<'a, super::Api>,
+        desc: &crate::ComputePassDescriptor<'a, super::QuerySet>,
     ) {
         unsafe { self.begin_pass(super::PassKind::Compute, desc.label) };
 
@@ -1213,7 +1198,13 @@ impl crate::CommandEncoder<super::Api> for super::CommandEncoder {
         _descriptors: T,
     ) where
         super::Api: 'a,
-        T: IntoIterator<Item = crate::BuildAccelerationStructureDescriptor<'a, super::Api>>,
+        T: IntoIterator<
+            Item = crate::BuildAccelerationStructureDescriptor<
+                'a,
+                super::Buffer,
+                super::AccelerationStructure,
+            >,
+        >,
     {
         // Implement using `BuildRaytracingAccelerationStructure`:
         // https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#buildraytracingaccelerationstructure

@@ -16,6 +16,7 @@ use placed as allocation;
 // This is the fast path using gpu_allocator to suballocate buffers and textures.
 #[cfg(feature = "windows_rs")]
 mod placed {
+    use crate::dx12::null_comptr_check;
     use d3d12::ComPtr;
     use parking_lot::Mutex;
     use std::ptr;
@@ -45,13 +46,31 @@ mod placed {
 
     pub(crate) fn create_allocator_wrapper(
         raw: &d3d12::Device,
+        memory_hints: &wgt::MemoryHints,
     ) -> Result<Option<Mutex<GpuAllocatorWrapper>>, crate::DeviceError> {
         let device = raw.as_ptr();
+
+        // TODO: the allocator's configuration should take hardware capability into
+        // account.
+        let mb = 1024 * 1024;
+        let allocation_sizes = match memory_hints {
+            wgt::MemoryHints::Performance => gpu_allocator::AllocationSizes::default(),
+            wgt::MemoryHints::MemoryUsage => gpu_allocator::AllocationSizes::new(8 * mb, 4 * mb),
+            wgt::MemoryHints::Manual {
+                suballocated_device_memory_block_size,
+            } => {
+                // TODO: Would it be useful to expose the host size in memory hints
+                // instead of always using half of the device size?
+                let device_size = suballocated_device_memory_block_size.start;
+                let host_size = device_size / 2;
+                gpu_allocator::AllocationSizes::new(device_size, host_size)
+            }
+        };
 
         match gpu_allocator::d3d12::Allocator::new(&gpu_allocator::d3d12::AllocatorCreateDesc {
             device: gpu_allocator::d3d12::ID3D12DeviceVersion::Device(device.as_windows().clone()),
             debug_settings: Default::default(),
-            allocation_sizes: gpu_allocator::AllocationSizes::default(),
+            allocation_sizes,
         }) {
             Ok(allocator) => Ok(Some(Mutex::new(GpuAllocatorWrapper { allocator }))),
             Err(e) => {
@@ -110,10 +129,17 @@ mod placed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(),
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
+
+        null_comptr_check(resource)?;
+
+        device
+            .counters
+            .buffer_memory
+            .add(allocation.size() as isize);
 
         Ok((hr, Some(AllocationWrapper { allocation })))
     }
@@ -157,18 +183,30 @@ mod placed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(), // clear value
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
+
+        null_comptr_check(resource)?;
+
+        device
+            .counters
+            .texture_memory
+            .add(allocation.size() as isize);
 
         Ok((hr, Some(AllocationWrapper { allocation })))
     }
 
     pub(crate) fn free_buffer_allocation(
+        device: &crate::dx12::Device,
         allocation: AllocationWrapper,
         allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
+        device
+            .counters
+            .buffer_memory
+            .sub(allocation.allocation.size() as isize);
         match allocator.lock().allocator.free(allocation.allocation) {
             Ok(_) => (),
             // TODO: Don't panic here
@@ -177,9 +215,14 @@ mod placed {
     }
 
     pub(crate) fn free_texture_allocation(
+        device: &crate::dx12::Device,
         allocation: AllocationWrapper,
         allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
+        device
+            .counters
+            .texture_memory
+            .sub(allocation.allocation.size() as isize);
         match allocator.lock().allocator.free(allocation.allocation) {
             Ok(_) => (),
             // TODO: Don't panic here
@@ -210,11 +253,16 @@ mod placed {
                     );
                     Self::Lost
                 }
+
                 gpu_allocator::AllocationError::Internal(e) => {
                     log::error!("DX12 gpu-allocator: Internal Error: {}", e);
                     Self::Lost
                 }
-                gpu_allocator::AllocationError::BarrierLayoutNeedsDevice10 => todo!(),
+                gpu_allocator::AllocationError::BarrierLayoutNeedsDevice10
+                | gpu_allocator::AllocationError::CastableFormatsRequiresEnhancedBarriers
+                | gpu_allocator::AllocationError::CastableFormatsRequiresAtLeastDevice12 => {
+                    unreachable!()
+                }
             }
         }
     }
@@ -223,6 +271,7 @@ mod placed {
 // This is the older, slower path where it doesn't suballocate buffers.
 // Tracking issue for when it can be removed: https://github.com/gfx-rs/wgpu/issues/3207
 mod committed {
+    use crate::dx12::null_comptr_check;
     use d3d12::ComPtr;
     use parking_lot::Mutex;
     use std::ptr;
@@ -248,6 +297,7 @@ mod committed {
     #[allow(unused)]
     pub(crate) fn create_allocator_wrapper(
         _raw: &d3d12::Device,
+        _memory_hints: &wgt::MemoryHints,
     ) -> Result<Option<Mutex<GpuAllocatorWrapper>>, crate::DeviceError> {
         Ok(None)
     }
@@ -291,10 +341,12 @@ mod committed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(),
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
+
+        null_comptr_check(resource)?;
 
         Ok((hr, None))
     }
@@ -327,16 +379,19 @@ mod committed {
                 &raw_desc,
                 d3d12_ty::D3D12_RESOURCE_STATE_COMMON,
                 ptr::null(), // clear value
-                &d3d12_ty::ID3D12Resource::uuidof(),
+                &ID3D12Resource::uuidof(),
                 resource.mut_void(),
             )
         };
+
+        null_comptr_check(resource)?;
 
         Ok((hr, None))
     }
 
     #[allow(unused)]
     pub(crate) fn free_buffer_allocation(
+        _device: &crate::dx12::Device,
         _allocation: AllocationWrapper,
         _allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
@@ -345,6 +400,7 @@ mod committed {
 
     #[allow(unused)]
     pub(crate) fn free_texture_allocation(
+        _device: &crate::dx12::Device,
         _allocation: AllocationWrapper,
         _allocator: &Mutex<GpuAllocatorWrapper>,
     ) {
