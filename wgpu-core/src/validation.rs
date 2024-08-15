@@ -1,8 +1,4 @@
-use crate::{
-    device::bgl,
-    id::{markers::Buffer, Id},
-    FastHashMap, FastHashSet,
-};
+use crate::{device::bgl, FastHashMap, FastHashSet};
 use arrayvec::ArrayVec;
 use std::{collections::hash_map::Entry, fmt};
 use thiserror::Error;
@@ -135,57 +131,8 @@ struct EntryPoint {
 #[derive(Debug)]
 pub struct Interface {
     limits: wgt::Limits,
-    features: wgt::Features,
     resources: naga::Arena<Resource>,
     entry_points: FastHashMap<(naga::ShaderStage, String), EntryPoint>,
-}
-
-#[derive(Clone, Debug, Error)]
-#[error(
-    "Usage flags {actual:?} for buffer {id:?} do not contain required usage flags {expected:?}"
-)]
-pub struct MissingBufferUsageError {
-    pub(crate) id: Id<Buffer>,
-    pub(crate) actual: wgt::BufferUsages,
-    pub(crate) expected: wgt::BufferUsages,
-}
-
-/// Checks that the given buffer usage contains the required buffer usage,
-/// returns an error otherwise.
-pub fn check_buffer_usage(
-    id: Id<Buffer>,
-    actual: wgt::BufferUsages,
-    expected: wgt::BufferUsages,
-) -> Result<(), MissingBufferUsageError> {
-    if !actual.contains(expected) {
-        Err(MissingBufferUsageError {
-            id,
-            actual,
-            expected,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Error)]
-#[error("Texture usage is {actual:?} which does not contain required usage {expected:?}")]
-pub struct MissingTextureUsageError {
-    pub(crate) actual: wgt::TextureUsages,
-    pub(crate) expected: wgt::TextureUsages,
-}
-
-/// Checks that the given texture usage contains the required texture usage,
-/// returns an error otherwise.
-pub fn check_texture_usage(
-    actual: wgt::TextureUsages,
-    expected: wgt::TextureUsages,
-) -> Result<(), MissingTextureUsageError> {
-    if !actual.contains(expected) {
-        Err(MissingTextureUsageError { actual, expected })
-    } else {
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug, Error)]
@@ -202,8 +149,11 @@ pub enum BindingError {
         binding: naga::AddressSpace,
         shader: naga::AddressSpace,
     },
-    #[error("Buffer structure size {0}, added to one element of an unbound array, if it's the last field, ended up greater than the given `min_binding_size`")]
-    WrongBufferSize(wgt::BufferSize),
+    #[error("Buffer structure size {buffer_size}, added to one element of an unbound array, if it's the last field, ended up greater than the given `min_binding_size`, which is {min_binding_size}")]
+    WrongBufferSize {
+        buffer_size: wgt::BufferSize,
+        min_binding_size: wgt::BufferSize,
+    },
     #[error("View dimension {dim:?} (is array: {is_array}) doesn't match the binding {binding:?}")]
     WrongTextureViewDimension {
         dim: naga::ImageDimension,
@@ -284,8 +234,6 @@ pub enum StageError {
         #[source]
         error: InputError,
     },
-    #[error("Location[{location}] is provided by the previous stage output but is not consumed as input by this stage.")]
-    InputNotConsumed { location: wgt::ShaderLocation },
     #[error(
         "Unable to select an entry point: no entry point was found in the provided shader module"
     )]
@@ -330,7 +278,7 @@ fn map_storage_format_to_naga(format: wgt::TextureFormat) -> Option<naga::Storag
 
         Tf::Rgb10a2Uint => Sf::Rgb10a2Uint,
         Tf::Rgb10a2Unorm => Sf::Rgb10a2Unorm,
-        Tf::Rg11b10Float => Sf::Rg11b10Float,
+        Tf::Rg11b10UFloat => Sf::Rg11b10UFloat,
 
         Tf::Rg32Uint => Sf::Rg32Uint,
         Tf::Rg32Sint => Sf::Rg32Sint,
@@ -386,7 +334,7 @@ fn map_storage_format_from_naga(format: naga::StorageFormat) -> wgt::TextureForm
 
         Sf::Rgb10a2Uint => Tf::Rgb10a2Uint,
         Sf::Rgb10a2Unorm => Tf::Rgb10a2Unorm,
-        Sf::Rg11b10Float => Tf::Rg11b10Float,
+        Sf::Rg11b10UFloat => Tf::Rg11b10UFloat,
 
         Sf::Rg32Uint => Tf::Rg32Uint,
         Sf::Rg32Sint => Tf::Rg32Sint,
@@ -440,7 +388,10 @@ impl Resource {
                 };
                 match min_size {
                     Some(non_zero) if non_zero < size => {
-                        return Err(BindingError::WrongBufferSize(size))
+                        return Err(BindingError::WrongBufferSize {
+                            buffer_size: size,
+                            min_binding_size: non_zero,
+                        })
                     }
                     _ => (),
                 }
@@ -714,7 +665,7 @@ impl NumericType {
             Tf::Rgba8Sint | Tf::Rgba16Sint | Tf::Rgba32Sint => {
                 (NumericDimension::Vector(Vs::Quad), Scalar::I32)
             }
-            Tf::Rg11b10Float => (NumericDimension::Vector(Vs::Tri), Scalar::F32),
+            Tf::Rg11b10UFloat => (NumericDimension::Vector(Vs::Tri), Scalar::F32),
             Tf::Stencil8
             | Tf::Depth16Unorm
             | Tf::Depth32Float
@@ -891,12 +842,7 @@ impl Interface {
         list.push(varying);
     }
 
-    pub fn new(
-        module: &naga::Module,
-        info: &naga::valid::ModuleInfo,
-        limits: wgt::Limits,
-        features: wgt::Features,
-    ) -> Self {
+    pub fn new(module: &naga::Module, info: &naga::valid::ModuleInfo, limits: wgt::Limits) -> Self {
         let mut resources = naga::Arena::new();
         let mut resource_mapping = FastHashMap::default();
         for (var_handle, var) in module.global_variables.iter() {
@@ -977,7 +923,6 @@ impl Interface {
 
         Self {
             limits,
-            features,
             resources,
             entry_points,
         }
@@ -1225,27 +1170,6 @@ impl Interface {
                     }
                 }
                 Varying::BuiltIn(_) => {}
-            }
-        }
-
-        // Check all vertex outputs and make sure the fragment shader consumes them.
-        // This requirement is removed if the `SHADER_UNUSED_VERTEX_OUTPUT` feature is enabled.
-        if shader_stage == naga::ShaderStage::Fragment
-            && !self
-                .features
-                .contains(wgt::Features::SHADER_UNUSED_VERTEX_OUTPUT)
-        {
-            for &index in inputs.keys() {
-                // This is a linear scan, but the count should be low enough
-                // that this should be fine.
-                let found = entry_point.inputs.iter().any(|v| match *v {
-                    Varying::Local { location, .. } => location == index,
-                    Varying::BuiltIn(_) => false,
-                });
-
-                if !found {
-                    return Err(StageError::InputNotConsumed { location: index });
-                }
             }
         }
 

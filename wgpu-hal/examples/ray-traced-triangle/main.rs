@@ -237,7 +237,7 @@ impl<A: hal::Api> Example<A> {
         };
 
         let (adapter, features) = unsafe {
-            let mut adapters = instance.enumerate_adapters();
+            let mut adapters = instance.enumerate_adapters(Some(&surface));
             if adapters.is_empty() {
                 panic!("No adapters found");
             }
@@ -249,8 +249,15 @@ impl<A: hal::Api> Example<A> {
             .expect("Surface doesn't support presentation");
         log::info!("Surface caps: {:#?}", surface_caps);
 
-        let hal::OpenDevice { device, queue } =
-            unsafe { adapter.open(features, &wgt::Limits::default()).unwrap() };
+        let hal::OpenDevice { device, queue } = unsafe {
+            adapter
+                .open(
+                    features,
+                    &wgt::Limits::default(),
+                    &wgt::MemoryHints::Performance,
+                )
+                .unwrap()
+        };
 
         let window_size: (u32, u32) = window.inner_size().into();
         dbg!(&surface_caps.formats);
@@ -374,7 +381,6 @@ impl<A: hal::Api> Example<A> {
                     entry_point: "main",
                     constants: &Default::default(),
                     zero_initialize_workgroup_memory: true,
-                    vertex_pulling_transform: false,
                 },
                 cache: None,
             })
@@ -408,7 +414,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 vertices_size_in_bytes,
             );
-            device.unmap_buffer(&vertices_buffer).unwrap();
+            device.unmap_buffer(&vertices_buffer);
             assert!(mapping.is_coherent);
 
             vertices_buffer
@@ -433,7 +439,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 indices_size_in_bytes,
             );
-            device.unmap_buffer(&indices_buffer).unwrap();
+            device.unmap_buffer(&indices_buffer);
             assert!(mapping.is_coherent);
 
             indices_buffer
@@ -532,7 +538,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 uniforms_size,
             );
-            device.unmap_buffer(&uniform_buffer).unwrap();
+            device.unmap_buffer(&uniform_buffer);
             assert!(mapping.is_coherent);
             uniform_buffer
         };
@@ -675,7 +681,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 instances_buffer_size,
             );
-            device.unmap_buffer(&instances_buffer).unwrap();
+            device.unmap_buffer(&instances_buffer);
             assert!(mapping.is_coherent);
 
             instances_buffer
@@ -843,7 +849,7 @@ impl<A: hal::Api> Example<A> {
                 mapping.ptr.as_ptr(),
                 instances_buffer_size,
             );
-            self.device.unmap_buffer(&self.instances_buffer).unwrap();
+            self.device.unmap_buffer(&self.instances_buffer);
             assert!(mapping.is_coherent);
         }
 
@@ -1035,7 +1041,7 @@ impl<A: hal::Api> Example<A> {
 
             self.surface.unconfigure(&self.device);
             self.device.exit(self.queue);
-            self.instance.destroy_surface(self.surface);
+            drop(self.surface);
             drop(self.adapter);
         }
     }

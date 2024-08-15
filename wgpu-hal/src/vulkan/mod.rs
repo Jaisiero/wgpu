@@ -7,7 +7,6 @@ Ash expects slices, which we don't generally have available.
 We cope with this requirement by the combination of the following ways:
   - temporarily allocating `Vec` on heap, where overhead is permitted
   - growing temporary local storage
-  - using `implace_it` on iterators
 
 ## Framebuffers and Render passes
 
@@ -43,6 +42,7 @@ use std::{
 use arrayvec::ArrayVec;
 use ash::{ext, khr, vk};
 use parking_lot::{Mutex, RwLock};
+use wgt::InternalCounter;
 
 const MILLIS_TO_NANOS: u64 = 1_000_000;
 const MAX_TOTAL_ATTACHMENTS: usize = crate::MAX_COLOR_ATTACHMENTS * 2 + 1;
@@ -77,6 +77,31 @@ impl crate::Api for Api {
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
 }
+
+crate::impl_dyn_resource!(
+    Adapter,
+    AccelerationStructure,
+    BindGroup,
+    BindGroupLayout,
+    Buffer,
+    CommandBuffer,
+    CommandEncoder,
+    ComputePipeline,
+    Device,
+    Fence,
+    Instance,
+    PipelineCache,
+    PipelineLayout,
+    QuerySet,
+    Queue,
+    RenderPipeline,
+    Sampler,
+    ShaderModule,
+    Surface,
+    SurfaceTexture,
+    Texture,
+    TextureView
+);
 
 struct DebugUtils {
     extension: ext::debug_utils::Instance,
@@ -357,8 +382,16 @@ pub struct SurfaceTexture {
     surface_semaphores: Arc<Mutex<SwapchainImageSemaphores>>,
 }
 
+impl crate::DynSurfaceTexture for SurfaceTexture {}
+
 impl Borrow<Texture> for SurfaceTexture {
     fn borrow(&self) -> &Texture {
+        &self.texture
+    }
+}
+
+impl Borrow<dyn crate::DynTexture> for SurfaceTexture {
+    fn borrow(&self) -> &dyn crate::DynTexture {
         &self.texture
     }
 }
@@ -527,6 +560,7 @@ struct DeviceShared {
     features: wgt::Features,
     render_passes: Mutex<rustc_hash::FxHashMap<RenderPassKey, vk::RenderPass>>,
     framebuffers: Mutex<rustc_hash::FxHashMap<FramebufferKey, vk::Framebuffer>>,
+    memory_allocations_counter: InternalCounter,
 }
 
 pub struct Device {
@@ -538,6 +572,7 @@ pub struct Device {
     naga_options: naga::back::spv::Options<'static>,
     #[cfg(feature = "renderdoc")]
     render_doc: crate::auxil::renderdoc::RenderDoc,
+    counters: wgt::HalCounters,
 }
 
 /// Semaphores for forcing queue submissions to run in order.
@@ -629,12 +664,16 @@ pub struct Buffer {
     block: Option<Mutex<gpu_alloc::MemoryBlock<vk::DeviceMemory>>>,
 }
 
+impl crate::DynBuffer for Buffer {}
+
 #[derive(Debug)]
 pub struct AccelerationStructure {
     raw: vk::AccelerationStructureKHR,
     buffer: vk::Buffer,
     block: Mutex<gpu_alloc::MemoryBlock<vk::DeviceMemory>>,
 }
+
+impl crate::DynAccelerationStructure for AccelerationStructure {}
 
 #[derive(Debug)]
 pub struct Texture {
@@ -647,6 +686,8 @@ pub struct Texture {
     copy_size: crate::CopyExtent,
     view_formats: Vec<wgt::TextureFormat>,
 }
+
+impl crate::DynTexture for Texture {}
 
 impl Texture {
     /// # Safety
@@ -664,6 +705,8 @@ pub struct TextureView {
     attachment: FramebufferAttachment,
 }
 
+impl crate::DynTextureView for TextureView {}
+
 impl TextureView {
     /// # Safety
     ///
@@ -678,6 +721,8 @@ pub struct Sampler {
     raw: vk::Sampler,
 }
 
+impl crate::DynSampler for Sampler {}
+
 #[derive(Debug)]
 pub struct BindGroupLayout {
     raw: vk::DescriptorSetLayout,
@@ -687,16 +732,22 @@ pub struct BindGroupLayout {
     binding_arrays: Vec<(u32, NonZeroU32)>,
 }
 
+impl crate::DynBindGroupLayout for BindGroupLayout {}
+
 #[derive(Debug)]
 pub struct PipelineLayout {
     raw: vk::PipelineLayout,
     binding_arrays: naga::back::spv::BindingMap,
 }
 
+impl crate::DynPipelineLayout for PipelineLayout {}
+
 #[derive(Debug)]
 pub struct BindGroup {
     set: gpu_descriptor::DescriptorSet<vk::DescriptorSet>,
 }
+
+impl crate::DynBindGroup for BindGroup {}
 
 /// Miscellaneous allocation recycling pool for `CommandAllocator`.
 #[derive(Default)]
@@ -711,7 +762,6 @@ impl Temp {
         self.marker.clear();
         self.buffer_barriers.clear();
         self.image_barriers.clear();
-        //see also - https://github.com/NotIntMan/inplace_it/issues/8
     }
 
     fn make_c_str(&mut self, name: &str) -> &CStr {
@@ -781,6 +831,8 @@ pub struct CommandBuffer {
     raw: vk::CommandBuffer,
 }
 
+impl crate::DynCommandBuffer for CommandBuffer {}
+
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum ShaderModule {
@@ -791,25 +843,35 @@ pub enum ShaderModule {
     },
 }
 
+impl crate::DynShaderModule for ShaderModule {}
+
 #[derive(Debug)]
 pub struct RenderPipeline {
     raw: vk::Pipeline,
 }
+
+impl crate::DynRenderPipeline for RenderPipeline {}
 
 #[derive(Debug)]
 pub struct ComputePipeline {
     raw: vk::Pipeline,
 }
 
+impl crate::DynComputePipeline for ComputePipeline {}
+
 #[derive(Debug)]
 pub struct PipelineCache {
     raw: vk::PipelineCache,
 }
 
+impl crate::DynPipelineCache for PipelineCache {}
+
 #[derive(Debug)]
 pub struct QuerySet {
     raw: vk::QueryPool,
 }
+
+impl crate::DynQuerySet for QuerySet {}
 
 /// The [`Api::Fence`] type for [`vulkan::Api`].
 ///
@@ -859,6 +921,8 @@ pub enum Fence {
         free: Vec<vk::Fence>,
     },
 }
+
+impl crate::DynFence for Fence {}
 
 impl Fence {
     /// Return the highest [`FenceValue`] among the signalled fences in `active`.
