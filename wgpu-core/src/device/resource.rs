@@ -2126,7 +2126,7 @@ impl Device {
         tlas.same_device(self)?;
 
         match decl.ty {
-            wgt::BindingType::AccelerationStructure => (),
+            wgt::BindingType::AccelerationStructure { .. } => (),
             _ => {
                 return Err(Error::WrongBindingType {
                     binding,
@@ -2281,8 +2281,6 @@ impl Device {
                     (res_index, num_bindings)
                 }
                 Br::AccelerationStructure(ref tlas) => {
-                    let tlas = self.create_tlas_binding(&mut used, binding, decl, tlas)?;
-
                     if let wgt::BindingType::AccelerationStructure {
                         vertex_return: true,
                     } = decl.ty
@@ -2291,9 +2289,11 @@ impl Device {
                             .flags
                             .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)
                         {
-                            return Err(Error::MissingVertexReturnFlag(id));
+                            return Err(Error::MissingVertexReturnFlag(tlas.error_ident()));
                         }
                     }
+
+                    let tlas = self.create_tlas_binding(&mut used, binding, decl, tlas)?;
 
                     let res_index = hal_tlas_s.len();
                     hal_tlas_s.push(tlas);

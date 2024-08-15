@@ -105,7 +105,6 @@ impl Device {
         self: &Arc<Self>,
         desc: &resource::TlasDescriptor,
     ) -> Result<Arc<resource::Tlas>, CreateTlasError> {
-
         if desc
             .flags
             .contains(wgt::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN)

@@ -35,7 +35,6 @@ mod query_set;
 mod queue_transfer;
 mod ray_tracing;
 mod render_pass_ownership;
-mod ray_tracing_use_after_free;
 mod resource_descriptor_accessor;
 mod resource_error;
 mod scissor_tests;

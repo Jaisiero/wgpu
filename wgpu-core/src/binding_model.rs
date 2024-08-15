@@ -192,9 +192,9 @@ pub enum CreateBindGroupError {
     #[error(transparent)]
     ResourceUsageCompatibility(#[from] ResourceUsageCompatibilityError),
     #[error("Tlas {0:?} is invalid or destroyed")]
-    InvalidTlas(TlasId),
+    InvalidTlas(ResourceErrorIdent),
     #[error("Tlas {0:?} is missing flag ALLOW_RAY_HIT_VERTEX_RETURN")]
-    MissingVertexReturnFlag(TlasId),
+    MissingVertexReturnFlag(ResourceErrorIdent),
 }
 
 #[derive(Clone, Debug, Error)]

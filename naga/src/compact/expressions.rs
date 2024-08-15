@@ -226,7 +226,9 @@ impl<'tracer> ExpressionTracer<'tracer> {
                 Ex::RayQueryVertexPositions {
                     query,
                     committed: _,
-                } => self.expressions_used.insert(query),
+                } => {
+                    self.expressions_used.insert(query);
+                }
             }
         }
     }
