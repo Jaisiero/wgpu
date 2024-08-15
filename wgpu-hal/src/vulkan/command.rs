@@ -460,7 +460,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         const CAPACITY_OUTER: usize = 8;
         const CAPACITY_INNER: usize = 1;
         let descriptor_count = descriptor_count as usize;
-        let iter = descriptors.into_iter();
+
         let ray_tracing_functions = self
             .device
             .extension_fns
@@ -497,7 +497,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
             [&[vk::AccelerationStructureBuildRangeInfoKHR]; CAPACITY_OUTER],
         >::with_capacity(descriptor_count);
 
-        for desc in iter {
+        for desc in descriptors {
             let (geometries, ranges) = match *desc.entries {
                 crate::AccelerationStructureEntries::Instances(ref instances) => {
                     let instance_data = vk::AccelerationStructureGeometryInstancesDataKHR::default(

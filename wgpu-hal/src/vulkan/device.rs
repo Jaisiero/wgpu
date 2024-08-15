@@ -2334,6 +2334,7 @@ impl crate::Device for super::Device {
         unsafe {
             let raw_buffer = self.shared.raw.create_buffer(&vk_buffer_info, None)?;
             let req = self.shared.raw.get_buffer_memory_requirements(raw_buffer);
+
             let block = self.mem_allocator.lock().alloc(
                 &*self.shared,
                 gpu_alloc::Request {
