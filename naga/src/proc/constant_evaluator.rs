@@ -886,7 +886,7 @@ impl<'a> ConstantEvaluator<'a> {
             Expression::ImageSample { .. }
             | Expression::ImageLoad { .. }
             | Expression::ImageQuery { .. } => Err(ConstantEvaluatorError::ImageExpression),
-            Expression::RayQueryProceedResult | Expression::RayQueryGetIntersection { .. } => {
+            Expression::RayQueryProceedResult | Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
                 Err(ConstantEvaluatorError::RayQueryExpression)
             }
             Expression::SubgroupBallotResult { .. } => {

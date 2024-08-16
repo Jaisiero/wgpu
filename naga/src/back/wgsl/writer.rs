@@ -182,7 +182,8 @@ impl<W: Write> Writer<W> {
                 | ShaderStage::RayGeneration
                 | ShaderStage::AnyHit
                 | ShaderStage::ClosestHit
-                | ShaderStage::Miss => vec![Attribute::Stage(ep.stage)],
+                | ShaderStage::Miss
+                | ShaderStage::Intersection => vec![Attribute::Stage(ep.stage)],
                 ShaderStage::Compute => vec![
                     Attribute::Stage(ShaderStage::Compute),
                     Attribute::WorkGroupSize(ep.workgroup_size),
@@ -224,6 +225,7 @@ impl<W: Write> Writer<W> {
                     ShaderStage::ClosestHit => "ClosestHitOutput",
                     ShaderStage::AnyHit => "AnyHitOutput",
                     ShaderStage::Miss => "MissOutput",
+                    ShaderStage::Intersection => "IntersectionOutput",
                 };
 
                 write!(self.out, "{name}")?;
@@ -346,10 +348,11 @@ impl<W: Write> Writer<W> {
                         ShaderStage::Vertex => "vertex",
                         ShaderStage::Fragment => "fragment",
                         ShaderStage::Compute => "compute",
-                        ShaderStage::RayGeneration => "ray-generation",
-                        ShaderStage::ClosestHit => "ray-closest-hit",
-                        ShaderStage::AnyHit => "ray-any-hit",
-                        ShaderStage::Miss => "ray-miss",
+                        ShaderStage::RayGeneration => "ray_gen",
+                        ShaderStage::ClosestHit => "ray_closest",
+                        ShaderStage::AnyHit => "ray_any",
+                        ShaderStage::Miss => "ray_miss",
+                        ShaderStage::Intersection => "intersection"
                     };
                     write!(self.out, "@{stage_str} ")?;
                 }
@@ -1828,7 +1831,7 @@ impl<W: Write> Writer<W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => unreachable!(),
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }

@@ -216,6 +216,7 @@ bitflags::bitflags! {
         const CLOSEST_HIT = 0x10;
         const ANY_HIT = 0x20;
         const MISS = 0x40;
+        const INTERSECTION = 0x80;
     }
 }
 

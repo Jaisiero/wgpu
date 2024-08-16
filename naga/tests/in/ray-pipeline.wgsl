@@ -44,3 +44,9 @@ fn miss(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>) {
     *colour = vec4<f32>();
     return;
 }
+
+@intersection
+fn intersect_return() {
+    let has_accepted = ReportIntersection(0.5, 5u, 0u);
+    return;
+}

@@ -433,6 +433,11 @@ impl super::Validator {
             } => {
                 handle.check_dep(query)?;
             }
+            crate::Expression::ReportIntersection { hit_t, hit_type, intersection, intersection_ty: _ } => {
+                handle.check_dep(hit_t)?;
+                handle.check_dep(hit_type)?;
+                handle.check_dep(intersection)?;
+            }
         }
         Ok(())
     }

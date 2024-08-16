@@ -4,7 +4,8 @@ Generating SPIR-V for ray query operations.
 
 use super::{Block, BlockContext, Instruction, LocalType, LookupType};
 use crate::arena::Handle;
-use crate::ShaderStage;
+use crate::{Expression, ShaderStage, TypeInner};
+use crate::proc::TypeResolution;
 
 impl<'w> BlockContext<'w> {
     pub(super) fn write_ray_query_function(
@@ -346,7 +347,7 @@ impl<'w> BlockContext<'w> {
                     ray_flags_id,
                     cull_mask_id,
                     self.get_index_constant(0),
-                    self.get_index_constant(0),
+                    self.get_index_constant(1),
                     self.get_index_constant(0),
                     ray_origin_id,
                     tmin_id,
@@ -358,5 +359,31 @@ impl<'w> BlockContext<'w> {
             }
         }
         Ok(())
+    }
+
+    pub(super) fn write_ray_report_intersect(
+        &mut self,
+        block: &mut Block,
+        hit_t: Handle<Expression>,
+        hit_type: Handle<Expression>,
+        intersection: Handle<Expression>,
+        intersection_ty: TypeInner,
+    ) -> Result<spirv::Word, super::Error> {
+        let id = self.gen_id();
+        let pointer_type_id = self.gen_id();
+        let ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(intersection_ty));
+        let instruction = Instruction::type_pointer(id, spirv::StorageClass::HitAttributeKHR, ty_id);
+        //let id = self.gen_id();
+        instruction.to_words(&mut self.writer.logical_layout.declarations);
+        Instruction::variable(id, pointer_type_id, spirv::StorageClass::HitAttributeKHR, None)
+            .to_words(&mut self.writer.logical_layout.declarations);
+        let hit_t_id = self.cached[hit_t];
+        let hit_type_id = self.cached[hit_type];
+        let intersection_id = self.cached[intersection];
+        block.body.push(Instruction::store(pointer_type_id, intersection_id, None));
+        let result_id = self.gen_id();
+        let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(crate::TypeInner::Scalar(crate::Scalar::BOOL)));
+        block.body.push(Instruction::report_intersection(result_ty_id, result_id, hit_t_id, hit_type_id));
+        Ok(result_id)
     }
 }

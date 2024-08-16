@@ -224,6 +224,11 @@ impl<'tracer> ExpressionTracer<'tracer> {
                 } => {
                     self.expressions_used.insert(query);
                 }
+                Ex::ReportIntersection { hit_t, hit_type, intersection, intersection_ty: _ } => {
+                    self.expressions_used.insert(hit_t);
+                    self.expressions_used.insert(hit_type);
+                    self.expressions_used.insert(intersection);
+                }
             }
         }
     }
@@ -388,6 +393,13 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
+            Ex::ReportIntersection { ref mut hit_t, ref mut hit_type, ref mut intersection, ref mut intersection_ty } => {
+                adjust(hit_t);
+                adjust(hit_type);
+                adjust(intersection);
+                //self.types.adjust(intersection_ty);
+            }
+
         }
     }
 

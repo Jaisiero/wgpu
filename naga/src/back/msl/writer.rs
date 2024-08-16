@@ -2209,6 +2209,7 @@ impl<W: Write> Writer<W> {
                 }
                 write!(self.out, "}}")?;
             }
+            crate::Expression::ReportIntersection { .. } => todo!(),
         }
         Ok(())
     }

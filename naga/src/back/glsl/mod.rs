@@ -1499,7 +1499,8 @@ impl<'a, W: Write> Writer<'a, W> {
             | ShaderStage::RayGeneration
             | ShaderStage::ClosestHit
             | ShaderStage::AnyHit
-            | ShaderStage::Miss => false,
+            | ShaderStage::Miss
+            | ShaderStage::Intersection => false,
         };
 
         // Write the I/O locations, if allowed
@@ -3856,7 +3857,7 @@ impl<'a, W: Write> Writer<'a, W> {
                 write!(self.out, ".length())")?
             }
             // not supported yet
-            Expression::RayQueryGetIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => unreachable!(),
         }
 
         Ok(())

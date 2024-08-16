@@ -29,6 +29,11 @@ pub enum ExpressionError {
     InvalidArrayType(Handle<crate::Expression>),
     #[error("Get intersection of {0:?} can't be done")]
     InvalidRayQueryType(Handle<crate::Expression>),
+    #[error("Report Intersection with hit t of {0:?} can't be done")]
+    InvalidHitTType(Handle<crate::Expression>),
+    #[error("Report Intersection with hit type of {0:?} can't be done")]
+    // there is no double spelling word here these are both intentional
+    InvalidHitTypeType(Handle<crate::Expression>),
     #[error("Splatting {0:?} can't be done")]
     InvalidSplatType(Handle<crate::Expression>),
     #[error("Swizzling {0:?} can't be done")]
@@ -1634,6 +1639,24 @@ impl super::Validator {
                     return Err(ExpressionError::InvalidRayQueryType(query));
                 }
             },
+            E::ReportIntersection { hit_t, hit_type, /* intersection can have any type */ .. } => {
+                match resolver[hit_t] {
+                    Ti::Scalar(crate::Scalar::F32) => {}
+                    ref other => {
+                        log::error!("Hit t of {:?}", other);
+                        return Err(ExpressionError::InvalidHitTType(hit_t));
+                    }
+                }
+                match resolver[hit_type] {
+                    Ti::Scalar(crate::Scalar::U32) => {}
+                    ref other => {
+                        log::error!("Hit type of {:?}", other);
+                        return Err(ExpressionError::InvalidHitTypeType(hit_t));
+                    }
+                }
+
+                ShaderStages::INTERSECTION
+            }
             E::SubgroupBallotResult | E::SubgroupOperationResult { .. } => self.subgroup_stages,
         };
         Ok(stages)

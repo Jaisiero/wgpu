@@ -896,6 +896,9 @@ impl<'a> ResolveContext<'a> {
                     .ok_or(ResolveError::MissingSpecialType)?;
                 TypeResolution::Handle(result)
             }
+            crate::Expression::ReportIntersection { .. } => {
+                TypeResolution::Value(crate::TypeInner::Scalar(crate::Scalar::BOOL))
+            }
             crate::Expression::SubgroupBallotResult => TypeResolution::Value(Ti::Vector {
                 scalar: crate::Scalar::U32,
                 size: crate::VectorSize::Quad,

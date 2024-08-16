@@ -222,7 +222,8 @@ impl VaryingContext<'_> {
                             | St::Miss
                             | St::ClosestHit
                             | St::AnyHit
-                            | St::RayGeneration => false,
+                            | St::RayGeneration
+                            | St::Intersection => false,
                         },
                         *ty_inner
                             == Ti::Vector {
@@ -237,7 +238,8 @@ impl VaryingContext<'_> {
                             | St::Miss
                             | St::ClosestHit
                             | St::AnyHit
-                            | St::RayGeneration => false,
+                            | St::RayGeneration
+                            | St::Intersection => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::I32),
                     ),
@@ -453,7 +455,8 @@ impl VaryingContext<'_> {
                     | crate::ShaderStage::RayGeneration
                     | crate::ShaderStage::ClosestHit
                     | crate::ShaderStage::AnyHit
-                    | crate::ShaderStage::Miss => false,
+                    | crate::ShaderStage::Miss
+                    | crate::ShaderStage::Intersection => false,
                 };
 
                 // It doesn't make sense to specify a sampling when `interpolation` is `Flat`, but
@@ -730,6 +733,7 @@ impl super::Validator {
                 crate::ShaderStage::AnyHit => ShaderStages::ANY_HIT,
                 crate::ShaderStage::ClosestHit => ShaderStages::CLOSEST_HIT,
                 crate::ShaderStage::Miss => ShaderStages::MISS,
+                crate::ShaderStage::Intersection => ShaderStages::INTERSECTION,
             };
 
             if !info.available_stages.contains(stage_bit) {

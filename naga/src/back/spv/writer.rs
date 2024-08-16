@@ -803,6 +803,7 @@ impl Writer {
             crate::ShaderStage::ClosestHit => spirv::ExecutionModel::ClosestHitKHR,
             crate::ShaderStage::AnyHit => spirv::ExecutionModel::AnyHitKHR,
             crate::ShaderStage::Miss => spirv::ExecutionModel::MissKHR,
+            crate::ShaderStage::Intersection => spirv::ExecutionModel::IntersectionKHR,
         };
         //self.check(exec_model.required_capabilities())?;
 
@@ -816,7 +817,6 @@ impl Writer {
 
     fn make_scalar(&mut self, id: Word, scalar: crate::Scalar) -> Instruction {
         use crate::ScalarKind as Sk;
-
         let bits = (scalar.width * BITS_PER_BYTE) as u32;
         match scalar.kind {
             Sk::Sint | Sk::Uint => {

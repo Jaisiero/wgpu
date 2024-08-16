@@ -811,6 +811,15 @@ impl super::Instruction {
         instruction
     }
 
+    pub(super) fn report_intersection(result_ty_id: Word, result_id: Word, hit_t_id: Word, hit_type_id: Word) -> Self {
+        let mut instruction = Self::new(Op::ReportIntersectionKHR);
+        instruction.set_result(result_id);
+        instruction.set_type(result_ty_id);
+        instruction.add_operand(hit_t_id);
+        instruction.add_operand(hit_type_id);
+        instruction
+    }
+
     //
     //  Conversion Instructions
     //

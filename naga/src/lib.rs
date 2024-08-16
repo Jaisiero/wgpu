@@ -364,6 +364,7 @@ pub enum ShaderStage {
     ClosestHit,
     AnyHit,
     Miss,
+    Intersection,
 }
 
 /// Addressing space of variables.
@@ -1696,6 +1697,13 @@ pub enum Expression {
     RayQueryGetIntersection {
         query: Handle<Expression>,
         committed: bool,
+    },
+    /// Report a intersection found by an intersection shader
+    ReportIntersection {
+        hit_t: Handle<Expression>,
+        hit_type: Handle<Expression>,
+        intersection: Handle<Expression>,
+        intersection_ty: TypeInner,
     },
     /// Result of a [`SubgroupBallot`] statement.
     ///

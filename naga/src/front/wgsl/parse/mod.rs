@@ -2232,6 +2232,9 @@ impl Parser {
                 ("ray_miss", name_span) => {
                     stage.set(ShaderStage::Miss, name_span)?;
                 }
+                ("intersection", name_span) => {
+                    stage.set(ShaderStage::Intersection, name_span)?;
+                }
                 ("workgroup_size", name_span) => {
                     lexer.expect(Token::Paren('('))?;
                     let mut new_workgroup_size = [None; 3];

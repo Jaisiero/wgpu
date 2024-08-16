@@ -1727,6 +1727,9 @@ impl<'w> BlockContext<'w> {
                 }
                 self.write_ray_query_get_intersection(query, block)
             }
+            crate::Expression::ReportIntersection { hit_t, hit_type, intersection, ref intersection_ty } => {
+                self.write_ray_report_intersect(block, hit_t, hit_type, intersection, intersection_ty.clone())?
+            }
         };
 
         self.cached[expr_handle] = id;

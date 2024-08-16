@@ -2424,6 +2424,22 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             );
                             return Ok(None);
                         }
+                        "ReportIntersection" => {
+                            let mut args = ctx.prepare_args(arguments, 3, span);
+                            let hit_t = self.expression(args.next()?, ctx)?;
+                            let hit_type = self.expression(args.next()?, ctx)?;
+                            let intersection = self.expression(args.next()?, ctx)?;
+                            args.finish()?;
+
+                            let intersection_ty = resolve_inner!(ctx, intersection.clone()).clone();
+
+                            crate::Expression::ReportIntersection {
+                                hit_t,
+                                hit_type,
+                                intersection,
+                                intersection_ty,
+                            }
+                        }
                         "RayDesc" => {
                             let ty = ctx.module.generate_ray_desc_type();
                             let handle = self.construct(
