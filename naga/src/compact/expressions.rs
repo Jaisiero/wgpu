@@ -392,7 +392,7 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
-            Ex::ReportIntersection { ref mut hit_t, ref mut hit_type, ref mut intersection, ref mut intersection_ty } => {
+            Ex::ReportIntersection { ref mut hit_t, ref mut hit_type, ref mut intersection, .. } => {
                 adjust(hit_t);
                 adjust(hit_type);
                 adjust(intersection);

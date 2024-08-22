@@ -320,7 +320,7 @@ impl VaryingContext<'_> {
                             == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ObjectRayOrigin => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Vector {
                             size: Vs::Tri,
@@ -328,7 +328,7 @@ impl VaryingContext<'_> {
                         },
                     ),
                     Bi::ObjectRayDirection => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Vector {
                             size: Vs::Tri,
@@ -336,12 +336,12 @@ impl VaryingContext<'_> {
                         },
                     ),
                     Bi::HitKind => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ObjectToWorld => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Matrix {
                             columns: Vs::Quad,
@@ -364,7 +364,7 @@ impl VaryingContext<'_> {
                             == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::RayOrigin => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Vector {
                             size: Vs::Tri,
@@ -372,7 +372,7 @@ impl VaryingContext<'_> {
                         },
                     ),
                     Bi::RayDirection => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Vector {
                             size: Vs::Tri,
@@ -380,12 +380,12 @@ impl VaryingContext<'_> {
                         },
                     ),
                     Bi::RayFlags => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss || self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ClosestRayT  => (
-                        todo!() && !self.output,
+                        (self.stage == St::Intersection) && !self.output,
                         *ty_inner
                             == Ti::Scalar(crate::Scalar::F32),
                     ),
