@@ -48,6 +48,14 @@ pub fn map_built_in(word: &str, span: Span) -> Result<crate::BuiltIn, Error<'_>>
         "payload" => crate::BuiltIn::Payload,
         "intersection" => crate::BuiltIn::Intersection,
         "ray_t" => crate::BuiltIn::RayT,
+        "object_ray_origin" => crate::BuiltIn::ObjectRayOrigin,
+        "object_ray_direction" => crate::BuiltIn::ObjectRayDirection,
+        "geometry_index" => crate::BuiltIn::GeometryIndex,
+        "hit_kind" => crate::BuiltIn::ObjectRayOrigin,
+        "object_to_world" => crate::BuiltIn::ObjectToWorld,
+        "world_to_object" => crate::BuiltIn::WorldToObject,
+        "ray_flags" => crate::BuiltIn::RayFlags,
+        "closest_t" => crate::BuiltIn::ClosestRayT,
         _ => return Err(Error::UnknownBuiltin(span)),
     })
 }
