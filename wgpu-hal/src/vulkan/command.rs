@@ -4,6 +4,7 @@ use arrayvec::ArrayVec;
 use ash::vk;
 
 use std::{mem, ops::Range, slice};
+use crate::{Api, ComputePassDescriptor};
 
 const ALLOCATION_GRANULARITY: u32 = 16;
 const DST_IMAGE_LAYOUT: vk::ImageLayout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
@@ -1140,6 +1141,99 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 .raw
                 .cmd_dispatch_indirect(self.active, buffer.raw, offset)
         }
+    }
+
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<super::QuerySet>) {
+        self.bind_point = vk::PipelineBindPoint::RAY_TRACING_KHR;
+        if let Some(label) = desc.label {
+            unsafe { self.begin_debug_marker(label) };
+            self.rpass_debug_marker_active = true;
+        }
+
+        if let Some(timestamp_writes) = desc.timestamp_writes.as_ref() {
+            if let Some(index) = timestamp_writes.beginning_of_pass_write_index {
+                unsafe {
+                    self.write_timestamp(timestamp_writes.query_set, index);
+                }
+            }
+            self.end_of_pass_timer_query = timestamp_writes
+                .end_of_pass_write_index
+                .map(|index| (timestamp_writes.query_set.raw, index));
+        }
+    }
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        self.write_pass_end_timestamp_if_requested();
+
+        if self.rpass_debug_marker_active {
+            unsafe { self.end_debug_marker() };
+            self.rpass_debug_marker_active = false
+        }
+    }
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &super::RayTracingPipeline) {
+        unsafe {
+            self.device.raw.cmd_bind_pipeline(
+                self.active,
+                vk::PipelineBindPoint::RAY_TRACING_KHR,
+                pipeline.raw,
+            )
+        };
+        self.sbt = Some([pipeline.ray_gen_sbt.clone(), pipeline.ray_miss_sbt.clone(), pipeline.ray_hit_sbt.clone()]);
+    }
+    unsafe fn trace_rays(&mut self, count: [u32; 3]) {
+        let ray_tracing_pipeline_functions = self
+            .device
+            .extension_fns
+            .ray_tracing_pipeline
+            .as_ref()
+            .expect("Feature `RAY_TRACING_PIPELINE` not enabled");
+        let sbt = self.sbt.as_ref().expect("Ray tracing pipeline not set");
+        unsafe {
+            ray_tracing_pipeline_functions
+                .ray_tracing_pipeline
+                .cmd_trace_rays(
+                    self.active,
+                    &sbt[0],
+                    &sbt[1],
+                    &sbt[2],
+                    // we don't have callable shaders
+                    &vk::StridedDeviceAddressRegionKHR::default(),
+                    count[0],
+                    count[1],
+                    count[2])
+        };
+    }
+    unsafe fn trace_rays_indirect(&mut self, buffer: &super::Buffer, offset: wgt::BufferAddress) {
+        let ray_tracing_pipeline_functions = self
+            .device
+            .extension_fns
+            .ray_tracing_pipeline
+            .as_ref()
+            .expect("Feature `RAY_TRACING_PIPELINE` not enabled");
+        let ray_tracing_functions = self
+            .device
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+
+        let sbt = self.sbt.as_ref().unwrap();
+        unsafe {
+            ray_tracing_pipeline_functions
+                .ray_tracing_pipeline
+                .cmd_trace_rays_indirect(
+                    self.active,
+                    &sbt[0],
+                    &sbt[1],
+                    &sbt[2],
+                    // we don't have callable shaders
+                    &vk::StridedDeviceAddressRegionKHR::default(),
+                    ray_tracing_functions
+                        .buffer_device_address
+                        .get_buffer_device_address(
+                            &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
+                        ) + offset,
+                )
+        };
     }
 }
 

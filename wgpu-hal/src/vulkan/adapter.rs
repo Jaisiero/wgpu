@@ -111,6 +111,8 @@ pub struct PhysicalDeviceFeatures {
 
     /// Features provided by `VK_EXT_subgroup_size_control`, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlFeatures<'static>>,
+
+    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR<'static>>
 }
 
 impl PhysicalDeviceFeatures {
@@ -447,6 +449,14 @@ impl PhysicalDeviceFeatures {
                 Some(
                     vk::PhysicalDeviceSubgroupSizeControlFeatures::default()
                         .subgroup_size_control(true),
+                )
+            } else {
+                None
+            },
+            ray_tracing_pipeline: if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
+                Some(
+                    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default()
+                        .ray_tracing_pipeline(true)
                 )
             } else {
                 None
@@ -826,6 +836,8 @@ pub struct PhysicalDeviceProperties {
     /// `VK_KHR_acceleration_structure` extension.
     acceleration_structure: Option<vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>>,
 
+    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>>,
+
     /// Additional `vk::PhysicalDevice` properties from the
     /// `VK_KHR_driver_properties` extension, promoted to Vulkan 1.2.
     driver: Option<vk::PhysicalDeviceDriverPropertiesKHR<'static>>,
@@ -1004,6 +1016,10 @@ impl PhysicalDeviceProperties {
             extensions.push(khr::shader_atomic_int64::NAME);
         }
 
+        if requested_features.contains(wgt::Features::RAY_TRACING_ACCELERATION_STRUCTURE) {
+            extensions.push(khr::ray_tracing_pipeline::NAME);
+        }
+
         extensions
     }
 
@@ -1127,6 +1143,9 @@ impl super::InstanceShared {
                 let supports_acceleration_structure =
                     capabilities.supports_extension(khr::acceleration_structure::NAME);
 
+                let supports_ray_tracing_pipeline =
+                    capabilities.supports_extension(khr::ray_tracing_pipeline::NAME);
+
                 let mut properties2 = vk::PhysicalDeviceProperties2KHR::default();
                 if supports_maintenance3 {
                     let next = capabilities
@@ -1146,6 +1165,13 @@ impl super::InstanceShared {
                     let next = capabilities
                         .acceleration_structure
                         .insert(vk::PhysicalDeviceAccelerationStructurePropertiesKHR::default());
+                    properties2 = properties2.push_next(next);
+                }
+
+                if supports_ray_tracing_pipeline {
+                    let next = capabilities
+                        .ray_tracing_pipeline
+                        .insert(vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default());
                     properties2 = properties2.push_next(next);
                 }
 
@@ -1668,6 +1694,17 @@ impl super::Adapter {
             None
         };
 
+        let ray_tracing_pipeline_fns = if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
+            Some(super::RayTracingPipelineDeviceExtensionFunctions {
+                ray_tracing_pipeline: khr::ray_tracing_pipeline::Device::new(
+                    &self.instance.raw,
+                    &raw_device,
+                )
+            })
+        } else {
+            None
+        };
+
         let naga_options = {
             use naga::back::spv;
 
@@ -1826,6 +1863,7 @@ impl super::Adapter {
                 draw_indirect_count: indirect_count_fn,
                 timeline_semaphore: timeline_semaphore_fn,
                 ray_tracing: ray_tracing_fns,
+                ray_tracing_pipeline: ray_tracing_pipeline_fns,
             },
             pipeline_cache_validation_key,
             vendor_id: self.phd_capabilities.properties.vendor_id,
@@ -1946,6 +1984,7 @@ impl super::Adapter {
             #[cfg(feature = "renderdoc")]
             render_doc: Default::default(),
             counters: Default::default(),
+            ray_tracing_pipeline_properties: self.phd_capabilities.ray_tracing_pipeline.clone(),
         };
 
         Ok(crate::OpenDevice { device, queue })

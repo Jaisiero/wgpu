@@ -1,4 +1,4 @@
-use super::conv;
+use super::{conv, Device};
 
 use arrayvec::ArrayVec;
 use ash::{khr, vk};
@@ -13,6 +13,7 @@ use std::{
     ptr,
     sync::Arc,
 };
+use wgt::math::align_to;
 
 impl super::DeviceShared {
     pub(super) unsafe fn set_object_name(&self, object: impl vk::Handle, name: &str) {
@@ -696,6 +697,47 @@ impl super::Device {
         }
     }
 
+    pub unsafe fn create_buffer_from_info(&self, vk_info: vk::BufferCreateInfo, label: crate::Label<'_>, alloc_usage: gpu_alloc::UsageFlags, alignment_mask: Option<vk::DeviceSize>) -> Result<super::Buffer, crate::DeviceError> {
+        let raw = unsafe {
+            self.shared
+                .raw
+                .create_buffer(&vk_info, None)
+                .map_err(super::map_host_device_oom_and_ioca_err)?
+        };
+        let req = unsafe { self.shared.raw.get_buffer_memory_requirements(raw) };
+        let alignment_mask = alignment_mask.unwrap_or(req.alignment - 1);
+        let block = unsafe {
+            self.mem_allocator.lock().alloc(
+                &*self.shared,
+                gpu_alloc::Request {
+                    size: req.size,
+                    align_mask: alignment_mask,
+                    usage: alloc_usage,
+                    memory_types: req.memory_type_bits & self.valid_ash_memory_types,
+                },
+            )?
+        };
+
+        unsafe {
+            self.shared
+                .raw
+                .bind_buffer_memory(raw, *block.memory(), block.offset())
+                .map_err(super::map_host_device_oom_and_ioca_err)?
+        };
+
+        if let Some(label) = label {
+            unsafe { self.shared.set_object_name(raw, label) };
+        }
+
+        self.counters.buffer_memory.add(block.size() as isize);
+        self.counters.buffers.add(1);
+
+        Ok(super::Buffer {
+            raw,
+            block: Some(Mutex::new(block)),
+        })
+    }
+
     fn create_shader_module_impl(
         &self,
         spv: &[u32],
@@ -871,14 +913,6 @@ impl crate::Device for super::Device {
             .usage(conv::map_buffer_usage(desc.usage))
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
-        let raw = unsafe {
-            self.shared
-                .raw
-                .create_buffer(&vk_info, None)
-                .map_err(super::map_host_device_oom_and_ioca_err)?
-        };
-        let req = unsafe { self.shared.raw.get_buffer_memory_requirements(raw) };
-
         let mut alloc_usage = if desc
             .usage
             .intersects(crate::BufferUses::MAP_READ | crate::BufferUses::MAP_WRITE)
@@ -906,41 +940,12 @@ impl crate::Device for super::Device {
             crate::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT
                 | crate::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
         ) {
-            16
+            Some(16 - 1)
         } else {
-            req.alignment
-        } - 1;
-
-        let block = unsafe {
-            self.mem_allocator.lock().alloc(
-                &*self.shared,
-                gpu_alloc::Request {
-                    size: req.size,
-                    align_mask: alignment_mask,
-                    usage: alloc_usage,
-                    memory_types: req.memory_type_bits & self.valid_ash_memory_types,
-                },
-            )?
+            None
         };
 
-        unsafe {
-            self.shared
-                .raw
-                .bind_buffer_memory(raw, *block.memory(), block.offset())
-                .map_err(super::map_host_device_oom_and_ioca_err)?
-        };
-
-        if let Some(label) = desc.label {
-            unsafe { self.shared.set_object_name(raw, label) };
-        }
-
-        self.counters.buffer_memory.add(block.size() as isize);
-        self.counters.buffers.add(1);
-
-        Ok(super::Buffer {
-            raw,
-            block: Some(Mutex::new(block)),
-        })
+        self.create_buffer_from_info(vk_info, desc.label, alloc_usage, alignment_mask)
     }
     unsafe fn destroy_buffer(&self, buffer: super::Buffer) {
         unsafe { self.shared.raw.destroy_buffer(buffer.raw, None) };
@@ -2064,6 +2069,193 @@ impl crate::Device for super::Device {
         unsafe { self.shared.raw.destroy_pipeline(pipeline.raw, None) };
 
         self.counters.compute_pipelines.sub(1);
+    }
+
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &crate::RayTracingPipelineDescriptor<
+            super::PipelineLayout,
+            super::ShaderModule,
+            super::PipelineCache,
+        >,
+    ) -> Result<super::RayTracingPipeline, crate::PipelineError> {
+        let ray_tracing_pipeline_functions = self
+            .shared
+            .extension_fns
+            .ray_tracing_pipeline
+            .as_ref()
+            .expect("Feature `RAY_TRACING_PIPELINE` not enabled");
+
+        let ray_tracing_functions = self
+            .shared
+            .extension_fns
+            .ray_tracing
+            .as_ref()
+            .expect("Feature `RAY_TRACING` not enabled");
+
+        let mut groups = Vec::with_capacity(desc.groups.len());
+        let mut stages = Vec::with_capacity(desc.groups.len());
+        let mut temp_modules = Vec::with_capacity(desc.groups.len());
+
+        // ray generation
+        let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default()
+            .closest_hit_shader(vk::SHADER_UNUSED_KHR)
+            .intersection_shader(vk::SHADER_UNUSED_KHR)
+            .any_hit_shader(vk::SHADER_UNUSED_KHR);
+        let ray_gen = self.compile_stage(
+            &desc.ray_gen_stage,
+            naga::ShaderStage::RayGeneration,
+            &desc.layout.binding_arrays,
+        )?;
+        vk_group = vk_group.general_shader(stages.len() as u32);
+        stages.push(ray_gen.create_info);
+        temp_modules.push(ray_gen.temp_raw_module);
+
+        // miss
+        let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default()
+            .closest_hit_shader(vk::SHADER_UNUSED_KHR)
+            .intersection_shader(vk::SHADER_UNUSED_KHR)
+            .any_hit_shader(vk::SHADER_UNUSED_KHR);
+        let ray_gen = self.compile_stage(
+            &desc.ray_gen_stage,
+            naga::ShaderStage::RayGeneration,
+            &desc.layout.binding_arrays,
+        )?;
+        vk_group = vk_group.general_shader(stages.len() as u32);
+        stages.push(ray_gen.create_info);
+        temp_modules.push(ray_gen.temp_raw_module);
+
+        let mut num_shaders = 0;
+
+        for group in desc.groups {
+            let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default().general_shader(vk::SHADER_UNUSED_KHR);
+            let closest = self.compile_stage(
+                &group.closest,
+                naga::ShaderStage::ClosestHit,
+                &desc.layout.binding_arrays,
+            )?;
+            vk_group = vk_group.closest_hit_shader(stages.len() as u32);
+            stages.push(closest.create_info);
+            temp_modules.push(closest.temp_raw_module);
+
+            let any = self.compile_stage(
+                &group.any,
+                naga::ShaderStage::AnyHit,
+                &desc.layout.binding_arrays,
+            )?;
+            vk_group = vk_group.any_hit_shader(stages.len() as u32);
+            stages.push(any.create_info);
+            temp_modules.push(any.temp_raw_module);
+
+            num_shaders += 2;
+
+            if let Some(intersection) = &group.intersection {
+                debug_assert_eq!(group.ty, crate::RayTracingGroupType::Procedural);
+                let intersection = self.compile_stage(
+                    &intersection,
+                    naga::ShaderStage::Intersection,
+                    &desc.layout.binding_arrays,
+                )?;
+                vk_group = vk_group.any_hit_shader(stages.len() as u32);
+                stages.push(intersection.create_info);
+                temp_modules.push(intersection.temp_raw_module);
+                num_shaders += 1;
+            } else {
+                debug_assert_eq!(group.ty, crate::RayTracingGroupType::Triangle);
+                vk_group = vk_group.intersection_shader(vk::SHADER_UNUSED_KHR);
+            }
+
+            vk_group = vk_group.ty(match group.ty {
+                crate::RayTracingGroupType::Triangle => vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
+                crate::RayTracingGroupType::Procedural => vk::RayTracingShaderGroupTypeKHR::PROCEDURAL_HIT_GROUP,
+            });
+
+            groups.push(vk_group);
+        }
+
+        let rt_properties = self.ray_tracing_pipeline_properties.as_ref().unwrap();
+        let handle_size = align_to(rt_properties.shader_group_handle_size, rt_properties.shader_group_handle_alignment);
+        let mut ray_gen_sbt =
+            vk::StridedDeviceAddressRegionKHR::default()
+                .stride(align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize)
+                .size(align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize);
+        let mut ray_miss_sbt =
+            vk::StridedDeviceAddressRegionKHR::default()
+                .stride(handle_size as vk::DeviceSize)
+                .size(handle_size as vk::DeviceSize);
+        let mut ray_hit_sbt =
+            vk::StridedDeviceAddressRegionKHR::default()
+                .stride(handle_size as vk::DeviceSize)
+                .size(handle_size as vk::DeviceSize * num_shaders);
+        let buffer_size = ray_gen_sbt.size + ray_miss_sbt.size + ray_hit_sbt.size;
+
+        let vk_infos = [{
+            vk::RayTracingPipelineCreateInfoKHR::default()
+                .groups(&groups)
+                .stages(&stages)
+                .layout(desc.layout.raw)
+                .max_pipeline_ray_recursion_depth(desc.max_recursion_depth)
+        }];
+
+        let pipeline_cache = desc
+            .cache
+            .map(|it| it.raw)
+            .unwrap_or(vk::PipelineCache::null());
+
+        let mut raw_vec = {
+            profiling::scope!("vkCreateComputePipelines");
+            unsafe {
+                ray_tracing_pipeline_functions
+                    .ray_tracing_pipeline
+                    .create_ray_tracing_pipelines(vk::DeferredOperationKHR::null(), pipeline_cache, &vk_infos, None)
+                    .map_err(|(_, e)| super::map_pipeline_err(e))
+            }?
+        };
+
+        let raw = raw_vec.pop().unwrap();
+        if let Some(label) = desc.label {
+            unsafe { self.shared.set_object_name(raw, label) };
+        }
+
+        let bytes = ray_tracing_pipeline_functions.ray_tracing_pipeline.get_ray_tracing_shader_group_handles(raw, 0, num_shaders as u32, buffer_size).map_err(|e| super::map_host_device_oom_err(e))?;
+
+        for temp_raw_module in temp_modules {
+            if let Some(raw_module) = temp_raw_module {
+                unsafe { self.shared.raw.destroy_shader_module(raw_module, None) };
+            }
+        }
+
+        self.counters.ray_tracing_pipelines.add(1);
+        let buffer = self.create_buffer_from_info(
+            vk::BufferCreateInfo::default()
+                .usage(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
+                .size(buffer_size),
+            None,
+            gpu_alloc::UsageFlags::UPLOAD,
+            None,
+        )?;
+        let mapping = self.map_buffer(&buffer, 0..buffer_size)?;
+        debug_assert!(mapping.is_coherent);
+        ptr::copy(bytes.as_ptr(), mapping.ptr.as_ptr(), bytes.len());
+        self.unmap_buffer(&buffer);
+        let buf_address = ray_tracing_functions
+            .buffer_device_address
+            .get_buffer_device_address(
+                &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
+            );
+        ray_gen_sbt = ray_gen_sbt.device_address(buf_address);
+        ray_miss_sbt = ray_miss_sbt.device_address(buf_address + ray_gen_sbt.size);
+        ray_hit_sbt = ray_hit_sbt.device_address(buf_address + ray_gen_sbt.size + ray_miss_sbt.size);
+        Ok(super::RayTracingPipeline { raw, buffer, ray_gen_sbt, ray_miss_sbt, ray_hit_sbt })
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {
+        unsafe {
+            self.shared.raw.destroy_pipeline(pipeline.raw, None);
+            self.destroy_buffer(pipeline.buffer);
+        };
+
+        self.counters.ray_tracing_pipelines.sub(1);
     }
 
     unsafe fn create_pipeline_cache(

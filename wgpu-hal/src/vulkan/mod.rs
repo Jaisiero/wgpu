@@ -76,6 +76,7 @@ impl crate::Api for Api {
     type ShaderModule = ShaderModule;
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
+    type RayTracingPipeline = RayTracingPipeline;
 }
 
 crate::impl_dyn_resource!(
@@ -95,6 +96,7 @@ crate::impl_dyn_resource!(
     QuerySet,
     Queue,
     RenderPipeline,
+    RayTracingPipeline,
     Sampler,
     ShaderModule,
     Surface,
@@ -421,11 +423,16 @@ struct DeviceExtensionFunctions {
     draw_indirect_count: Option<khr::draw_indirect_count::Device>,
     timeline_semaphore: Option<ExtensionFn<khr::timeline_semaphore::Device>>,
     ray_tracing: Option<RayTracingDeviceExtensionFunctions>,
+    ray_tracing_pipeline: Option<RayTracingPipelineDeviceExtensionFunctions>,
 }
 
 struct RayTracingDeviceExtensionFunctions {
     acceleration_structure: khr::acceleration_structure::Device,
     buffer_device_address: khr::buffer_device_address::Device,
+}
+
+struct RayTracingPipelineDeviceExtensionFunctions {
+    ray_tracing_pipeline: khr::ray_tracing_pipeline::Device,
 }
 
 /// Set of internal capabilities, which don't show up in the exposed
@@ -573,6 +580,7 @@ pub struct Device {
     #[cfg(feature = "renderdoc")]
     render_doc: crate::auxil::renderdoc::RenderDoc,
     counters: wgt::HalCounters,
+    ray_tracing_pipeline_properties: Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>>
 }
 
 /// Semaphores for forcing queue submissions to run in order.
@@ -807,6 +815,8 @@ pub struct CommandEncoder {
     /// If set, the end of the next render/compute pass will write a timestamp at
     /// the given pool & location.
     end_of_pass_timer_query: Option<(vk::QueryPool, u32)>,
+
+    sbt: Option<[StridedDeviceAddressRegionKHR; 3]>
 }
 
 impl CommandEncoder {
@@ -855,6 +865,16 @@ impl crate::DynRenderPipeline for RenderPipeline {}
 #[derive(Debug)]
 pub struct ComputePipeline {
     raw: vk::Pipeline,
+}
+
+#[derive(Debug)]
+pub struct RayTracingPipeline {
+    raw: vk::Pipeline,
+    // the buffer for the shader binding tables
+    buffer: Buffer,
+    ray_gen_sbt: vk::StridedDeviceAddressRegionKHR,
+    ray_miss_sbt: vk::StridedDeviceAddressRegionKHR,
+    ray_hit_sbt: vk::StridedDeviceAddressRegionKHR,
 }
 
 impl crate::DynComputePipeline for ComputePipeline {}

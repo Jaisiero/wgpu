@@ -444,6 +444,7 @@ pub trait Api: Clone + fmt::Debug + Sized {
     type ShaderModule: DynShaderModule;
     type RenderPipeline: DynRenderPipeline;
     type ComputePipeline: DynComputePipeline;
+    type RayTracingPipeline: DynRayTracingPipeline;
     type PipelineCache: DynPipelineCache;
 
     type AccelerationStructure: DynAccelerationStructure + 'static;
@@ -849,6 +850,17 @@ pub trait Device: WasmNotSendSync {
         >,
     ) -> Result<<Self::A as Api>::ComputePipeline, PipelineError>;
     unsafe fn destroy_compute_pipeline(&self, pipeline: <Self::A as Api>::ComputePipeline);
+
+    #[allow(clippy::type_complexity)]
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &RayTracingPipelineDescriptor<
+            <Self::A as Api>::PipelineLayout,
+            <Self::A as Api>::ShaderModule,
+            <Self::A as Api>::PipelineCache,
+        >,
+    ) -> Result<<Self::A as Api>::RayTracingPipeline, PipelineError>;
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: <Self::A as Api>::RayTracingPipeline);
 
     unsafe fn create_pipeline_cache(
         &self,
@@ -1337,6 +1349,23 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
 
     unsafe fn dispatch(&mut self, count: [u32; 3]);
     unsafe fn dispatch_indirect(
+        &mut self,
+        buffer: &<Self::A as Api>::Buffer,
+        offset: wgt::BufferAddress,
+    );
+
+    // Begins a ray tracing pass, clears all active bindings
+
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        desc: &RayTracingPassDescriptor<<Self::A as Api>::QuerySet>,
+    );
+    unsafe fn end_ray_tracing_pass(&mut self);
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &<Self::A as Api>::RayTracingPipeline);
+
+    unsafe fn trace_rays(&mut self, count: [u32; 3]);
+    unsafe fn trace_rays_indirect(
         &mut self,
         buffer: &<Self::A as Api>::Buffer,
         offset: wgt::BufferAddress,
@@ -1952,6 +1981,43 @@ pub struct ComputePipelineDescriptor<
     pub cache: Option<&'a Pc>,
 }
 
+/// Describes a ray tracing pipeline.
+#[derive(Clone, Debug)]
+pub struct RayTracingPipelineDescriptor<
+    'a,
+    Pl: DynPipelineLayout + ?Sized,
+    M: DynShaderModule + ?Sized,
+    Pc: DynPipelineCache + ?Sized,
+> {
+    pub label: Label<'a>,
+    /// The layout of bind groups for this pipeline.
+    pub layout: &'a Pl,
+    /// The compiled ray gen stage and its entry point.
+    pub ray_gen_stage: ProgrammableStage<'a, M>,
+    pub groups: &'a [RayTracingGroup<'a, M>],
+    /// The compiled miss stage and its entry point.
+    pub miss_stage: ProgrammableStage<'a, M>,
+    /// The cache which will be used and filled when compiling this pipeline
+    pub cache: Option<&'a Pc>,
+    /// The maximum size the ray payload can be
+    pub max_payload_size: wgt::BufferSize,
+    pub max_recursion_depth: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct RayTracingGroup<'a, M: DynShaderModule + ?Sized> {
+    closest: ProgrammableStage<'a, M>,
+    any: ProgrammableStage<'a, M>,
+    intersection: Option<ProgrammableStage<'a, M>>,
+    ty: RayTracingGroupType,
+}
+
+#[derive(Clone, Debug)]
+pub enum RayTracingGroupType {
+    Triangle,
+    Procedural,
+}
+
 pub struct PipelineCacheDescriptor<'a> {
     pub label: Label<'a>,
     pub data: Option<&'a [u8]>,
@@ -2129,6 +2195,8 @@ pub struct ComputePassDescriptor<'a, Q: DynQuerySet + ?Sized> {
     pub timestamp_writes: Option<PassTimestampWrites<'a, Q>>,
 }
 
+pub type RayTracingPassDescriptor<'a, Q> = ComputePassDescriptor<'a, Q>;
+
 /// Stores the text of any validation errors that have occurred since
 /// the last call to `get_and_reset`.
 ///
@@ -2288,6 +2356,7 @@ pub struct AccelerationStructureTriangleTransform<'a, B: DynBuffer + ?Sized> {
 
 pub use wgt::AccelerationStructureFlags as AccelerationStructureBuildFlags;
 pub use wgt::AccelerationStructureGeometryFlags;
+use crate::dynamic::DynRayTracingPipeline;
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
