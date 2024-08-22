@@ -175,7 +175,8 @@ impl super::Device {
             naga::ShaderStage::RayGeneration
             | naga::ShaderStage::ClosestHit
             | naga::ShaderStage::AnyHit
-            | naga::ShaderStage::Miss => {
+            | naga::ShaderStage::Miss
+            | naga::ShaderStage::Intersection => {
                 unreachable!("ray-tracing is not supported")
             }
         };
