@@ -240,6 +240,14 @@ impl super::Validator {
         }
     }
 
+    const fn require_any_type_capability(&self, capability: Capabilities) -> Result<(), TypeError> {
+        if self.capabilities.intersects(capability) {
+            Ok(())
+        } else {
+            Err(TypeError::MissingCapability(capability))
+        }
+    }
+
     pub(super) const fn check_width(&self, scalar: crate::Scalar) -> Result<(), WidthError> {
         let good = match scalar.kind {
             crate::ScalarKind::Bool => scalar.width == crate::BOOL_WIDTH,
@@ -653,7 +661,7 @@ impl super::Validator {
             }
             Ti::Sampler { .. } => TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE),
             Ti::AccelerationStructure => {
-                self.require_type_capability(Capabilities::RAY_QUERY)?;
+                self.require_any_type_capability(Capabilities::RAY_QUERY | Capabilities::RAY_TRACING)?;
                 TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE)
             }
             Ti::RayQuery => {
