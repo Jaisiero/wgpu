@@ -1,4 +1,4 @@
-use super::{conv, Device};
+use super::conv;
 
 use arrayvec::ArrayVec;
 use ash::{khr, vk};
@@ -945,7 +945,7 @@ impl crate::Device for super::Device {
             None
         };
 
-        self.create_buffer_from_info(vk_info, desc.label, alloc_usage, alignment_mask)
+        unsafe { self.create_buffer_from_info(vk_info, desc.label, alloc_usage, alignment_mask) }
     }
     unsafe fn destroy_buffer(&self, buffer: super::Buffer) {
         unsafe { self.shared.raw.destroy_buffer(buffer.raw, None) };
@@ -1281,6 +1281,7 @@ impl crate::Device for super::Device {
             discarded: Vec::new(),
             rpass_debug_marker_active: false,
             end_of_pass_timer_query: None,
+            sbt: None,
         })
     }
     unsafe fn destroy_command_encoder(&self, cmd_encoder: super::CommandEncoder) {
@@ -2108,6 +2109,7 @@ impl crate::Device for super::Device {
             &desc.layout.binding_arrays,
         )?;
         vk_group = vk_group.general_shader(stages.len() as u32);
+        groups.push(vk_group);
         stages.push(ray_gen.create_info);
         temp_modules.push(ray_gen.temp_raw_module);
 
@@ -2122,6 +2124,7 @@ impl crate::Device for super::Device {
             &desc.layout.binding_arrays,
         )?;
         vk_group = vk_group.general_shader(stages.len() as u32);
+        groups.push(vk_group);
         stages.push(ray_gen.create_info);
         temp_modules.push(ray_gen.temp_raw_module);
 
@@ -2217,7 +2220,7 @@ impl crate::Device for super::Device {
             unsafe { self.shared.set_object_name(raw, label) };
         }
 
-        let bytes = ray_tracing_pipeline_functions.ray_tracing_pipeline.get_ray_tracing_shader_group_handles(raw, 0, num_shaders as u32, buffer_size).map_err(|e| super::map_host_device_oom_err(e))?;
+        let bytes = unsafe { ray_tracing_pipeline_functions.ray_tracing_pipeline.get_ray_tracing_shader_group_handles(raw, 0, num_shaders as u32, buffer_size as usize) }.map_err(|e| super::map_host_device_oom_err(e))?;
 
         for temp_raw_module in temp_modules {
             if let Some(raw_module) = temp_raw_module {
@@ -2226,23 +2229,27 @@ impl crate::Device for super::Device {
         }
 
         self.counters.ray_tracing_pipelines.add(1);
-        let buffer = self.create_buffer_from_info(
-            vk::BufferCreateInfo::default()
-                .usage(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
-                .size(buffer_size),
-            None,
-            gpu_alloc::UsageFlags::UPLOAD,
-            None,
-        )?;
-        let mapping = self.map_buffer(&buffer, 0..buffer_size)?;
+        let buffer = unsafe {
+            self.create_buffer_from_info(
+                vk::BufferCreateInfo::default()
+                    .usage(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
+                    .size(buffer_size),
+                None,
+                gpu_alloc::UsageFlags::UPLOAD,
+                None,
+            )?
+        };
+        let mapping = unsafe { self.map_buffer(&buffer, 0..buffer_size)? };
         debug_assert!(mapping.is_coherent);
-        ptr::copy(bytes.as_ptr(), mapping.ptr.as_ptr(), bytes.len());
-        self.unmap_buffer(&buffer);
-        let buf_address = ray_tracing_functions
-            .buffer_device_address
-            .get_buffer_device_address(
-                &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
-            );
+        unsafe { ptr::copy(bytes.as_ptr(), mapping.ptr.as_ptr(), bytes.len()) };
+        unsafe { self.unmap_buffer(&buffer) };
+        let buf_address = unsafe {
+            ray_tracing_functions
+                .buffer_device_address
+                .get_buffer_device_address(
+                    &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
+                )
+        };
         ray_gen_sbt = ray_gen_sbt.device_address(buf_address);
         ray_miss_sbt = ray_miss_sbt.device_address(buf_address + ray_gen_sbt.size);
         ray_hit_sbt = ray_hit_sbt.device_address(buf_address + ray_gen_sbt.size + ray_miss_sbt.size);

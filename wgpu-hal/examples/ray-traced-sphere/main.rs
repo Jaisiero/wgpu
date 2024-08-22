@@ -195,7 +195,7 @@ struct Example<A: hal::Api> {
     context_index: usize,
     extent: [u32; 2],
     start: Instant,
-    pipeline: A::ComputePipeline,
+    pipeline: A::RayTracingPipeline,
     bind_group: A::BindGroup,
     bgl: A::BindGroupLayout,
     shader_module: A::ShaderModule,
@@ -376,13 +376,44 @@ impl<A: hal::Api> Example<A> {
             device.create_ray_tracing_pipeline(&hal::RayTracingPipelineDescriptor {
                 label: Some("pipeline"),
                 layout: &pipeline_layout,
-                stage: hal::ProgrammableStage {
+                ray_gen_stage: hal::ProgrammableStage {
                     module: &shader_module,
-                    entry_point: "main",
+                    entry_point: "ray_gen",
+                    constants: &Default::default(),
+                    zero_initialize_workgroup_memory: true,
+                },
+                groups: &[
+                    hal::RayTracingGroup {
+                        closest: hal::ProgrammableStage {
+                            module: &shader_module,
+                            entry_point: "closest_hit",
+                            constants: &Default::default(),
+                            zero_initialize_workgroup_memory: true,
+                        },
+                        any: hal::ProgrammableStage {
+                            module: &shader_module,
+                            entry_point: "any_hit",
+                            constants: &Default::default(),
+                            zero_initialize_workgroup_memory: true,
+                        },
+                        intersection: Some(hal::ProgrammableStage {
+                            module: &shader_module,
+                            entry_point: "intersect_sphere",
+                            constants: &Default::default(),
+                            zero_initialize_workgroup_memory: true,
+                        }),
+                        ty: hal::RayTracingGroupType::Procedural,
+                    },
+                ],
+                miss_stage: hal::ProgrammableStage {
+                    module: &shader_module,
+                    entry_point: "miss",
                     constants: &Default::default(),
                     zero_initialize_workgroup_memory: true,
                 },
                 cache: None,
+                max_payload_size: wgt::BufferSize::new(16).unwrap(),
+                max_recursion_depth: 2,
             })
         }
         .unwrap();
@@ -965,8 +996,7 @@ impl<A: hal::Api> Example<A> {
             self.device.destroy_bind_group(self.bind_group);
             self.device.destroy_buffer(self.scratch_buffer);
             self.device.destroy_buffer(self.instances_buffer);
-            self.device.destroy_buffer(self.indices_buffer);
-            self.device.destroy_buffer(self.vertices_buffer);
+            self.device.destroy_buffer(self.aabb_buffer);
             self.device.destroy_buffer(self.uniform_buffer);
             self.device.destroy_acceleration_structure(self.tlas);
             self.device.destroy_acceleration_structure(self.blas);

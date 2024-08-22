@@ -1329,6 +1329,13 @@ impl super::InstanceShared {
                 features2 = features2.push_next(next);
             }
 
+            if capabilities.supports_extension(khr::ray_tracing_pipeline::NAME) {
+                let next = features
+                    .ray_tracing_pipeline
+                    .insert(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default());
+                features2 = features2.push_next(next);
+            }
+
             unsafe { get_device_properties.get_physical_device_features2(phd, &mut features2) };
             features2.features
         } else {

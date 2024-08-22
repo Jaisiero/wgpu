@@ -38,6 +38,7 @@ impl crate::Api for Api {
     type ShaderModule = Resource;
     type RenderPipeline = Resource;
     type ComputePipeline = Resource;
+    type RayTracingPipeline = Resource;
 }
 
 crate::impl_dyn_resource!(Context, Encoder, Resource);
@@ -53,6 +54,7 @@ impl crate::DynPipelineCache for Resource {}
 impl crate::DynPipelineLayout for Resource {}
 impl crate::DynQuerySet for Resource {}
 impl crate::DynRenderPipeline for Resource {}
+impl crate::DynRayTracingPipeline for Resource {}
 impl crate::DynSampler for Resource {}
 impl crate::DynShaderModule for Resource {}
 impl crate::DynSurfaceTexture for Resource {}
@@ -248,6 +250,13 @@ impl crate::Device for Context {
         Ok(Resource)
     }
     unsafe fn destroy_compute_pipeline(&self, pipeline: Resource) {}
+
+    unsafe fn create_ray_tracing_pipeline(&self, desc: &crate::RayTracingPipelineDescriptor<Resource, Resource, Resource>) -> Result<Resource, crate::PipelineError> {
+        Ok(Resource)
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: Resource) {}
+
     unsafe fn create_pipeline_cache(
         &self,
         desc: &crate::PipelineCacheDescriptor<'_>,
@@ -502,5 +511,20 @@ impl crate::CommandEncoder for Encoder {
         &mut self,
         _barriers: crate::AccelerationStructureBarrier,
     ) {
+    }
+
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<Resource>) {
+    }
+
+    unsafe fn end_ray_tracing_pass(&mut self) {
+    }
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &Resource) {
+    }
+
+    unsafe fn trace_rays(&mut self, count: [u32; 3]) {
+    }
+
+    unsafe fn trace_rays_indirect(&mut self, buffer: &Resource, offset: wgt::BufferAddress) {
     }
 }

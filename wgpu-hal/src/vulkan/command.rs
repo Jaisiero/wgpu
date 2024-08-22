@@ -4,7 +4,6 @@ use arrayvec::ArrayVec;
 use ash::vk;
 
 use std::{mem, ops::Range, slice};
-use crate::{Api, ComputePassDescriptor};
 
 const ALLOCATION_GRANULARITY: u32 = 16;
 const DST_IMAGE_LAYOUT: vk::ImageLayout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;

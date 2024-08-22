@@ -58,3 +58,6 @@ fn closest_hit(@builtin(payload) colour: ptr<ray_tracing, vec3<f32>>, @builtin(i
 
 @ray_any
 fn any_hit(@builtin(payload) colour: ptr<ray_tracing, vec3<f32>>, @builtin(intersection) intersection: u32, @builtin(ray_t) t: f32) {}
+
+@ray_miss
+fn miss(@builtin(payload) colour: ptr<ray_tracing, vec3<f32>>) {}

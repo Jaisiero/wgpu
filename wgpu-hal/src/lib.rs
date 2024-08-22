@@ -2006,13 +2006,13 @@ pub struct RayTracingPipelineDescriptor<
 
 #[derive(Clone, Debug)]
 pub struct RayTracingGroup<'a, M: DynShaderModule + ?Sized> {
-    closest: ProgrammableStage<'a, M>,
-    any: ProgrammableStage<'a, M>,
-    intersection: Option<ProgrammableStage<'a, M>>,
-    ty: RayTracingGroupType,
+    pub closest: ProgrammableStage<'a, M>,
+    pub any: ProgrammableStage<'a, M>,
+    pub intersection: Option<ProgrammableStage<'a, M>>,
+    pub ty: RayTracingGroupType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RayTracingGroupType {
     Triangle,
     Procedural,

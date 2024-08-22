@@ -816,7 +816,7 @@ pub struct CommandEncoder {
     /// the given pool & location.
     end_of_pass_timer_query: Option<(vk::QueryPool, u32)>,
 
-    sbt: Option<[StridedDeviceAddressRegionKHR; 3]>
+    sbt: Option<[vk::StridedDeviceAddressRegionKHR; 3]>
 }
 
 impl CommandEncoder {
@@ -867,6 +867,8 @@ pub struct ComputePipeline {
     raw: vk::Pipeline,
 }
 
+impl crate::DynComputePipeline for ComputePipeline {}
+
 #[derive(Debug)]
 pub struct RayTracingPipeline {
     raw: vk::Pipeline,
@@ -877,7 +879,7 @@ pub struct RayTracingPipeline {
     ray_hit_sbt: vk::StridedDeviceAddressRegionKHR,
 }
 
-impl crate::DynComputePipeline for ComputePipeline {}
+impl crate::DynRayTracingPipeline for RayTracingPipeline {}
 
 #[derive(Debug)]
 pub struct PipelineCache {
