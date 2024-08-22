@@ -1195,7 +1195,7 @@ impl<'a, W: Write> Writer<'a, W> {
             crate::AddressSpace::Function => unreachable!(),
             // Textures and samplers are handled directly in `Writer::write`.
             crate::AddressSpace::Handle => unreachable!(),
-            crate::AddressSpace::RayTracing => todo!()
+            crate::AddressSpace::RayTracing => todo!(),
         }
 
         Ok(())
@@ -3924,7 +3924,9 @@ impl<'a, W: Write> Writer<'a, W> {
                 write!(self.out, ".length())")?
             }
             // not supported yet
-            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
+                unreachable!()
+            }
         }
 
         Ok(())
@@ -4752,7 +4754,20 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         // raytracing
         Bi::LaunchId => "gl_LaunchIDEXT",
         Bi::LaunchSize => "gl_LaunchSizeEXT",
-        Bi::Payload | Bi::Intersection | Bi::RayT | Bi::GeometryIndex | Bi::ObjectRayDirection | Bi::ObjectRayOrigin | Bi::HitKind | Bi::ObjectToWorld | Bi::WorldToObject | Bi::InstanceCustomIndex | Bi::RayOrigin | Bi::RayDirection | Bi::RayFlags | Bi::ClosestRayT => unreachable!(),
+        Bi::Payload
+        | Bi::Intersection
+        | Bi::RayT
+        | Bi::GeometryIndex
+        | Bi::ObjectRayDirection
+        | Bi::ObjectRayOrigin
+        | Bi::HitKind
+        | Bi::ObjectToWorld
+        | Bi::WorldToObject
+        | Bi::InstanceCustomIndex
+        | Bi::RayOrigin
+        | Bi::RayDirection
+        | Bi::RayFlags
+        | Bi::ClosestRayT => unreachable!(),
     }
 }
 

@@ -4,8 +4,8 @@ Generating SPIR-V for ray query operations.
 
 use super::{Block, BlockContext, Instruction, LocalType, LookupType};
 use crate::arena::Handle;
-use crate::{ShaderStage, TypeInner};
 use crate::proc::TypeResolution;
+use crate::{ShaderStage, TypeInner};
 
 impl<'w> BlockContext<'w> {
     pub(super) fn write_ray_query_function(
@@ -270,7 +270,11 @@ impl<'w> BlockContext<'w> {
     ) -> Result<(), super::Error> {
         let acc_struct_id = self.get_handle_id(acceleration_structure);
         match *function {
-            crate::RayTracingFunction::TraceRay { descriptor, payload, payload_ty } => {
+            crate::RayTracingFunction::TraceRay {
+                descriptor,
+                payload,
+                payload_ty,
+            } => {
                 let varying_id = self.writer.write_varying(
                     self.ir_module,
                     stage,
@@ -341,7 +345,9 @@ impl<'w> BlockContext<'w> {
                     desc_id,
                     &[5],
                 ));
-                block.body.push(Instruction::copy(varying_id, payload_id, None));
+                block
+                    .body
+                    .push(Instruction::copy(varying_id, payload_id, None));
                 block.body.push(Instruction::trace_ray(
                     acc_struct_id,
                     ray_flags_id,
@@ -355,7 +361,9 @@ impl<'w> BlockContext<'w> {
                     tmax_id,
                     varying_id,
                 ));
-                block.body.push(Instruction::copy(payload_id, varying_id, None));
+                block
+                    .body
+                    .push(Instruction::copy(payload_id, varying_id, None));
             }
         }
         Ok(())
@@ -371,19 +379,38 @@ impl<'w> BlockContext<'w> {
     ) -> Result<spirv::Word, super::Error> {
         let id = self.gen_id();
         let pointer_type_id = self.gen_id();
-        let ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(intersection_ty));
-        let instruction = Instruction::type_pointer(id, spirv::StorageClass::HitAttributeKHR, ty_id);
+        let ty_id = self
+            .writer
+            .get_expression_type_id(&TypeResolution::Value(intersection_ty));
+        let instruction =
+            Instruction::type_pointer(id, spirv::StorageClass::HitAttributeKHR, ty_id);
         //let id = self.gen_id();
         instruction.to_words(&mut self.writer.logical_layout.declarations);
-        Instruction::variable(id, pointer_type_id, spirv::StorageClass::HitAttributeKHR, None)
-            .to_words(&mut self.writer.logical_layout.declarations);
+        Instruction::variable(
+            id,
+            pointer_type_id,
+            spirv::StorageClass::HitAttributeKHR,
+            None,
+        )
+        .to_words(&mut self.writer.logical_layout.declarations);
         let hit_t_id = self.cached[hit_t];
         let hit_type_id = self.cached[hit_type];
         let intersection_id = self.cached[intersection];
-        block.body.push(Instruction::store(pointer_type_id, intersection_id, None));
+        block
+            .body
+            .push(Instruction::store(pointer_type_id, intersection_id, None));
         let result_id = self.gen_id();
-        let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(crate::TypeInner::Scalar(crate::Scalar::BOOL)));
-        block.body.push(Instruction::report_intersection(result_ty_id, result_id, hit_t_id, hit_type_id));
+        let result_ty_id =
+            self.writer
+                .get_expression_type_id(&TypeResolution::Value(crate::TypeInner::Scalar(
+                    crate::Scalar::BOOL,
+                )));
+        block.body.push(Instruction::report_intersection(
+            result_ty_id,
+            result_id,
+            hit_t_id,
+            hit_type_id,
+        ));
         Ok(result_id)
     }
 }

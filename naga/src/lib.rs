@@ -388,7 +388,7 @@ pub enum AddressSpace {
     /// Push constants.
     PushConstant,
     /// Ray-tracing (only allowed in function input)
-    RayTracing
+    RayTracing,
 }
 
 /// Built-in inputs and outputs.
@@ -446,7 +446,7 @@ pub enum BuiltIn {
     RayDirection,
     RayFlags,
     // intersection
-    ClosestRayT
+    ClosestRayT,
 }
 
 /// Number of bytes per scalar.

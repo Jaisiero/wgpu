@@ -9,7 +9,7 @@ use super::{
 use crate::{
     back::{self, Baked},
     proc::{self, NameKey},
-    valid, Handle, Module, Scalar, ScalarKind, ShaderStage, TypeInner, RayTracingFunction,
+    valid, Handle, Module, RayTracingFunction, Scalar, ScalarKind, ShaderStage, TypeInner,
 };
 use std::{fmt, mem};
 
@@ -449,7 +449,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         stage: Option<(ShaderStage, Io)>,
     ) -> BackendResult {
         match *binding {
-            Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload | crate::BuiltIn::Intersection)) => {}
+            Some(crate::Binding::BuiltIn(
+                crate::BuiltIn::Payload | crate::BuiltIn::Intersection,
+            )) => {}
             Some(crate::Binding::BuiltIn(builtin)) if !is_subgroup_builtin_binding(binding) => {
                 let builtin_str = builtin.to_hlsl_str()?;
                 write!(self.out, " : {builtin_str}")?;
@@ -860,7 +862,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, "ConstantBuffer<")?;
                 "b"
             }
-            crate::AddressSpace::RayTracing => todo!()
+            crate::AddressSpace::RayTracing => todo!(),
         };
 
         // If the global is a push constant write the type now because it will be a
@@ -1227,7 +1229,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             TypeInner::AccelerationStructure => {
                 write!(self.out, "RaytracingAccelerationStructure")?;
             }
-            TypeInner::Pointer { base, space:crate::AddressSpace::RayTracing } => {
+            TypeInner::Pointer {
+                base,
+                space: crate::AddressSpace::RayTracing,
+            } => {
                 write!(self.out, "inout")?;
                 self.write_type(module, base)?;
             }
@@ -2238,39 +2243,44 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_switch(module, func_ctx, level, selector, cases)?;
             }
             Statement::RayQuery { .. } => unreachable!(),
-            Statement::RayTracing { acceleration_structure, ref fun } => {
-                match fun {
-                    RayTracingFunction::TraceRay { descriptor, payload, .. } => {
-                        write!(self.out, "TraceRay(")?;
-                        self.write_expr(module, acceleration_structure, func_ctx)?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".flags")?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".cull_mask")?;
-                        write!(self.out, ", ")?;
-                        write!(self.out, "0, ")?;
-                        write!(self.out, "0, ")?;
-                        write!(self.out, "0, ")?;
-                        write!(self.out, "{{ ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".origin")?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".tmin")?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".dir")?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, *descriptor, func_ctx)?;
-                        write!(self.out, ".tmax")?;
-                        write!(self.out, "}}, ")?;
-                        self.write_expr(module, *payload, func_ctx)?;
-                        write!(self.out, ");")?;
-                    }
+            Statement::RayTracing {
+                acceleration_structure,
+                ref fun,
+            } => match fun {
+                RayTracingFunction::TraceRay {
+                    descriptor,
+                    payload,
+                    ..
+                } => {
+                    write!(self.out, "TraceRay(")?;
+                    self.write_expr(module, acceleration_structure, func_ctx)?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".flags")?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".cull_mask")?;
+                    write!(self.out, ", ")?;
+                    write!(self.out, "0, ")?;
+                    write!(self.out, "0, ")?;
+                    write!(self.out, "0, ")?;
+                    write!(self.out, "{{ ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".origin")?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".tmin")?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".dir")?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *descriptor, func_ctx)?;
+                    write!(self.out, ".tmax")?;
+                    write!(self.out, "}}, ")?;
+                    self.write_expr(module, *payload, func_ctx)?;
+                    write!(self.out, ");")?;
                 }
-            }
+            },
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let name = Baked(result).to_string();
@@ -3578,7 +3588,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
+                unreachable!()
+            }
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }

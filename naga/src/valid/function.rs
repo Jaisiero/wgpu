@@ -1245,7 +1245,11 @@ impl super::Validator {
                         }
                     }
                     match fun {
-                        RayTracingFunction::TraceRay { descriptor, payload, payload_ty } => {
+                        RayTracingFunction::TraceRay {
+                            descriptor,
+                            payload,
+                            payload_ty,
+                        } => {
                             let desc_ty_given = context
                                 .resolve_type(descriptor.clone(), &self.valid_expression_set)?;
                             let desc_ty_expected = context
@@ -1268,7 +1272,10 @@ impl super::Validator {
                                 base: *payload_ty,
                                 space: AddressSpace::Function,
                             };
-                            if !(expected_pointer_inner.equivalent(payload_inner, context.types) || expected_pointer_inner_function.equivalent(payload_inner, context.types)) {
+                            if !(expected_pointer_inner.equivalent(payload_inner, context.types)
+                                || expected_pointer_inner_function
+                                    .equivalent(payload_inner, context.types))
+                            {
                                 return Err(FunctionError::InvalidRayPayload(*payload)
                                     .with_span_static(span, "TraceRay"));
                             }
@@ -1431,7 +1438,12 @@ impl super::Validator {
 
         for (index, argument) in fun.arguments.iter().enumerate() {
             match module.types[argument.ty].inner.pointer_space() {
-                Some(crate::AddressSpace::Private | crate::AddressSpace::Function | crate::AddressSpace::RayTracing) | None => {}
+                Some(
+                    crate::AddressSpace::Private
+                    | crate::AddressSpace::Function
+                    | crate::AddressSpace::RayTracing,
+                )
+                | None => {}
                 Some(other) => {
                     return Err(FunctionError::InvalidArgumentPointerSpace {
                         index,

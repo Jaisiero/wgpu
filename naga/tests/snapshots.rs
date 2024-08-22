@@ -634,6 +634,7 @@ fn write_output_hlsl(
             naga::ShaderStage::ClosestHit => &mut config.closest_hit,
             naga::ShaderStage::AnyHit => &mut config.any_hit,
             naga::ShaderStage::Miss => &mut config.miss,
+            naga::ShaderStage::Intersection => &mut config.intersection,
         }
         .push(hlsl_snapshots::ConfigItem {
             entry_point: name.clone(),

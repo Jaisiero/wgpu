@@ -792,8 +792,16 @@ impl FunctionInfo {
                 non_uniform_result: self.add_ref(query),
                 requirements: UniformityRequirements::empty(),
             },
-            E::ReportIntersection { hit_t, hit_type, intersection, intersection_ty: _ } => Uniformity {
-                non_uniform_result: self.add_ref(hit_t).or(self.add_ref(hit_type)).or(self.add_ref(intersection)),
+            E::ReportIntersection {
+                hit_t,
+                hit_type,
+                intersection,
+                intersection_ty: _,
+            } => Uniformity {
+                non_uniform_result: self
+                    .add_ref(hit_t)
+                    .or(self.add_ref(hit_type))
+                    .or(self.add_ref(intersection)),
                 requirements: UniformityRequirements::empty(),
             },
             E::SubgroupBallotResult => Uniformity {

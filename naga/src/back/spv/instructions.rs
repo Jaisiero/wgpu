@@ -788,7 +788,7 @@ impl super::Instruction {
         ray_flags: Word,
         cull_mask: Word,
         sbt_offest: Word,
-        sbt_stride:Word,
+        sbt_stride: Word,
         miss_idx: Word,
         ray_origin: Word,
         ray_tmin: Word,
@@ -811,7 +811,12 @@ impl super::Instruction {
         instruction
     }
 
-    pub(super) fn report_intersection(result_ty_id: Word, result_id: Word, hit_t_id: Word, hit_type_id: Word) -> Self {
+    pub(super) fn report_intersection(
+        result_ty_id: Word,
+        result_id: Word,
+        hit_t_id: Word,
+        hit_type_id: Word,
+    ) -> Self {
         let mut instruction = Self::new(Op::ReportIntersectionKHR);
         instruction.set_result(result_id);
         instruction.set_type(result_ty_id);

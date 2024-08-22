@@ -661,7 +661,9 @@ impl super::Validator {
             }
             Ti::Sampler { .. } => TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE),
             Ti::AccelerationStructure => {
-                self.require_any_type_capability(Capabilities::RAY_QUERY | Capabilities::RAY_TRACING)?;
+                self.require_any_type_capability(
+                    Capabilities::RAY_QUERY | Capabilities::RAY_TRACING,
+                )?;
                 TypeInfo::new(TypeFlags::ARGUMENT, Alignment::ONE)
             }
             Ti::RayQuery => {
