@@ -4,7 +4,7 @@ Generating SPIR-V for ray query operations.
 
 use super::{Block, BlockContext, Instruction, LocalType, LookupType};
 use crate::arena::Handle;
-use crate::{Expression, ShaderStage, TypeInner};
+use crate::{ShaderStage, TypeInner};
 use crate::proc::TypeResolution;
 
 impl<'w> BlockContext<'w> {
@@ -364,9 +364,9 @@ impl<'w> BlockContext<'w> {
     pub(super) fn write_ray_report_intersect(
         &mut self,
         block: &mut Block,
-        hit_t: Handle<Expression>,
-        hit_type: Handle<Expression>,
-        intersection: Handle<Expression>,
+        hit_t: Handle<crate::Expression>,
+        hit_type: Handle<crate::Expression>,
+        intersection: Handle<crate::Expression>,
         intersection_ty: TypeInner,
     ) -> Result<spirv::Word, super::Error> {
         let id = self.gen_id();

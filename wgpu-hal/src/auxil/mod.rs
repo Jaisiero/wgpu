@@ -55,6 +55,7 @@ pub fn map_naga_stage(stage: naga::ShaderStage) -> wgt::ShaderStages {
         naga::ShaderStage::ClosestHit => wgt::ShaderStages::CLOSEST_HIT,
         naga::ShaderStage::AnyHit => wgt::ShaderStages::ANY_HIT,
         naga::ShaderStage::Miss => wgt::ShaderStages::MISS,
+        naga::ShaderStage::Intersection => wgt::ShaderStages::INTERSECTION,
     }
 }
 

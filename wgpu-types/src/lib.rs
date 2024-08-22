@@ -1893,8 +1893,10 @@ bitflags::bitflags! {
         const ANY_HIT = 1 << 5;
         /// Binding is visible from the miss shader
         const MISS = 1 << 6;
+        /// Binding is visible from the intersection shader
+        const INTERSECTION = 1 << 7;
         /// Binding is visible from any ray tracing shader
-        const RAY_TRACING = Self::RAY_GENERATION.bits() | Self::CLOSEST_HIT.bits() | Self::ANY_HIT.bits() | Self::MISS.bits();
+        const RAY_TRACING = Self::RAY_GENERATION.bits() | Self::CLOSEST_HIT.bits() | Self::ANY_HIT.bits() | Self::MISS.bits() | Self::INTERSECTION.bits();
     }
 }
 
