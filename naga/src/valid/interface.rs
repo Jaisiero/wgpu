@@ -300,7 +300,7 @@ impl VaryingContext<'_> {
                             },
                     ),
                     Bi::Payload => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss) && !self.output,
+                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss || self.stage == St::Intersection) && !self.output,
                         // this builtin can be anything
                         true,
                     ),
