@@ -56,6 +56,8 @@ pub fn map_built_in(word: &str, span: Span) -> Result<crate::BuiltIn, Error<'_>>
         "world_to_object" => crate::BuiltIn::WorldToObject,
         "ray_flags" => crate::BuiltIn::RayFlags,
         "closest_t" => crate::BuiltIn::ClosestRayT,
+        "ray_origin" => crate::BuiltIn::RayOrigin,
+        "ray_direction" => crate::BuiltIn::RayDirection,
         _ => return Err(Error::UnknownBuiltin(span)),
     })
 }
