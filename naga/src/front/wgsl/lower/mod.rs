@@ -2431,7 +2431,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             let intersection = self.expression(args.next()?, ctx)?;
                             args.finish()?;
 
-                            let intersection_ty = resolve_inner!(ctx, intersection.clone()).clone();
+                            let intersection_ty = resolve_inner!(ctx, intersection).clone();
 
                             crate::Expression::ReportIntersection {
                                 hit_t,

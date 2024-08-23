@@ -1195,7 +1195,7 @@ impl<'a, W: Write> Writer<'a, W> {
             crate::AddressSpace::Function => unreachable!(),
             // Textures and samplers are handled directly in `Writer::write`.
             crate::AddressSpace::Handle => unreachable!(),
-            crate::AddressSpace::RayTracing => todo!(),
+            crate::AddressSpace::RayTracing => unimplemented!("no raytracing support"),
         }
 
         Ok(())
@@ -4783,7 +4783,7 @@ const fn glsl_storage_qualifier(space: crate::AddressSpace) -> Option<&'static s
         As::Handle => Some("uniform"),
         As::WorkGroup => Some("shared"),
         As::PushConstant => Some("uniform"),
-        As::RayTracing => todo!(),
+        As::RayTracing => None,
     }
 }
 

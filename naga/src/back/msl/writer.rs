@@ -482,8 +482,7 @@ impl crate::AddressSpace {
             | Self::WorkGroup
             | Self::PushConstant
             | Self::Handle => true,
-            Self::Function => false,
-            Self::RayTracing => todo!(),
+            Self::Function | Self::RayTracing => false,
         }
     }
 
@@ -501,7 +500,7 @@ impl crate::AddressSpace {
             Self::Uniform | Self::PushConstant => false,
             // Not applicable.
             Self::Handle | Self::Function => false,
-            Self::RayTracing => todo!(),
+            Self::RayTracing => false,
         }
     }
 
@@ -512,7 +511,7 @@ impl crate::AddressSpace {
             Self::Storage { .. } => Some("device"),
             Self::Private | Self::Function => Some("thread"),
             Self::WorkGroup => Some("threadgroup"),
-            Self::RayTracing => todo!(),
+            Self::RayTracing => None,
         }
     }
 }
@@ -2173,7 +2172,9 @@ impl<W: Write> Writer<W> {
                 }
                 write!(self.out, "}}")?;
             }
-            crate::Expression::ReportIntersection { .. } => todo!(),
+            crate::Expression::ReportIntersection { .. } => {
+                unimplemented!("metal raytracing pipeline")
+            }
         }
         Ok(())
     }
@@ -3179,7 +3180,7 @@ impl<W: Write> Writer<W> {
                         }
                     }
                 }
-                crate::Statement::RayTracing { .. } => todo!(),
+                crate::Statement::RayTracing { .. } => unimplemented!("metal raytracing pipeline"),
                 crate::Statement::SubgroupBallot { result, predicate } => {
                     write!(self.out, "{level}")?;
                     let name = self.namer.call("");
@@ -4759,7 +4760,7 @@ impl<W: Write> Writer<W> {
                     LocationMode::Uniform,
                     false,
                 ),
-                _ => todo!(),
+                _ => unimplemented!("metal raytracing"),
             };
 
             // Should this entry point be modified to do vertex pulling?
@@ -4829,7 +4830,7 @@ impl<W: Write> Writer<W> {
                         crate::AddressSpace::Function
                         | crate::AddressSpace::Private
                         | crate::AddressSpace::WorkGroup => {}
-                        crate::AddressSpace::RayTracing => todo!(),
+                        crate::AddressSpace::RayTracing => unimplemented!(),
                     }
                 }
                 if needs_buffer_sizes {

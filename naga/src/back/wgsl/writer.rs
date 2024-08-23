@@ -2110,7 +2110,7 @@ const fn address_space_str(
             As::WorkGroup => "workgroup",
             As::Handle => return (None, None),
             As::Function => "function",
-            As::RayTracing => todo!(),
+            As::RayTracing => "ray_tracing",
         }),
         None,
     )

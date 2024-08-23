@@ -723,7 +723,7 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
         } => {
             adjust(acceleration_structure);
             match fun {
-                crate::RayTracingFunction::TraceRay {
+                &mut crate::RayTracingFunction::TraceRay {
                     ref mut descriptor,
                     ref mut payload,
                     ..

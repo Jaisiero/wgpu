@@ -369,7 +369,7 @@ impl StatementGraph {
                         crate::GatherMode::ShuffleXor(_) => "SubgroupShuffleXor",
                     }
                 }
-                S::RayTracing { .. } => todo!(),
+                S::RayTracing { .. } => unimplemented!("no raytracing support"),
             };
             // Set the last node to the merge node
             last_node = merge_id;
@@ -701,7 +701,7 @@ fn write_function_expressions(
                 let ty = if committed { "Committed" } else { "Candidate" };
                 (format!("rayQueryGet{}Intersection", ty).into(), 4)
             }
-            E::ReportIntersection { .. } => todo!(),
+            E::ReportIntersection { .. } => unimplemented!("no raytracing support"),
             E::SubgroupBallotResult => ("SubgroupBallotResult".into(), 4),
             E::SubgroupOperationResult { .. } => ("SubgroupOperationResult".into(), 4),
         };

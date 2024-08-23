@@ -862,7 +862,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, "ConstantBuffer<")?;
                 "b"
             }
-            crate::AddressSpace::RayTracing => todo!(),
+            crate::AddressSpace::RayTracing => unreachable!("Raytracing address space"),
         };
 
         // If the global is a push constant write the type now because it will be a
@@ -2247,9 +2247,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 acceleration_structure,
                 ref fun,
             } => match fun {
-                RayTracingFunction::TraceRay {
-                    descriptor,
-                    payload,
+                &RayTracingFunction::TraceRay {
+                    ref descriptor,
+                    ref payload,
                     ..
                 } => {
                     write!(self.out, "TraceRay(")?;

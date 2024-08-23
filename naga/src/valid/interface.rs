@@ -287,7 +287,8 @@ impl VaryingContext<'_> {
                         match self.stage {
                             St::Compute | St::Fragment => !self.output,
                             St::Vertex => false,
-                            _ => todo!(),
+                            // maybe subgroups in future?
+                            _ => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
@@ -585,7 +586,7 @@ impl super::Validator {
         let type_info = &self.types[inner_ty.index()];
 
         let (required_type_flags, is_resource) = match var.space {
-            crate::AddressSpace::Function => {
+            crate::AddressSpace::Function | crate::AddressSpace::RayTracing => {
                 return Err(GlobalVariableError::InvalidUsage(var.space))
             }
             crate::AddressSpace::Storage { access } => {
@@ -671,7 +672,6 @@ impl super::Validator {
                     false,
                 )
             }
-            crate::AddressSpace::RayTracing => todo!(),
         };
 
         if !type_info.flags.contains(required_type_flags) {
