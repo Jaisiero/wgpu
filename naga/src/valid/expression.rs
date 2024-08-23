@@ -1639,7 +1639,11 @@ impl super::Validator {
                     return Err(ExpressionError::InvalidRayQueryType(query));
                 }
             },
-            E::ReportIntersection { hit_t, hit_type, /* intersection can have any type */ .. } => {
+            E::ReportIntersection {
+                hit_t,
+                hit_type, /* intersection can have any type */
+                ..
+            } => {
                 match resolver[hit_t] {
                     Ti::Scalar(crate::Scalar::F32) => {}
                     ref other => {

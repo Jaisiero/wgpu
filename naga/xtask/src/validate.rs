@@ -311,6 +311,7 @@ fn push_job_for_each_hlsl_config_item(
         closest_hit,
         any_hit,
         miss,
+        intersection,
     } = hlsl_snapshots::Config::from_path(path.with_extension("ron"))?;
     for shader in [
         vertex,
@@ -320,6 +321,7 @@ fn push_job_for_each_hlsl_config_item(
         closest_hit,
         any_hit,
         miss,
+        intersection,
     ]
     .into_iter()
     .flatten()

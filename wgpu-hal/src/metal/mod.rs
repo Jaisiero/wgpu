@@ -582,6 +582,7 @@ struct MultiStageData<T> {
     rc_hit_s: T,
     ra_hit_s: T,
     r_miss_s: T,
+    is: T,
 }
 
 const NAGA_STAGES: MultiStageData<naga::ShaderStage> = MultiStageData {
@@ -592,6 +593,7 @@ const NAGA_STAGES: MultiStageData<naga::ShaderStage> = MultiStageData {
     rc_hit_s: naga::ShaderStage::ClosestHit,
     ra_hit_s: naga::ShaderStage::AnyHit,
     r_miss_s: naga::ShaderStage::Miss,
+    is: naga::ShaderStage::Intersection,
 };
 
 impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
@@ -605,6 +607,7 @@ impl<T> ops::Index<naga::ShaderStage> for MultiStageData<T> {
             naga::ShaderStage::ClosestHit => &self.rc_hit_s,
             naga::ShaderStage::AnyHit => &self.ra_hit_s,
             naga::ShaderStage::Miss => &self.r_miss_s,
+            naga::ShaderStage::Intersection => &self.is,
         }
     }
 }
@@ -619,6 +622,7 @@ impl<T> MultiStageData<T> {
             rc_hit_s: fun(&self.rc_hit_s),
             ra_hit_s: fun(&self.ra_hit_s),
             r_miss_s: fun(&self.r_miss_s),
+            is: fun(&self.is),
         }
     }
     fn map<Y>(self, fun: impl Fn(T) -> Y) -> MultiStageData<Y> {
@@ -630,17 +634,28 @@ impl<T> MultiStageData<T> {
             rc_hit_s: fun(self.rc_hit_s),
             ra_hit_s: fun(self.ra_hit_s),
             r_miss_s: fun(self.r_miss_s),
+            is: fun(self.is),
         }
     }
     fn iter<'a>(&'a self) -> impl Iterator<Item = &'a T> {
         iter::once(&self.vs)
             .chain(iter::once(&self.fs))
             .chain(iter::once(&self.cs))
+            .chain(iter::once(&self.rgs))
+            .chain(iter::once(&self.rc_hit_s))
+            .chain(iter::once(&self.ra_hit_s))
+            .chain(iter::once(&self.r_miss_s))
+            .chain(iter::once(&self.is))
     }
     fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut T> {
         iter::once(&mut self.vs)
             .chain(iter::once(&mut self.fs))
             .chain(iter::once(&mut self.cs))
+            .chain(iter::once(&mut self.rgs))
+            .chain(iter::once(&mut self.rc_hit_s))
+            .chain(iter::once(&mut self.ra_hit_s))
+            .chain(iter::once(&mut self.r_miss_s))
+            .chain(iter::once(&mut self.is))
     }
 }
 

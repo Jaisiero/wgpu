@@ -54,6 +54,7 @@ pub struct Config {
     pub closest_hit: Vec<ConfigItem>,
     pub any_hit: Vec<ConfigItem>,
     pub miss: Vec<ConfigItem>,
+    pub intersection: Vec<ConfigItem>,
 }
 
 impl Config {
@@ -66,6 +67,7 @@ impl Config {
             closest_hit: Default::default(),
             any_hit: Default::default(),
             miss: Default::default(),
+            intersection: Default::default(),
         }
     }
 
@@ -95,6 +97,7 @@ impl Config {
             closest_hit,
             any_hit,
             miss,
+            intersection,
         } = self;
         vertex.is_empty()
             && fragment.is_empty()
@@ -103,6 +106,7 @@ impl Config {
             && closest_hit.is_empty()
             && any_hit.is_empty()
             && miss.is_empty()
+            && intersection.is_empty()
     }
 }
 

@@ -352,7 +352,7 @@ impl<W: Write> Writer<W> {
                         ShaderStage::ClosestHit => "ray_closest",
                         ShaderStage::AnyHit => "ray_any",
                         ShaderStage::Miss => "ray_miss",
-                        ShaderStage::Intersection => "intersection"
+                        ShaderStage::Intersection => "intersection",
                     };
                     write!(self.out, "@{stage_str} ")?;
                 }
@@ -1831,7 +1831,9 @@ impl<W: Write> Writer<W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
+                unreachable!()
+            }
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }
@@ -1965,7 +1967,9 @@ fn builtin_str(built_in: crate::BuiltIn) -> Result<&'static str, Error> {
         | Bi::RayOrigin
         | Bi::RayDirection
         | Bi::RayFlags
-        | Bi::ClosestRayT => return Err(Error::Custom(format!("Unsupported builtin {built_in:?}"))),
+        | Bi::ClosestRayT => {
+            return Err(Error::Custom(format!("Unsupported builtin {built_in:?}")))
+        }
     })
 }
 
@@ -2106,7 +2110,7 @@ const fn address_space_str(
             As::WorkGroup => "workgroup",
             As::Handle => return (None, None),
             As::Function => "function",
-            As::RayTracing => todo!()
+            As::RayTracing => "ray_tracing",
         }),
         None,
     )

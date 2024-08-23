@@ -509,7 +509,12 @@ fn adjust_expr(new_pos: &HandleVec<Expression, Handle<Expression>>, expr: &mut E
         } => {
             adjust(query);
         }
-        Expression::ReportIntersection { ref mut hit_t, ref mut hit_type, ref mut intersection, intersection_ty: _ } => {
+        Expression::ReportIntersection {
+            ref mut hit_t,
+            ref mut hit_type,
+            ref mut intersection,
+            intersection_ty: _,
+        } => {
             adjust(hit_t);
             adjust(hit_type);
             adjust(intersection);
@@ -714,11 +719,11 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
         }
         Statement::RayTracing {
             ref mut acceleration_structure,
-            ref mut fun
+            ref mut fun,
         } => {
             adjust(acceleration_structure);
             match fun {
-                crate::RayTracingFunction::TraceRay {
+                &mut crate::RayTracingFunction::TraceRay {
                     ref mut descriptor,
                     ref mut payload,
                     ..

@@ -287,12 +287,17 @@ impl VaryingContext<'_> {
                         match self.stage {
                             St::Compute | St::Fragment => !self.output,
                             St::Vertex => false,
-                            _ => todo!(),
+                            // maybe subgroups in future?
+                            _ => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::LaunchId | Bi::LaunchSize => (
-                        (self.stage == St::RayGeneration || self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss) && !self.output,
+                        (self.stage == St::RayGeneration
+                            || self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Miss)
+                            && !self.output,
                         *ty_inner
                             == Ti::Vector {
                                 size: Vs::Tri,
@@ -300,7 +305,11 @@ impl VaryingContext<'_> {
                             },
                     ),
                     Bi::Payload => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Miss
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         // this builtin can be anything
                         true,
                     ),
@@ -311,83 +320,99 @@ impl VaryingContext<'_> {
                     ),
                     Bi::RayT => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::F32),
+                        *ty_inner == Ti::Scalar(crate::Scalar::F32),
                     ),
                     Bi::GeometryIndex => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::U32),
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ObjectRayOrigin => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Vector {
-                            size: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                size: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::ObjectRayDirection => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Vector {
-                            size: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                size: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::HitKind => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::U32),
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ObjectToWorld => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Matrix {
-                            columns: Vs::Quad,
-                            rows: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                columns: Vs::Quad,
+                                rows: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::WorldToObject => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
                         *ty_inner
                             == Ti::Matrix {
-                            columns: Vs::Quad,
-                            rows: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                columns: Vs::Quad,
+                                rows: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::InstanceCustomIndex => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::U32),
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::RayOrigin => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Vector {
-                            size: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                size: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::RayDirection => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Vector {
-                            size: Vs::Tri,
-                            scalar: crate::Scalar::F32,
-                        },
+                                size: Vs::Tri,
+                                scalar: crate::Scalar::F32,
+                            },
                     ),
                     Bi::RayFlags => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Miss || self.stage == St::Intersection) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::U32),
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Miss
+                            || self.stage == St::Intersection)
+                            && !self.output,
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
-                    Bi::ClosestRayT  => (
+                    Bi::ClosestRayT => (
                         (self.stage == St::Intersection) && !self.output,
-                        *ty_inner
-                            == Ti::Scalar(crate::Scalar::F32),
+                        *ty_inner == Ti::Scalar(crate::Scalar::F32),
                     ),
                 };
 
@@ -561,7 +586,7 @@ impl super::Validator {
         let type_info = &self.types[inner_ty.index()];
 
         let (required_type_flags, is_resource) = match var.space {
-            crate::AddressSpace::Function => {
+            crate::AddressSpace::Function | crate::AddressSpace::RayTracing => {
                 return Err(GlobalVariableError::InvalidUsage(var.space))
             }
             crate::AddressSpace::Storage { access } => {
@@ -647,7 +672,6 @@ impl super::Validator {
                     false,
                 )
             }
-            crate::AddressSpace::RayTracing => todo!(),
         };
 
         if !type_info.flags.contains(required_type_flags) {
@@ -837,7 +861,9 @@ impl super::Validator {
                     } => storage_usage(access),
                     _ => GlobalUse::READ | GlobalUse::QUERY,
                 },
-                crate::AddressSpace::Private | crate::AddressSpace::WorkGroup | crate::AddressSpace::RayTracing => GlobalUse::all(),
+                crate::AddressSpace::Private
+                | crate::AddressSpace::WorkGroup
+                | crate::AddressSpace::RayTracing => GlobalUse::all(),
                 crate::AddressSpace::PushConstant => GlobalUse::READ,
             };
             if !allowed_usage.contains(usage) {

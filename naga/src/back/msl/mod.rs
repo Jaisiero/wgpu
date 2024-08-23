@@ -569,10 +569,24 @@ impl ResolvedBinding {
                     Bi::SubgroupId => "simdgroup_index_in_threadgroup",
                     Bi::SubgroupSize => "threads_per_simdgroup",
                     Bi::SubgroupInvocationId => "thread_index_in_simdgroup",
-                    Bi::CullDistance | Bi::ViewIndex | Bi::LaunchId | Bi::LaunchSize | Bi::Payload | Bi::Intersection | Bi::RayT | Bi::GeometryIndex | Bi::ObjectRayDirection | Bi::ObjectRayOrigin | Bi::HitKind | Bi::ObjectToWorld | Bi::WorldToObject | Bi::InstanceCustomIndex | Bi::RayOrigin | Bi::RayDirection | Bi::RayFlags | Bi::ClosestRayT  => {
-                        return Err(Error::UnsupportedBuiltIn(built_in))
-                    },
-
+                    Bi::CullDistance
+                    | Bi::ViewIndex
+                    | Bi::LaunchId
+                    | Bi::LaunchSize
+                    | Bi::Payload
+                    | Bi::Intersection
+                    | Bi::RayT
+                    | Bi::GeometryIndex
+                    | Bi::ObjectRayDirection
+                    | Bi::ObjectRayOrigin
+                    | Bi::HitKind
+                    | Bi::ObjectToWorld
+                    | Bi::WorldToObject
+                    | Bi::InstanceCustomIndex
+                    | Bi::RayOrigin
+                    | Bi::RayDirection
+                    | Bi::RayFlags
+                    | Bi::ClosestRayT => return Err(Error::UnsupportedBuiltIn(built_in)),
                 };
                 write!(out, "{name}")?;
             }

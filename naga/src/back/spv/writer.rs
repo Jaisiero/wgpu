@@ -6,7 +6,12 @@ use super::{
     LocalType, LocalVariable, LogicalLayout, LookupFunctionType, LookupType, LoopContext, Options,
     PhysicalLayout, PipelineOptions, ResultMember, Writer, WriterFlags, BITS_PER_BYTE,
 };
-use crate::{arena::{Handle, HandleVec, UniqueArena}, back::spv::BindingInfo, proc::{Alignment, TypeResolution}, valid::{FunctionInfo, ModuleInfo}};
+use crate::{
+    arena::{Handle, HandleVec, UniqueArena},
+    back::spv::BindingInfo,
+    proc::{Alignment, TypeResolution},
+    valid::{FunctionInfo, ModuleInfo},
+};
 use spirv::Word;
 use std::collections::hash_map::Entry;
 
@@ -344,7 +349,11 @@ impl Writer {
         for argument in ir_function.arguments.iter() {
             let mut class = spirv::StorageClass::Input;
             let handle_ty = ir_module.types[argument.ty].inner.is_handle();
-            if let crate::TypeInner::Pointer { space: crate::AddressSpace::RayTracing, ..} = ir_module.types[argument.ty].inner {
+            if let crate::TypeInner::Pointer {
+                space: crate::AddressSpace::RayTracing,
+                ..
+            } = ir_module.types[argument.ty].inner
+            {
                 class = map_storage_class(crate::AddressSpace::RayTracing);
             }
             let argument_type_id = match handle_ty {
@@ -369,15 +378,19 @@ impl Writer {
                         binding,
                     )?;
                     let id = match ir_module.types[argument.ty].inner {
-                        crate::TypeInner::Pointer { space: crate::AddressSpace::RayTracing, ..} => {
-                            varying_id
-                        }
+                        crate::TypeInner::Pointer {
+                            space: crate::AddressSpace::RayTracing,
+                            ..
+                        } => varying_id,
                         _ => {
                             iface.varying_ids.push(varying_id);
                             let id = self.id_gen.next();
-                            prelude
-                                .body
-                                .push(Instruction::load(argument_type_id, id, varying_id, None));
+                            prelude.body.push(Instruction::load(
+                                argument_type_id,
+                                id,
+                                varying_id,
+                                None,
+                            ));
                             id
                         }
                     };
@@ -1546,7 +1559,10 @@ impl Writer {
                 }
             }
             // these are very different between spv and hlsl and wgsl
-            crate::Binding::BuiltIn(built_in) if built_in == crate::BuiltIn::Payload || built_in == crate::BuiltIn::Intersection  => {
+            crate::Binding::BuiltIn(built_in)
+                if built_in == crate::BuiltIn::Payload
+                    || built_in == crate::BuiltIn::Intersection =>
+            {
                 self.decorate(id, Decoration::Location, &[0]);
             }
             crate::Binding::BuiltIn(built_in) => {
@@ -1653,130 +1669,102 @@ impl Writer {
                     Bi::LaunchId => {
                         self.require_any(
                             "`launch id` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::LaunchIdKHR
-                    },
+                    }
                     Bi::LaunchSize => {
                         self.require_any(
                             "`launch size` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::LaunchSizeKHR
-                    },
+                    }
                     // in the closest hit and any hit shaders this is the case
                     Bi::RayT => {
                         self.require_any(
                             "`ray t max` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::RayTmaxKHR
-                    },
+                    }
                     Bi::GeometryIndex => {
                         self.require_any(
                             "`geometry index` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::RayGeometryIndexKHR
-                    },
+                    }
                     Bi::ObjectRayOrigin => {
                         self.require_any(
                             "`object ray origin` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::ObjectRayOriginKHR
-                    },
+                    }
                     Bi::ObjectRayDirection => {
                         self.require_any(
                             "`object ray direction` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::ObjectRayDirectionKHR
-                    },
+                    }
                     Bi::HitKind => {
                         self.require_any(
                             "`hit kind` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::HitKindKHR
-                    },
+                    }
                     Bi::ObjectToWorld => {
                         self.require_any(
                             "`object to world` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::ObjectToWorldKHR
-                    },
+                    }
                     Bi::WorldToObject => {
                         self.require_any(
                             "`world to object` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::WorldToObjectKHR
-                    },
+                    }
                     Bi::InstanceCustomIndex => {
                         self.require_any(
                             "`instance custom index` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::InstanceCustomIndexKHR
-                    },
+                    }
                     Bi::RayOrigin => {
                         self.require_any(
                             "`ray origin` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::WorldRayOriginKHR
-                    },
+                    }
                     Bi::RayDirection => {
                         self.require_any(
                             "`ray direction` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::WorldRayDirectionKHR
-                    },
-                    Bi::RayFlags  => {
+                    }
+                    Bi::RayFlags => {
                         self.require_any(
                             "`ray flag` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::IncomingRayFlagsKHR
-                    },
+                    }
                     Bi::ClosestRayT => {
                         self.require_any(
                             "`closest ray t` built-in",
-                            &[
-                                spirv::Capability::RayTracingKHR,
-                            ],
+                            &[spirv::Capability::RayTracingKHR],
                         )?;
                         BuiltIn::RayTmaxKHR
-                    },
+                    }
                     Bi::Payload | Bi::Intersection => unreachable!(),
                 };
 
@@ -2084,7 +2072,11 @@ impl Writer {
         let mut has_ray_tracing = ir_module.special_types.tri_ray_intersection.is_some();
 
         for entry_point in ir_module.entry_points.iter() {
-            if let crate::ShaderStage::Miss | crate::ShaderStage::ClosestHit | crate::ShaderStage::AnyHit | crate::ShaderStage::RayGeneration = entry_point.stage {
+            if let crate::ShaderStage::Miss
+            | crate::ShaderStage::ClosestHit
+            | crate::ShaderStage::AnyHit
+            | crate::ShaderStage::RayGeneration = entry_point.stage
+            {
                 has_ray_tracing = true;
             }
         }
