@@ -787,7 +787,7 @@ impl super::Instruction {
         acceleration_structure: Word,
         ray_flags: Word,
         cull_mask: Word,
-        sbt_offest: Word,
+        sbt_offset: Word,
         sbt_stride: Word,
         miss_idx: Word,
         ray_origin: Word,
@@ -800,7 +800,7 @@ impl super::Instruction {
         instruction.add_operand(acceleration_structure);
         instruction.add_operand(ray_flags);
         instruction.add_operand(cull_mask);
-        instruction.add_operand(sbt_offest);
+        instruction.add_operand(sbt_offset);
         instruction.add_operand(sbt_stride);
         instruction.add_operand(miss_idx);
         instruction.add_operand(ray_origin);
