@@ -2173,7 +2173,7 @@ impl<W: Write> Writer<W> {
                 write!(self.out, "}}")?;
             }
             crate::Expression::ReportIntersection { .. } => {
-                unimplemented!("metal raytracing pipeline")
+                return Err(Error::FeatureNotImplemented("metal raytracing pipeline".to_string()))
             }
         }
         Ok(())
@@ -3180,7 +3180,7 @@ impl<W: Write> Writer<W> {
                         }
                     }
                 }
-                crate::Statement::RayTracing { .. } => unimplemented!("metal raytracing pipeline"),
+                crate::Statement::RayTracing { .. } => return Err(Error::FeatureNotImplemented("metal raytracing pipeline".to_string())),
                 crate::Statement::SubgroupBallot { result, predicate } => {
                     write!(self.out, "{level}")?;
                     let name = self.namer.call("");
@@ -4760,7 +4760,7 @@ impl<W: Write> Writer<W> {
                     LocationMode::Uniform,
                     false,
                 ),
-                _ => unimplemented!("metal raytracing"),
+                _ => return Err(Error::FeatureNotImplemented("metal raytracing pipeline".to_string())),
             };
 
             // Should this entry point be modified to do vertex pulling?
@@ -4830,7 +4830,7 @@ impl<W: Write> Writer<W> {
                         crate::AddressSpace::Function
                         | crate::AddressSpace::Private
                         | crate::AddressSpace::WorkGroup => {}
-                        crate::AddressSpace::RayTracing => unimplemented!(),
+                        crate::AddressSpace::RayTracing => return Err(Error::FeatureNotImplemented("metal raytracing pipeline".to_string())),
                     }
                 }
                 if needs_buffer_sizes {

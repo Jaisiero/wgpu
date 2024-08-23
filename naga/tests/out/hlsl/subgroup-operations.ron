@@ -9,4 +9,14 @@
             target_profile:"cs_6_0",
         ),
     ],
+    ray_gen:[
+    ],
+    closest_hit:[
+    ],
+    any_hit:[
+    ],
+    miss:[
+    ],
+    intersection:[
+    ],
 )
