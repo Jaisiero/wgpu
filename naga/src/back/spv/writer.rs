@@ -369,6 +369,10 @@ impl Writer {
                 let id = if let Some(ref binding) = argument.binding {
                     let name = argument.name.as_deref();
 
+                    if binding == &crate::Binding::BuiltIn(crate::BuiltIn::Intersection) {
+                        class = spirv::StorageClass::HitAttributeKHR;
+                    }
+
                     let varying_id = self.write_varying(
                         ir_module,
                         iface.stage,

@@ -310,8 +310,14 @@ impl VaryingContext<'_> {
                             || self.stage == St::Miss
                             || self.stage == St::Intersection)
                             && !self.output,
-                        // this builtin can be anything
-                        true,
+                        // this builtin can be anything pointerd to by a ray-trscing pointer
+                        match *ty_inner {
+                            Ti::Pointer {
+                                space: crate::AddressSpace::RayTracing,
+                                ..
+                            } => true,
+                            _ => false,
+                        },
                     ),
                     Bi::Intersection => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
@@ -345,7 +351,10 @@ impl VaryingContext<'_> {
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::WorldToObject | Bi::ObjectToWorld => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Matrix {
                                 columns: Vs::Quad,
