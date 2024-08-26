@@ -6,7 +6,6 @@ use crate::arena::{Handle, UniqueArena};
 
 use crate::span::{AddSpan as _, MapErrWithSpan as _, SpanProvider as _, WithSpan};
 use bit_set::BitSet;
-use crate::AddressSpace;
 
 const MAX_WORKGROUP_SIZE: u32 = 0x4000;
 
@@ -313,7 +312,10 @@ impl VaryingContext<'_> {
                             && !self.output,
                         // this builtin can be anything pointerd to by a ray-trscing pointer
                         match *ty_inner {
-                            Ti::Pointer { space: AddressSpace::RayTracing, ..} => true,
+                            Ti::Pointer {
+                                space: crate::AddressSpace::RayTracing,
+                                ..
+                            } => true,
                             _ => false,
                         },
                     ),
@@ -349,7 +351,10 @@ impl VaryingContext<'_> {
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::WorldToObject | Bi::ObjectToWorld => (
-                        (self.stage == St::AnyHit || self.stage == St::ClosestHit || self.stage == St::Intersection) && !self.output,
+                        (self.stage == St::AnyHit
+                            || self.stage == St::ClosestHit
+                            || self.stage == St::Intersection)
+                            && !self.output,
                         *ty_inner
                             == Ti::Matrix {
                                 columns: Vs::Quad,

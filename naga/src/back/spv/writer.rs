@@ -369,7 +369,7 @@ impl Writer {
                 let id = if let Some(ref binding) = argument.binding {
                     let name = argument.name.as_deref();
 
-                    if binding == &crate::Binding::BuiltIn(crate::BuiltIn::Intersection){
+                    if binding == &crate::Binding::BuiltIn(crate::BuiltIn::Intersection) {
                         class = spirv::StorageClass::HitAttributeKHR;
                     }
 
