@@ -1142,7 +1142,10 @@ impl crate::CommandEncoder for super::CommandEncoder {
         }
     }
 
-    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<super::QuerySet>) {
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        desc: &crate::RayTracingPassDescriptor<super::QuerySet>,
+    ) {
         self.bind_point = vk::PipelineBindPoint::RAY_TRACING_KHR;
         if let Some(label) = desc.label {
             unsafe { self.begin_debug_marker(label) };
@@ -1176,7 +1179,11 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 pipeline.raw,
             )
         };
-        self.sbt = Some([pipeline.ray_gen_sbt.clone(), pipeline.ray_miss_sbt.clone(), pipeline.ray_hit_sbt.clone()]);
+        self.sbt = Some([
+            pipeline.ray_gen_sbt.clone(),
+            pipeline.ray_miss_sbt.clone(),
+            pipeline.ray_hit_sbt.clone(),
+        ]);
     }
     unsafe fn trace_rays(&mut self, count: [u32; 3]) {
         let ray_tracing_pipeline_functions = self
@@ -1198,7 +1205,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
                     &vk::StridedDeviceAddressRegionKHR::default(),
                     count[0],
                     count[1],
-                    count[2])
+                    count[2],
+                )
         };
     }
     unsafe fn trace_rays_indirect(&mut self, buffer: &super::Buffer, offset: wgt::BufferAddress) {
@@ -1230,7 +1238,8 @@ impl crate::CommandEncoder for super::CommandEncoder {
                         .buffer_device_address
                         .get_buffer_device_address(
                             &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
-                        ) + offset,
+                        )
+                        + offset,
                 )
         };
     }

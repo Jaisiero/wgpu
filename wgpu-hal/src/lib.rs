@@ -2354,9 +2354,9 @@ pub struct AccelerationStructureTriangleTransform<'a, B: DynBuffer + ?Sized> {
     pub offset: u32,
 }
 
+use crate::dynamic::DynRayTracingPipeline;
 pub use wgt::AccelerationStructureFlags as AccelerationStructureBuildFlags;
 pub use wgt::AccelerationStructureGeometryFlags;
-use crate::dynamic::DynRayTracingPipeline;
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

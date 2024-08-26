@@ -251,7 +251,10 @@ impl crate::Device for Context {
     }
     unsafe fn destroy_compute_pipeline(&self, pipeline: Resource) {}
 
-    unsafe fn create_ray_tracing_pipeline(&self, desc: &crate::RayTracingPipelineDescriptor<Resource, Resource, Resource>) -> Result<Resource, crate::PipelineError> {
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &crate::RayTracingPipelineDescriptor<Resource, Resource, Resource>,
+    ) -> Result<Resource, crate::PipelineError> {
         Ok(Resource)
     }
 
@@ -513,18 +516,13 @@ impl crate::CommandEncoder for Encoder {
     ) {
     }
 
-    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<Resource>) {
-    }
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &crate::RayTracingPassDescriptor<Resource>) {}
 
-    unsafe fn end_ray_tracing_pass(&mut self) {
-    }
+    unsafe fn end_ray_tracing_pass(&mut self) {}
 
-    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &Resource) {
-    }
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &Resource) {}
 
-    unsafe fn trace_rays(&mut self, count: [u32; 3]) {
-    }
+    unsafe fn trace_rays(&mut self, count: [u32; 3]) {}
 
-    unsafe fn trace_rays_indirect(&mut self, buffer: &Resource, offset: wgt::BufferAddress) {
-    }
+    unsafe fn trace_rays_indirect(&mut self, buffer: &Resource, offset: wgt::BufferAddress) {}
 }

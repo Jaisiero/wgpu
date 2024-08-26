@@ -112,7 +112,7 @@ pub struct PhysicalDeviceFeatures {
     /// Features provided by `VK_EXT_subgroup_size_control`, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlFeatures<'static>>,
 
-    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR<'static>>
+    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR<'static>>,
 }
 
 impl PhysicalDeviceFeatures {
@@ -160,6 +160,9 @@ impl PhysicalDeviceFeatures {
             info = info.push_next(feature);
         }
         if let Some(ref mut feature) = self.subgroup_size_control {
+            info = info.push_next(feature);
+        }
+        if let Some(ref mut feature) = self.ray_tracing_pipeline {
             info = info.push_next(feature);
         }
         info
@@ -456,7 +459,7 @@ impl PhysicalDeviceFeatures {
             ray_tracing_pipeline: if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
                 Some(
                     vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default()
-                        .ray_tracing_pipeline(true)
+                        .ray_tracing_pipeline(true),
                 )
             } else {
                 None
@@ -652,6 +655,12 @@ impl PhysicalDeviceFeatures {
                 features |= F::PARTIALLY_BOUND_BINDING_ARRAY;
             }
         }
+
+        features.set(
+            F::RAY_TRACING_PIPELINE,
+            self.ray_tracing_pipeline
+                .is_some_and(|features| features.ray_tracing_pipeline != 0),
+        );
 
         features.set(F::DEPTH_CLIP_CONTROL, self.core.depth_clamp != 0);
         features.set(F::DUAL_SOURCE_BLENDING, self.core.dual_src_blend != 0);
@@ -1016,7 +1025,7 @@ impl PhysicalDeviceProperties {
             extensions.push(khr::shader_atomic_int64::NAME);
         }
 
-        if requested_features.contains(wgt::Features::RAY_TRACING_ACCELERATION_STRUCTURE) {
+        if requested_features.contains(wgt::Features::RAY_TRACING_PIPELINE) {
             extensions.push(khr::ray_tracing_pipeline::NAME);
         }
 
@@ -1701,16 +1710,17 @@ impl super::Adapter {
             None
         };
 
-        let ray_tracing_pipeline_fns = if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
-            Some(super::RayTracingPipelineDeviceExtensionFunctions {
-                ray_tracing_pipeline: khr::ray_tracing_pipeline::Device::new(
-                    &self.instance.raw,
-                    &raw_device,
-                )
-            })
-        } else {
-            None
-        };
+        let ray_tracing_pipeline_fns =
+            if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
+                Some(super::RayTracingPipelineDeviceExtensionFunctions {
+                    ray_tracing_pipeline: khr::ray_tracing_pipeline::Device::new(
+                        &self.instance.raw,
+                        &raw_device,
+                    ),
+                })
+            } else {
+                None
+            };
 
         let naga_options = {
             use naga::back::spv;
@@ -1781,6 +1791,10 @@ impl super::Adapter {
                     | wgt::Features::SHADER_INT64_ATOMIC_MIN_MAX,
             ) {
                 capabilities.push(spv::Capability::Int64Atomics);
+            }
+
+            if features.contains(wgt::Features::RAY_TRACING_PIPELINE) {
+                capabilities.push(spv::Capability::RayTracingKHR)
             }
 
             let mut flags = spv::WriterFlags::empty();

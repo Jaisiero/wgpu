@@ -209,7 +209,7 @@ struct Example<A: hal::Api> {
     blas: A::AccelerationStructure,
     tlas: A::AccelerationStructure,
     scratch_buffer: A::Buffer,
-    time: f32,
+    time: Instant,
 }
 
 impl<A: hal::Api> Example<A> {
@@ -242,7 +242,10 @@ impl<A: hal::Api> Example<A> {
             }
             let exposed = adapters.swap_remove(0);
             dbg!(exposed.features);
-            if !exposed.features.contains(wgt::Features::RAY_TRACING_ACCELERATION_STRUCTURE | wgt::Features::RAY_TRACING_PIPELINE) {
+            if !exposed.features.contains(
+                wgt::Features::RAY_TRACING_ACCELERATION_STRUCTURE
+                    | wgt::Features::RAY_TRACING_PIPELINE,
+            ) {
                 panic!("missing features")
             }
             (exposed.adapter, exposed.features)
@@ -265,7 +268,7 @@ impl<A: hal::Api> Example<A> {
         dbg!(&surface_caps.formats);
         let surface_format = if surface_caps
             .formats
-            .contains(&wgt::TextureFormat::Rgba8Snorm)
+            .contains(&wgt::TextureFormat::Rgba8Unorm)
         {
             wgt::TextureFormat::Rgba8Unorm
         } else {
@@ -302,7 +305,7 @@ impl<A: hal::Api> Example<A> {
             entries: &[
                 wgt::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgt::ShaderStages::COMPUTE,
+                    visibility: wgt::ShaderStages::RAY_TRACING,
                     ty: wgt::BindingType::Buffer {
                         ty: wgt::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -312,7 +315,7 @@ impl<A: hal::Api> Example<A> {
                 },
                 wgt::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgt::ShaderStages::COMPUTE,
+                    visibility: wgt::ShaderStages::RAY_TRACING,
                     ty: wgt::BindingType::StorageTexture {
                         access: wgt::StorageTextureAccess::WriteOnly,
                         format: wgt::TextureFormat::Rgba8Unorm,
@@ -322,7 +325,7 @@ impl<A: hal::Api> Example<A> {
                 },
                 wgt::BindGroupLayoutEntry {
                     binding: 2,
-                    visibility: wgt::ShaderStages::COMPUTE,
+                    visibility: wgt::ShaderStages::RAY_TRACING,
                     ty: wgt::BindingType::AccelerationStructure,
                     count: None,
                 },
@@ -382,29 +385,27 @@ impl<A: hal::Api> Example<A> {
                     constants: &Default::default(),
                     zero_initialize_workgroup_memory: true,
                 },
-                groups: &[
-                    hal::RayTracingGroup {
-                        closest: hal::ProgrammableStage {
-                            module: &shader_module,
-                            entry_point: "closest_hit",
-                            constants: &Default::default(),
-                            zero_initialize_workgroup_memory: true,
-                        },
-                        any: hal::ProgrammableStage {
-                            module: &shader_module,
-                            entry_point: "any_hit",
-                            constants: &Default::default(),
-                            zero_initialize_workgroup_memory: true,
-                        },
-                        intersection: Some(hal::ProgrammableStage {
-                            module: &shader_module,
-                            entry_point: "intersect_sphere",
-                            constants: &Default::default(),
-                            zero_initialize_workgroup_memory: true,
-                        }),
-                        ty: hal::RayTracingGroupType::Procedural,
+                groups: &[hal::RayTracingGroup {
+                    closest: hal::ProgrammableStage {
+                        module: &shader_module,
+                        entry_point: "closest_hit",
+                        constants: &Default::default(),
+                        zero_initialize_workgroup_memory: true,
                     },
-                ],
+                    any: hal::ProgrammableStage {
+                        module: &shader_module,
+                        entry_point: "any_hit",
+                        constants: &Default::default(),
+                        zero_initialize_workgroup_memory: true,
+                    },
+                    intersection: Some(hal::ProgrammableStage {
+                        module: &shader_module,
+                        entry_point: "intersect_sphere",
+                        constants: &Default::default(),
+                        zero_initialize_workgroup_memory: true,
+                    }),
+                    ty: hal::RayTracingGroupType::Procedural,
+                }],
                 miss_stage: hal::ProgrammableStage {
                     module: &shader_module,
                     entry_point: "miss",
@@ -418,14 +419,14 @@ impl<A: hal::Api> Example<A> {
         }
         .unwrap();
 
-        let aabb: [f32; 6] = [1.0, 1.0, 1.0, -1.0, -1.0, -1.0];
+        let aabb: [f32; 6] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
 
-        let aabb_size_in_bytes = aabb.len() * 4;
+        let aabb_size_in_bytes = mem::size_of_val(&aabb);
 
         let aabb_buffer = unsafe {
             let aabb_buffer = device
                 .create_buffer(&hal::BufferDescriptor {
-                    label: Some("vertices buffer"),
+                    label: Some("aabb buffer"),
                     size: aabb_size_in_bytes as u64,
                     usage: hal::BufferUses::MAP_WRITE
                         | hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
@@ -451,15 +452,15 @@ impl<A: hal::Api> Example<A> {
             buffer: Some(&aabb_buffer),
             offset: 0,
             count: 1,
-            stride: 24,
-            flags: hal::AccelerationStructureGeometryFlags::OPAQUE,
+            stride: aabb_size_in_bytes as wgt::BufferAddress,
+            flags: hal::AccelerationStructureGeometryFlags::empty(),
         }];
         let blas_entries = hal::AccelerationStructureEntries::AABBs(blas_aabbs);
 
         let mut tlas_entries =
             hal::AccelerationStructureEntries::Instances(hal::AccelerationStructureInstances {
                 buffer: None,
-                count: 3,
+                count: 1,
                 offset: 0,
             });
 
@@ -504,7 +505,7 @@ impl<A: hal::Api> Example<A> {
 
         let uniforms = {
             let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.5), Vec3::ZERO, Vec3::Y);
-            let proj = Mat4::perspective_rh(59.0_f32.to_radians(), 1.0, 0.001, 1000.0);
+            let proj = Mat4::perspective_rh(60.0_f32.to_radians(), 1.0, 0.001, 1000.0);
 
             Uniforms {
                 view_inverse: view.inverse(),
@@ -614,23 +615,16 @@ impl<A: hal::Api> Example<A> {
                 .unwrap()
         };
 
-        let instances = [
-            AccelerationStructureInstance::new(
-                &Affine3A::from_translation(Vec3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                }),
-                0,
-                0xff,
-                0,
-                0,
-                unsafe { device.get_acceleration_structure_device_address(&blas) },
-            ),
-        ];
+        let instances = [AccelerationStructureInstance::new(
+            &Affine3A::IDENTITY,
+            0,
+            0xff,
+            0,
+            0,
+            unsafe { device.get_acceleration_structure_device_address(&blas) },
+        )];
 
-        let instances_buffer_size =
-            instances.len() * std::mem::size_of::<AccelerationStructureInstance>();
+        let instances_buffer_size = mem::size_of_val(&instances);
 
         let instances_buffer = unsafe {
             let instances_buffer = device
@@ -770,7 +764,7 @@ impl<A: hal::Api> Example<A> {
             blas,
             tlas,
             scratch_buffer,
-            time: 0.0,
+            time: Instant::now(),
             aabb_buffer,
             uniform_buffer,
             texture_view,
@@ -804,9 +798,7 @@ impl<A: hal::Api> Example<A> {
         let tlas_flags = hal::AccelerationStructureBuildFlags::PREFER_FAST_TRACE
             | hal::AccelerationStructureBuildFlags::ALLOW_UPDATE;
 
-        self.time += 1.0 / 60.0;
-
-        self.instances[0].set_transform(&Affine3A::from_scale(Vec3::new(1.0, (self.time.cos() + 1.0) / 2.0 + 0.001, 1.0)));
+        //self.instances[0].set_transform(&Affine3A::from_scale(Vec3::new(1.0, (self.time.elapsed().as_secs_f32().cos() + 1.0) / 2.0 + 0.01, 1.0)));
 
         unsafe {
             let mapping = self
@@ -880,14 +872,15 @@ impl<A: hal::Api> Example<A> {
                 .unwrap()
         };
         unsafe {
-            ctx.encoder.begin_ray_tracing_pass(&hal::RayTracingPassDescriptor {
-                label: None,
-                timestamp_writes: None,
-            });
+            ctx.encoder
+                .begin_ray_tracing_pass(&hal::RayTracingPassDescriptor {
+                    label: None,
+                    timestamp_writes: None,
+                });
             ctx.encoder.set_ray_tracing_pipeline(&self.pipeline);
             ctx.encoder
                 .set_bind_group(&self.pipeline_layout, 0, &self.bind_group, &[]);
-            ctx.encoder.dispatch([512, 512, 1]);
+            ctx.encoder.trace_rays([512, 512, 1]);
         }
 
         ctx.frames_recorded += 1;

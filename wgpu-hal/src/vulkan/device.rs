@@ -697,7 +697,13 @@ impl super::Device {
         }
     }
 
-    pub unsafe fn create_buffer_from_info(&self, vk_info: vk::BufferCreateInfo, label: crate::Label<'_>, alloc_usage: gpu_alloc::UsageFlags, alignment_mask: Option<vk::DeviceSize>) -> Result<super::Buffer, crate::DeviceError> {
+    pub unsafe fn create_buffer_from_info(
+        &self,
+        vk_info: vk::BufferCreateInfo,
+        label: crate::Label<'_>,
+        alloc_usage: gpu_alloc::UsageFlags,
+        alignment_mask: Option<vk::DeviceSize>,
+    ) -> Result<super::Buffer, crate::DeviceError> {
         let raw = unsafe {
             self.shared
                 .raw
@@ -2097,6 +2103,7 @@ impl crate::Device for super::Device {
         let mut groups = Vec::with_capacity(desc.groups.len());
         let mut stages = Vec::with_capacity(desc.groups.len());
         let mut temp_modules = Vec::with_capacity(desc.groups.len());
+        let mut c_strings = Vec::with_capacity(desc.groups.len());
 
         // ray generation
         let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default()
@@ -2111,6 +2118,7 @@ impl crate::Device for super::Device {
         vk_group = vk_group.general_shader(stages.len() as u32);
         groups.push(vk_group);
         stages.push(ray_gen.create_info);
+        c_strings.push(ray_gen._entry_point);
         temp_modules.push(ray_gen.temp_raw_module);
 
         // miss
@@ -2118,20 +2126,25 @@ impl crate::Device for super::Device {
             .closest_hit_shader(vk::SHADER_UNUSED_KHR)
             .intersection_shader(vk::SHADER_UNUSED_KHR)
             .any_hit_shader(vk::SHADER_UNUSED_KHR);
-        let ray_gen = self.compile_stage(
-            &desc.ray_gen_stage,
-            naga::ShaderStage::RayGeneration,
+        let miss = self.compile_stage(
+            &desc.miss_stage,
+            naga::ShaderStage::Miss,
             &desc.layout.binding_arrays,
         )?;
         vk_group = vk_group.general_shader(stages.len() as u32);
         groups.push(vk_group);
-        stages.push(ray_gen.create_info);
-        temp_modules.push(ray_gen.temp_raw_module);
+        stages.push(miss.create_info);
+        c_strings.push(miss._entry_point);
+        temp_modules.push(miss.temp_raw_module);
 
-        let mut num_shaders = 0;
+        let mut num_hit_shaders = 0;
+        // already miss and ray gen
+        let mut num_groups = 2;
 
         for group in desc.groups {
-            let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default().general_shader(vk::SHADER_UNUSED_KHR);
+            num_groups += 1;
+            let mut vk_group = vk::RayTracingShaderGroupCreateInfoKHR::default()
+                .general_shader(vk::SHADER_UNUSED_KHR);
             let closest = self.compile_stage(
                 &group.closest,
                 naga::ShaderStage::ClosestHit,
@@ -2139,6 +2152,7 @@ impl crate::Device for super::Device {
             )?;
             vk_group = vk_group.closest_hit_shader(stages.len() as u32);
             stages.push(closest.create_info);
+            c_strings.push(closest._entry_point);
             temp_modules.push(closest.temp_raw_module);
 
             let any = self.compile_stage(
@@ -2148,9 +2162,10 @@ impl crate::Device for super::Device {
             )?;
             vk_group = vk_group.any_hit_shader(stages.len() as u32);
             stages.push(any.create_info);
+            c_strings.push(any._entry_point);
             temp_modules.push(any.temp_raw_module);
 
-            num_shaders += 2;
+            num_hit_shaders += 2;
 
             if let Some(intersection) = &group.intersection {
                 debug_assert_eq!(group.ty, crate::RayTracingGroupType::Procedural);
@@ -2159,37 +2174,51 @@ impl crate::Device for super::Device {
                     naga::ShaderStage::Intersection,
                     &desc.layout.binding_arrays,
                 )?;
-                vk_group = vk_group.any_hit_shader(stages.len() as u32);
+                vk_group = vk_group.intersection_shader(stages.len() as u32);
                 stages.push(intersection.create_info);
+                c_strings.push(intersection._entry_point);
                 temp_modules.push(intersection.temp_raw_module);
-                num_shaders += 1;
+                num_hit_shaders += 1;
             } else {
                 debug_assert_eq!(group.ty, crate::RayTracingGroupType::Triangle);
                 vk_group = vk_group.intersection_shader(vk::SHADER_UNUSED_KHR);
             }
 
             vk_group = vk_group.ty(match group.ty {
-                crate::RayTracingGroupType::Triangle => vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
-                crate::RayTracingGroupType::Procedural => vk::RayTracingShaderGroupTypeKHR::PROCEDURAL_HIT_GROUP,
+                crate::RayTracingGroupType::Triangle => {
+                    vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP
+                }
+                crate::RayTracingGroupType::Procedural => {
+                    vk::RayTracingShaderGroupTypeKHR::PROCEDURAL_HIT_GROUP
+                }
             });
 
             groups.push(vk_group);
         }
 
         let rt_properties = self.ray_tracing_pipeline_properties.as_ref().unwrap();
-        let handle_size = align_to(rt_properties.shader_group_handle_size, rt_properties.shader_group_handle_alignment);
-        let mut ray_gen_sbt =
-            vk::StridedDeviceAddressRegionKHR::default()
-                .stride(align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize)
-                .size(align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize);
-        let mut ray_miss_sbt =
-            vk::StridedDeviceAddressRegionKHR::default()
-                .stride(handle_size as vk::DeviceSize)
-                .size(handle_size as vk::DeviceSize);
-        let mut ray_hit_sbt =
-            vk::StridedDeviceAddressRegionKHR::default()
-                .stride(handle_size as vk::DeviceSize)
-                .size(handle_size as vk::DeviceSize * num_shaders);
+        let handle_size = align_to(
+            rt_properties.shader_group_handle_size,
+            rt_properties.shader_group_handle_alignment,
+        );
+        let mut ray_gen_sbt = vk::StridedDeviceAddressRegionKHR::default()
+            .stride(
+                align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize,
+            )
+            .size(
+                align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize,
+            );
+        let mut ray_miss_sbt = vk::StridedDeviceAddressRegionKHR::default()
+            .stride(handle_size as vk::DeviceSize)
+            .size(
+                align_to(handle_size, rt_properties.shader_group_base_alignment) as vk::DeviceSize,
+            );
+        let mut ray_hit_sbt = vk::StridedDeviceAddressRegionKHR::default()
+            .stride(handle_size as vk::DeviceSize)
+            .size(align_to(
+                handle_size * num_hit_shaders,
+                rt_properties.shader_group_base_alignment,
+            ) as vk::DeviceSize);
         let buffer_size = ray_gen_sbt.size + ray_miss_sbt.size + ray_hit_sbt.size;
 
         let vk_infos = [{
@@ -2210,7 +2239,12 @@ impl crate::Device for super::Device {
             unsafe {
                 ray_tracing_pipeline_functions
                     .ray_tracing_pipeline
-                    .create_ray_tracing_pipelines(vk::DeferredOperationKHR::null(), pipeline_cache, &vk_infos, None)
+                    .create_ray_tracing_pipelines(
+                        vk::DeferredOperationKHR::null(),
+                        pipeline_cache,
+                        &vk_infos,
+                        None,
+                    )
                     .map_err(|(_, e)| super::map_pipeline_err(e))
             }?
         };
@@ -2220,7 +2254,12 @@ impl crate::Device for super::Device {
             unsafe { self.shared.set_object_name(raw, label) };
         }
 
-        let bytes = unsafe { ray_tracing_pipeline_functions.ray_tracing_pipeline.get_ray_tracing_shader_group_handles(raw, 0, num_shaders as u32, buffer_size as usize) }.map_err(|e| super::map_host_device_oom_err(e))?;
+        let bytes = unsafe {
+            ray_tracing_pipeline_functions
+                .ray_tracing_pipeline
+                .get_ray_tracing_shader_group_handles(raw, 0, num_groups, buffer_size as usize)
+        }
+        .map_err(|e| super::map_host_device_oom_err(e))?;
 
         for temp_raw_module in temp_modules {
             if let Some(raw_module) = temp_raw_module {
@@ -2232,16 +2271,48 @@ impl crate::Device for super::Device {
         let buffer = unsafe {
             self.create_buffer_from_info(
                 vk::BufferCreateInfo::default()
-                    .usage(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
+                    .usage(
+                        vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                            | vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR,
+                    )
                     .size(buffer_size),
                 None,
                 gpu_alloc::UsageFlags::UPLOAD,
+                //Some(rt_properties.shader_group_base_alignment as vk::DeviceSize),
                 None,
             )?
         };
         let mapping = unsafe { self.map_buffer(&buffer, 0..buffer_size)? };
         debug_assert!(mapping.is_coherent);
-        unsafe { ptr::copy(bytes.as_ptr(), mapping.ptr.as_ptr(), bytes.len()) };
+        unsafe {
+            ptr::copy(
+                bytes.as_ptr(),
+                mapping.ptr.as_ptr(),
+                ray_gen_sbt.stride as usize,
+            )
+        };
+        let mut byte_offset = rt_properties.shader_group_handle_size as usize;
+        unsafe {
+            ptr::copy(
+                bytes.as_ptr().add(byte_offset),
+                mapping.ptr.as_ptr().add(ray_gen_sbt.size as usize),
+                ray_miss_sbt.stride as usize,
+            )
+        };
+        byte_offset += rt_properties.shader_group_handle_size as usize;
+        let mut offset = ray_gen_sbt.size as usize + ray_miss_sbt.size as usize;
+        for _ in 0..num_hit_shaders {
+            unsafe {
+                ptr::copy(
+                    bytes.as_ptr().add(byte_offset),
+                    mapping.ptr.as_ptr().add(offset),
+                    ray_hit_sbt.stride as usize,
+                )
+            };
+            offset += ray_hit_sbt.stride as usize;
+            byte_offset += rt_properties.shader_group_handle_size as usize;
+        }
+
         unsafe { self.unmap_buffer(&buffer) };
         let buf_address = unsafe {
             ray_tracing_functions
@@ -2250,10 +2321,21 @@ impl crate::Device for super::Device {
                     &vk::BufferDeviceAddressInfo::default().buffer(buffer.raw),
                 )
         };
+        debug_assert_eq!(
+            buf_address % rt_properties.shader_group_base_alignment as vk::DeviceAddress,
+            0
+        );
         ray_gen_sbt = ray_gen_sbt.device_address(buf_address);
         ray_miss_sbt = ray_miss_sbt.device_address(buf_address + ray_gen_sbt.size);
-        ray_hit_sbt = ray_hit_sbt.device_address(buf_address + ray_gen_sbt.size + ray_miss_sbt.size);
-        Ok(super::RayTracingPipeline { raw, buffer, ray_gen_sbt, ray_miss_sbt, ray_hit_sbt })
+        ray_hit_sbt =
+            ray_hit_sbt.device_address(buf_address + ray_gen_sbt.size + ray_miss_sbt.size);
+        Ok(super::RayTracingPipeline {
+            raw,
+            buffer,
+            ray_gen_sbt,
+            ray_miss_sbt,
+            ray_hit_sbt,
+        })
     }
 
     unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {

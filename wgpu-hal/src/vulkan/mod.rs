@@ -580,7 +580,8 @@ pub struct Device {
     #[cfg(feature = "renderdoc")]
     render_doc: crate::auxil::renderdoc::RenderDoc,
     counters: wgt::HalCounters,
-    ray_tracing_pipeline_properties: Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>>
+    ray_tracing_pipeline_properties:
+        Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>>,
 }
 
 /// Semaphores for forcing queue submissions to run in order.
@@ -816,7 +817,7 @@ pub struct CommandEncoder {
     /// the given pool & location.
     end_of_pass_timer_query: Option<(vk::QueryPool, u32)>,
 
-    sbt: Option<[vk::StridedDeviceAddressRegionKHR; 3]>
+    sbt: Option<[vk::StridedDeviceAddressRegionKHR; 3]>,
 }
 
 impl CommandEncoder {
