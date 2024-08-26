@@ -381,13 +381,12 @@ impl Writer {
                         argument.ty,
                         binding,
                     )?;
-                    let id = match ir_module.types[argument.ty].inner {
-                        crate::TypeInner::Pointer {
-                            space: crate::AddressSpace::RayTracing,
-                            ..
-                        } => varying_id,
+                    let id = match binding {
+                        &crate::Binding::BuiltIn(crate::BuiltIn::Payload) => varying_id,
                         _ => {
-                            iface.varying_ids.push(varying_id);
+                            if binding != &crate::Binding::BuiltIn(crate::BuiltIn::Intersection) {
+                                iface.varying_ids.push(varying_id);
+                            }
                             let id = self.id_gen.next();
                             prelude.body.push(Instruction::load(
                                 argument_type_id,
