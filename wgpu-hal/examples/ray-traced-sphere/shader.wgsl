@@ -24,13 +24,12 @@ fn intersect_sphere(@builtin(object_ray_origin) origin: vec3<f32>, @builtin(obje
     if (discriminant >= 0.0) {
         let sqrt_discriminant = sqrt(discriminant);
         let t1 = (-half_B - sqrt_discriminant) / A;
-        let u = ReportIntersection(t1, 2u, 0u);
+        ReportIntersection(t1, 2u, 0u);
         let t2 = (-half_B + sqrt_discriminant) / A;
         if (sqrt_discriminant != 0.0) {
-            let u2 = ReportIntersection(t2, 3u, 0u);
+            ReportIntersection(t2, 3u, 0u);
         }
     }
-    ReportIntersection(1.0, 4u, 0u);
 }
 
 @ray_gen
@@ -45,8 +44,8 @@ fn ray_gen(@builtin(launch_id) global_id: vec3<u32>, @builtin(launch_size) targe
 
     var colour = vec3<f32>(in_uv, 0.0);
     traceRay(acc_struct, RayDesc(0u, 0xFFu, 0.1, 200.0, origin, direction), &colour);
-
-    textureStore(output, global_id.xy, vec4<f32>(colour, 1.0));
+    // y goes from bottom up
+    textureStore(output, vec2<u32>(global_id.x, target_size.y - global_id.y), vec4<f32>(colour, 1.0));
 }
 
 const HIT_COLOUR = vec3<f32>(0.5, 1.0, 0.5);
