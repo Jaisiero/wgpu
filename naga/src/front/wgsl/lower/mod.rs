@@ -2406,6 +2406,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
 
                             let _ = ctx.module.generate_ray_desc_type();
                             let fun = crate::RayTracingFunction::TraceRay {
+                                acceleration_structure,
                                 descriptor,
                                 payload,
                                 payload_ty,
@@ -2417,7 +2418,6 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             rctx.emitter.start(&rctx.function.expressions);
                             rctx.block.push(
                                 crate::Statement::RayTracing {
-                                    acceleration_structure,
                                     fun,
                                 },
                                 span,
@@ -2433,12 +2433,31 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
 
                             let intersection_ty = resolve_inner!(ctx, intersection).clone();
 
-                            crate::Expression::ReportIntersection {
+                            let result = ctx.interrupt_emitter(
+                                crate::Expression::RayQueryProceedResult,
+                                span,
+                            )?;
+                            
+                            let fun = crate::RayTracingFunction::ReportIntersection {
                                 hit_t,
                                 hit_type,
                                 intersection,
                                 intersection_ty,
-                            }
+                                result,
+                            };
+
+                            let rctx = ctx.runtime_expression_ctx(span)?;
+                            rctx.block
+                                .extend(rctx.emitter.finish(&rctx.function.expressions));
+                            rctx.emitter.start(&rctx.function.expressions);
+                            rctx.block.push(
+                                crate::Statement::RayTracing {
+                                    fun,
+                                },
+                                span,
+                            );
+
+                            return Ok(Some(result));
                         }
                         "RayDesc" => {
                             let ty = ctx.module.generate_ray_desc_type();

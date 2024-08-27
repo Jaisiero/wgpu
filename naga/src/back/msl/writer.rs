@@ -2172,7 +2172,7 @@ impl<W: Write> Writer<W> {
                 }
                 write!(self.out, "}}")?;
             }
-            crate::Expression::ReportIntersection { .. } => {
+            crate::Expression::ReportIntersectionResult => {
                 return Err(Error::FeatureNotImplemented(
                     "metal raytracing pipeline".to_string(),
                 ))

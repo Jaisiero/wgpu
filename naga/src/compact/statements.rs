@@ -100,10 +100,8 @@ impl FunctionTracer<'_> {
                         self.trace_ray_query_function(fun);
                     }
                     St::RayTracing {
-                        acceleration_structure,
                         ref fun,
                     } => {
-                        self.expressions_used.insert(acceleration_structure);
                         self.trace_ray_tracing_function(fun);
                     }
                     St::SubgroupBallot { result, predicate } => {
@@ -190,12 +188,26 @@ impl FunctionTracer<'_> {
         use crate::RayTracingFunction as Rf;
         match *fun {
             Rf::TraceRay {
+                acceleration_structure,
                 descriptor,
                 payload,
                 ..
             } => {
+                self.expressions_used.insert(acceleration_structure);
                 self.expressions_used.insert(descriptor);
                 self.expressions_used.insert(payload);
+            }
+            Rf::ReportIntersection {
+                hit_t,
+                hit_type,
+                intersection,
+                result,
+                ..
+            } => {
+                self.expressions_used.insert(hit_t);
+                self.expressions_used.insert(hit_type);
+                self.expressions_used.insert(intersection);
+                self.expressions_used.insert(result);
             }
         }
     }
@@ -308,10 +320,8 @@ impl FunctionMap {
                         self.adjust_ray_query_function(fun);
                     }
                     St::RayTracing {
-                        ref mut acceleration_structure,
                         ref mut fun,
                     } => {
-                        adjust(acceleration_structure);
                         self.adjust_ray_tracing_function(fun);
                     }
                     St::SubgroupBallot {
@@ -399,12 +409,26 @@ impl FunctionMap {
         use crate::RayTracingFunction as Rf;
         match *fun {
             Rf::TraceRay {
+                ref mut acceleration_structure,
                 ref mut descriptor,
                 ref mut payload,
                 ..
             } => {
+                self.expressions.adjust(acceleration_structure);
                 self.expressions.adjust(descriptor);
                 self.expressions.adjust(payload);
+            }
+            Rf::ReportIntersection {
+                ref mut hit_t,
+                ref mut hit_type,
+                ref mut intersection,
+                ref mut result,
+                ..
+            } => {
+                self.expressions.adjust(hit_t);
+                self.expressions.adjust(hit_type);
+                self.expressions.adjust(intersection);
+                self.expressions.adjust(result);
             }
         }
     }

@@ -7,10 +7,7 @@
 
 use super::{ExpressionError, FunctionError, ModuleInfo, ShaderStages, ValidationFlags};
 use crate::span::{AddSpan as _, WithSpan};
-use crate::{
-    arena::{Arena, Handle},
-    proc::{ResolveContext, TypeResolution},
-};
+use crate::{arena::{Arena, Handle}, proc::{ResolveContext, TypeResolution}, RayTracingFunction};
 use std::ops;
 
 pub type NonUniformResult = Option<Handle<crate::Expression>>;
@@ -770,7 +767,7 @@ impl FunctionInfo {
                 requirements: UniformityRequirements::empty(),
             },
             E::CallResult(function) => other_functions[function.index()].uniformity.clone(),
-            E::AtomicResult { .. } | E::RayQueryProceedResult => Uniformity {
+            E::AtomicResult { .. } | E::RayQueryProceedResult | E::ReportIntersectionResult => Uniformity {
                 non_uniform_result: Some(handle),
                 requirements: UniformityRequirements::empty(),
             },
@@ -790,18 +787,6 @@ impl FunctionInfo {
                 committed: _,
             } => Uniformity {
                 non_uniform_result: self.add_ref(query),
-                requirements: UniformityRequirements::empty(),
-            },
-            E::ReportIntersection {
-                hit_t,
-                hit_type,
-                intersection,
-                intersection_ty: _,
-            } => Uniformity {
-                non_uniform_result: self
-                    .add_ref(hit_t)
-                    .or(self.add_ref(hit_type))
-                    .or(self.add_ref(intersection)),
                 requirements: UniformityRequirements::empty(),
             },
             E::SubgroupBallotResult => Uniformity {
@@ -1055,17 +1040,30 @@ impl FunctionInfo {
                     FunctionUniformity::new()
                 }
                 S::RayTracing {
-                    acceleration_structure,
                     ref fun,
                 } => {
-                    let _ = self.add_ref(acceleration_structure);
-                    let crate::RayTracingFunction::TraceRay {
-                        descriptor,
-                        payload,
-                        ..
-                    } = *fun;
-                    let _ = self.add_ref(descriptor);
-                    let _ = self.add_ref(payload);
+                    match *fun {
+                        RayTracingFunction::ReportIntersection {
+                            hit_t,
+                            hit_type,
+                            intersection,
+                            ..
+                        } => {
+                            let _ = self.add_ref(hit_t);
+                            let _ = self.add_ref(hit_type);
+                            let _ = self.add_ref(intersection);
+                        }
+                        RayTracingFunction::TraceRay {
+                            descriptor,
+                            payload,
+                            acceleration_structure,
+                            ..
+                        } => {
+                            let _ = self.add_ref(acceleration_structure);
+                            let _ = self.add_ref(descriptor);
+                            let _ = self.add_ref(payload);
+                        }
+                    }
                     FunctionUniformity::new()
                 }
                 S::SubgroupBallot {
