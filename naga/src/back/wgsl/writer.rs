@@ -1831,7 +1831,7 @@ impl<W: Write> Writer<W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
+            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersectionResult => {
                 unreachable!()
             }
             // Nothing to do here, since call expression already cached

@@ -711,14 +711,14 @@ impl super::Validator {
                             | Ex::Math { .. }
                             | Ex::As { .. }
                             | Ex::ArrayLength(_)
-                            | Ex::RayQueryGetIntersection { .. }
-                            | Ex::ReportIntersection { .. } => {
+                            | Ex::RayQueryGetIntersection { .. } => {
                                 self.emit_expression(handle, context)?
                             }
                             Ex::CallResult(_)
                             | Ex::AtomicResult { .. }
                             | Ex::WorkGroupUniformLoadResult { .. }
                             | Ex::RayQueryProceedResult
+                            | Ex::ReportIntersectionResult
                             | Ex::SubgroupBallotResult
                             | Ex::SubgroupOperationResult { .. } => {
                                 return Err(FunctionError::EmitResult(handle)
@@ -1230,26 +1230,26 @@ impl super::Validator {
                     }
                 }
                 S::RayTracing {
-                    acceleration_structure,
                     ref fun,
                 } => {
-                    match *context
-                        .resolve_type(acceleration_structure, &self.valid_expression_set)?
-                    {
-                        Ti::AccelerationStructure => {}
-                        _ => {
-                            return Err(FunctionError::InvalidAccelerationStructure(
-                                acceleration_structure,
-                            )
-                            .with_span_static(span, "invalid acceleration structure"))
-                        }
-                    }
-                    match fun {
-                        &RayTracingFunction::TraceRay {
+                    match *fun {
+                        RayTracingFunction::TraceRay {
+                            ref acceleration_structure,
                             ref descriptor,
                             ref payload,
                             ref payload_ty,
                         } => {
+                            match *context
+                                .resolve_type(*acceleration_structure, &self.valid_expression_set)?
+                            {
+                                Ti::AccelerationStructure => {}
+                                _ => {
+                                    return Err(FunctionError::InvalidAccelerationStructure(
+                                        *acceleration_structure,
+                                    )
+                                        .with_span_static(span, "invalid acceleration structure"))
+                                }
+                            }
                             let desc_ty_given =
                                 context.resolve_type(*descriptor, &self.valid_expression_set)?;
                             let desc_ty_expected = context
@@ -1277,6 +1277,33 @@ impl super::Validator {
                                 return Err(FunctionError::InvalidRayPayload(*payload)
                                     .with_span_static(span, "TraceRay"));
                             }
+                        }
+                        RayTracingFunction::ReportIntersection {
+                            ref hit_t,
+                            ref hit_type,
+                            ref result,
+                            // the intersection type can be anything
+                            ..
+                        } => {
+                            match *context
+                                .resolve_type(*hit_t, &self.valid_expression_set)?
+                            {
+                                Ti::Scalar(crate::Scalar::F32) => {}
+                                _ => {
+                                    return Err(FunctionError::InvalidArgumentType { index: 1, name: "hit t".to_string()}
+                                        .with_span_static(span, "invalid hit t type"))
+                                }
+                            }
+                            match *context
+                                .resolve_type(*hit_type, &self.valid_expression_set)?
+                            {
+                                Ti::Scalar(crate::Scalar::U32) => {}
+                                _ => {
+                                    return Err(FunctionError::InvalidArgumentType { index: 2, name: "hit type".to_string()}
+                                        .with_span_static(span, "invalid hit type type"))
+                                }
+                            }
+                            self.emit_expression(*result, context)?;
                         }
                     }
                 }

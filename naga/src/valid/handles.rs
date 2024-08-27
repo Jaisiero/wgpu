@@ -421,6 +421,7 @@ impl super::Validator {
             }
             crate::Expression::AtomicResult { .. }
             | crate::Expression::RayQueryProceedResult
+            | crate::Expression::ReportIntersectionResult
             | crate::Expression::SubgroupBallotResult
             | crate::Expression::SubgroupOperationResult { .. }
             | crate::Expression::WorkGroupUniformLoadResult { .. } => (),
@@ -432,16 +433,6 @@ impl super::Validator {
                 committed: _,
             } => {
                 handle.check_dep(query)?;
-            }
-            crate::Expression::ReportIntersection {
-                hit_t,
-                hit_type,
-                intersection,
-                intersection_ty: _,
-            } => {
-                handle.check_dep(hit_t)?;
-                handle.check_dep(hit_type)?;
-                handle.check_dep(intersection)?;
             }
         }
         Ok(())
@@ -581,18 +572,30 @@ impl super::Validator {
                 Ok(())
             }
             crate::Statement::RayTracing {
-                acceleration_structure,
                 ref fun,
             } => {
-                validate_expr(acceleration_structure)?;
                 match *fun {
                     RayTracingFunction::TraceRay {
+                        acceleration_structure,
                         descriptor,
                         payload,
                         ..
                     } => {
+                        validate_expr(acceleration_structure)?;
                         validate_expr(descriptor)?;
                         validate_expr(payload)?;
+                    }
+                    RayTracingFunction::ReportIntersection {
+                        hit_t,
+                        hit_type,
+                        intersection,
+                        result,
+                        ..
+                    } => {
+                        validate_expr(hit_t)?;
+                        validate_expr(hit_type)?;
+                        validate_expr(intersection)?;
+                        validate_expr(result)?;
                     }
                 }
                 Ok(())

@@ -1697,12 +1697,7 @@ pub enum Expression {
         committed: bool,
     },
     /// Report a intersection found by an intersection shader
-    ReportIntersection {
-        hit_t: Handle<Expression>,
-        hit_type: Handle<Expression>,
-        intersection: Handle<Expression>,
-        intersection_ty: TypeInner,
-    },
+    ReportIntersectionResult,
     /// Result of a [`SubgroupBallot`] statement.
     ///
     /// [`SubgroupBallot`]: Statement::SubgroupBallot
@@ -1790,7 +1785,18 @@ pub enum RayQueryFunction {
 #[cfg_attr(feature = "deserialize", derive(Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
 pub enum RayTracingFunction {
+    ReportIntersection {
+        hit_t: Handle<Expression>,
+        hit_type: Handle<Expression>,
+        intersection: Handle<Expression>,
+        intersection_ty: TypeInner,
+        result: Handle<Expression>,
+    },
     TraceRay {
+        /// The [`AccelerationStructure`] object this ray traces through.
+        ///
+        /// [`AccelerationStructure`]: TypeInner::AccelerationStructure
+        acceleration_structure: Handle<Expression>,
         #[allow(rustdoc::private_intra_doc_links)]
         /// A struct of detailed parameters for the ray to be traced.
         ///
@@ -2071,11 +2077,6 @@ pub enum Statement {
         fun: RayQueryFunction,
     },
     RayTracing {
-        /// The [`AccelerationStructure`] object this statement operates on.
-        ///
-        /// [`AccelerationStructure`]: TypeInner::AccelerationStructure
-        acceleration_structure: Handle<Expression>,
-
         /// The specific operation we're performing on `acceleration_structure`.
         fun: RayTracingFunction,
     },

@@ -72,7 +72,8 @@ impl<'tracer> ExpressionTracer<'tracer> {
                 | Ex::LocalVariable(_)
                 | Ex::CallResult(_)
                 | Ex::SubgroupBallotResult
-                | Ex::RayQueryProceedResult => {}
+                | Ex::RayQueryProceedResult
+                | Ex::ReportIntersectionResult => {}
 
                 Ex::Constant(handle) => {
                     self.constants_used.insert(handle);
@@ -223,16 +224,6 @@ impl<'tracer> ExpressionTracer<'tracer> {
                 } => {
                     self.expressions_used.insert(query);
                 }
-                Ex::ReportIntersection {
-                    hit_t,
-                    hit_type,
-                    intersection,
-                    intersection_ty: _,
-                } => {
-                    self.expressions_used.insert(hit_t);
-                    self.expressions_used.insert(hit_type);
-                    self.expressions_used.insert(intersection);
-                }
             }
         }
     }
@@ -261,7 +252,8 @@ impl ModuleMap {
             | Ex::LocalVariable(_)
             | Ex::CallResult(_)
             | Ex::SubgroupBallotResult
-            | Ex::RayQueryProceedResult => {}
+            | Ex::RayQueryProceedResult
+            | Ex::ReportIntersectionResult => {}
 
             // All overrides are retained, so their handles never change.
             Ex::Override(_) => {}
@@ -397,17 +389,6 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
-            Ex::ReportIntersection {
-                ref mut hit_t,
-                ref mut hit_type,
-                ref mut intersection,
-                ..
-            } => {
-                adjust(hit_t);
-                adjust(hit_type);
-                adjust(intersection);
-                //self.types.adjust(intersection_ty);
-            }
         }
     }
 

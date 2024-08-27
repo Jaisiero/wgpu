@@ -1639,28 +1639,7 @@ impl super::Validator {
                     return Err(ExpressionError::InvalidRayQueryType(query));
                 }
             },
-            E::ReportIntersection {
-                hit_t,
-                hit_type, /* intersection can have any type */
-                ..
-            } => {
-                match resolver[hit_t] {
-                    Ti::Scalar(crate::Scalar::F32) => {}
-                    ref other => {
-                        log::error!("Hit t of {:?}", other);
-                        return Err(ExpressionError::InvalidHitTType(hit_t));
-                    }
-                }
-                match resolver[hit_type] {
-                    Ti::Scalar(crate::Scalar::U32) => {}
-                    ref other => {
-                        log::error!("Hit type of {:?}", other);
-                        return Err(ExpressionError::InvalidHitTypeType(hit_t));
-                    }
-                }
-
-                ShaderStages::INTERSECTION
-            }
+            E::ReportIntersectionResult => ShaderStages::INTERSECTION,
             E::SubgroupBallotResult | E::SubgroupOperationResult { .. } => self.subgroup_stages,
         };
         Ok(stages)

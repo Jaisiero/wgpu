@@ -1428,7 +1428,8 @@ impl<'w> BlockContext<'w> {
             | crate::Expression::WorkGroupUniformLoadResult { .. }
             | crate::Expression::RayQueryProceedResult
             | crate::Expression::SubgroupBallotResult
-            | crate::Expression::SubgroupOperationResult { .. } => self.cached[expr_handle],
+            | crate::Expression::SubgroupOperationResult { .. }
+            | crate::Expression::ReportIntersectionResult => self.cached[expr_handle],
             crate::Expression::As {
                 expr,
                 kind,
@@ -1727,18 +1728,6 @@ impl<'w> BlockContext<'w> {
                 }
                 self.write_ray_query_get_intersection(query, block)
             }
-            crate::Expression::ReportIntersection {
-                hit_t,
-                hit_type,
-                intersection,
-                ref intersection_ty,
-            } => self.write_ray_report_intersect(
-                block,
-                hit_t,
-                hit_type,
-                intersection,
-                intersection_ty.clone(),
-            )?,
         };
 
         self.cached[expr_handle] = id;
@@ -2669,11 +2658,9 @@ impl<'w> BlockContext<'w> {
                     self.write_ray_query_function(query, fun, &mut block);
                 }
                 Statement::RayTracing {
-                    acceleration_structure,
                     ref fun,
                 } => {
                     self.write_ray_tracing_function(
-                        acceleration_structure,
                         fun,
                         &mut block,
                         stage.unwrap(),

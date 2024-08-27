@@ -2244,16 +2244,16 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             }
             Statement::RayQuery { .. } => unreachable!(),
             Statement::RayTracing {
-                acceleration_structure,
                 ref fun,
-            } => match fun {
-                &RayTracingFunction::TraceRay {
+            } => match *fun {
+                RayTracingFunction::TraceRay {
                     ref descriptor,
                     ref payload,
+                    ref acceleration_structure,
                     ..
                 } => {
                     write!(self.out, "TraceRay(")?;
-                    self.write_expr(module, acceleration_structure, func_ctx)?;
+                    self.write_expr(module, *acceleration_structure, func_ctx)?;
                     write!(self.out, ", ")?;
                     self.write_expr(module, *descriptor, func_ctx)?;
                     write!(self.out, ".flags")?;
@@ -2280,6 +2280,20 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     self.write_expr(module, *payload, func_ctx)?;
                     write!(self.out, ");")?;
                 }
+                RayTracingFunction::ReportIntersection {
+                    ref hit_t,
+                    ref hit_type,
+                    ref intersection,
+                    ..
+                } => {
+                    write!(self.out, "ReportHit(")?;
+                    self.write_expr(module, *hit_t, func_ctx)?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *hit_type, func_ctx)?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, *intersection, func_ctx)?;
+                    write!(self.out, ");")?;
+                },
             },
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
@@ -3588,7 +3602,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, ")")?
             }
             // Not supported yet
-            Expression::RayQueryGetIntersection { .. } | Expression::ReportIntersection { .. } => {
+            Expression::RayQueryGetIntersection { .. } => {
                 unreachable!()
             }
             // Nothing to do here, since call expression already cached
@@ -3597,7 +3611,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             | Expression::WorkGroupUniformLoadResult { .. }
             | Expression::RayQueryProceedResult
             | Expression::SubgroupBallotResult
-            | Expression::SubgroupOperationResult { .. } => {}
+            | Expression::SubgroupOperationResult { .. }
+            | Expression::ReportIntersectionResult => {}
         }
 
         if !closing_bracket.is_empty() {

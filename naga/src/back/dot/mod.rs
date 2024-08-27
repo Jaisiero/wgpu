@@ -701,7 +701,7 @@ fn write_function_expressions(
                 let ty = if committed { "Committed" } else { "Candidate" };
                 (format!("rayQueryGet{}Intersection", ty).into(), 4)
             }
-            E::ReportIntersection { .. } => unimplemented!("no raytracing support"),
+            E::ReportIntersectionResult => unimplemented!("no raytracing support"),
             E::SubgroupBallotResult => ("SubgroupBallotResult".into(), 4),
             E::SubgroupOperationResult { .. } => ("SubgroupOperationResult".into(), 4),
         };
