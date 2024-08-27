@@ -1209,4 +1209,27 @@ impl crate::CommandEncoder for super::CommandEncoder {
     ) {
         todo!()
     }
+
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        _desc: &crate::RayTracingPassDescriptor<super::QuerySet>,
+    ) {
+        todo!()
+    }
+
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        todo!()
+    }
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, _pipeline: &super::RayTracingPipeline) {
+        todo!()
+    }
+
+    unsafe fn trace_rays(&mut self, _count: [u32; 3]) {
+        todo!()
+    }
+
+    unsafe fn trace_rays_indirect(&mut self, _buffer: &super::Buffer, _offset: wgt::BufferAddress) {
+        todo!()
+    }
 }

@@ -1180,9 +1180,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
             )
         };
         self.sbt = Some([
-            pipeline.ray_gen_sbt.clone(),
-            pipeline.ray_miss_sbt.clone(),
-            pipeline.ray_hit_sbt.clone(),
+            pipeline.ray_gen_sbt,
+            pipeline.ray_miss_sbt,
+            pipeline.ray_hit_sbt,
         ]);
     }
     unsafe fn trace_rays(&mut self, count: [u32; 3]) {

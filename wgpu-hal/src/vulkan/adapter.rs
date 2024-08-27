@@ -2005,7 +2005,7 @@ impl super::Adapter {
             #[cfg(feature = "renderdoc")]
             render_doc: Default::default(),
             counters: Default::default(),
-            ray_tracing_pipeline_properties: self.phd_capabilities.ray_tracing_pipeline.clone(),
+            ray_tracing_pipeline_properties: self.phd_capabilities.ray_tracing_pipeline,
         };
 
         Ok(crate::OpenDevice { device, queue })

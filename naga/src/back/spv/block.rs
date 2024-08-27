@@ -2657,14 +2657,8 @@ impl<'w> BlockContext<'w> {
                 Statement::RayQuery { query, ref fun } => {
                     self.write_ray_query_function(query, fun, &mut block);
                 }
-                Statement::RayTracing {
-                    ref fun,
-                } => {
-                    self.write_ray_tracing_function(
-                        fun,
-                        &mut block,
-                        stage.unwrap(),
-                    )?;
+                Statement::RayTracing { ref fun } => {
+                    self.write_ray_tracing_function(fun, &mut block, stage.unwrap())?;
                 }
                 Statement::SubgroupBallot {
                     result,

@@ -2170,7 +2170,7 @@ impl crate::Device for super::Device {
             if let Some(intersection) = &group.intersection {
                 debug_assert_eq!(group.ty, crate::RayTracingGroupType::Procedural);
                 let intersection = self.compile_stage(
-                    &intersection,
+                    intersection,
                     naga::ShaderStage::Intersection,
                     &desc.layout.binding_arrays,
                 )?;
@@ -2259,12 +2259,10 @@ impl crate::Device for super::Device {
                 .ray_tracing_pipeline
                 .get_ray_tracing_shader_group_handles(raw, 0, num_groups, buffer_size as usize)
         }
-        .map_err(|e| super::map_host_device_oom_err(e))?;
+        .map_err(super::map_host_device_oom_err)?;
 
-        for temp_raw_module in temp_modules {
-            if let Some(raw_module) = temp_raw_module {
-                unsafe { self.shared.raw.destroy_shader_module(raw_module, None) };
-            }
+        for raw_module in temp_modules.into_iter().flatten() {
+            unsafe { self.shared.raw.destroy_shader_module(raw_module, None) };
         }
 
         self.counters.ray_tracing_pipelines.add(1);
