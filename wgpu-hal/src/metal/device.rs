@@ -1423,4 +1423,10 @@ impl crate::Device for super::Device {
     fn get_internal_counters(&self) -> wgt::HalCounters {
         self.counters.clone()
     }
+    unsafe fn create_ray_tracing_pipeline(&self, _desc: &crate::RayTracingPipelineDescriptor<super::PipelineLayout, super::ShaderModule, super::PipelineCache>) -> Result<super::RayTracingPipeline, crate::PipelineError> {
+        unimplemented!()
+    }
+    unsafe fn destroy_ray_tracing_pipeline(&self, _pipeline: super::RayTracingPipeline) {
+        unimplemented!()
+    }
 }

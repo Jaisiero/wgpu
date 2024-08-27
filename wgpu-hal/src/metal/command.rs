@@ -1277,6 +1277,26 @@ impl crate::CommandEncoder for super::CommandEncoder {
     ) {
         unimplemented!()
     }
+    unsafe fn begin_ray_tracing_pass(&mut self, _desc: &crate::RayTracingPassDescriptor<super::QuerySet>) {
+        unimplemented!()
+    }
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        unimplemented!()
+    }
+    unsafe fn set_ray_tracing_pipeline(&mut self, _pipeline: &super::RayTracingPipeline) {
+        unimplemented!()
+    }
+
+    unsafe fn trace_rays(&mut self, _count: [u32; 3]) {
+        unimplemented!()
+    }
+    unsafe fn trace_rays_indirect(
+        &mut self,
+        _buffer: &super::Buffer,
+        _offset: wgt::BufferAddress,
+    ) {
+        unimplemented!()
+    }
 }
 
 impl Drop for super::CommandEncoder {

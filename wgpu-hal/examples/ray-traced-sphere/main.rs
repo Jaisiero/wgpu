@@ -1,4 +1,4 @@
-/// based off ray-traced triangle, but demonsrates ray-shpere intersections
+/// based off ray-traced triangle, but demonstrates ray-sphere intersections
 extern crate wgpu_hal as hal;
 
 use hal::{

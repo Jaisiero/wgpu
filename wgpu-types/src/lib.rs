@@ -950,7 +950,7 @@ bitflags::bitflags! {
         ///
         /// This is a native only feature.
         const SHADER_INT64_ATOMIC_ALL_OPS = 1 << 61;
-        /// Allows the use of the ray-tracing pipline
+        /// Allows the use of the ray-tracing pipeline
         ///
         /// Supported platforms:
         /// Vulkan
