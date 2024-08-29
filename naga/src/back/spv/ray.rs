@@ -400,6 +400,11 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::store(pointer_type_id, intersection_id, None));
+                (interface
+                    .as_mut()
+                    .expect("can only call trace rays in ray gen entry"))
+                .varying_ids
+                .push(pointer_type_id);
                 let result_id = self.gen_id();
                 let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(
                     crate::TypeInner::Scalar(crate::Scalar::BOOL),

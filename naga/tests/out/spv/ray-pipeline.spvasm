@@ -14,7 +14,7 @@ OpEntryPoint AnyHitNV %38 "discard_any_hit" %34 %35
 OpEntryPoint AnyHitNV %47 "any_hit" %41 %42 %44
 OpEntryPoint ClosestHitNV %55 "closest_hit" %50 %51 %53
 OpEntryPoint MissNV %61 "miss" %60
-OpEntryPoint IntersectionNV %64 "intersect_return"
+OpEntryPoint IntersectionNV %64 "intersect_return" %69
 OpMemberDecorate %8 0 Offset 0
 OpMemberDecorate %8 1 Offset 4
 OpMemberDecorate %8 2 Offset 8
