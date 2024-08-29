@@ -381,12 +381,10 @@ impl Writer {
                         argument.ty,
                         binding,
                     )?;
+                    iface.varying_ids.push(varying_id);
                     let id = match binding {
                         &crate::Binding::BuiltIn(crate::BuiltIn::Payload) => varying_id,
                         _ => {
-                            if binding != &crate::Binding::BuiltIn(crate::BuiltIn::Intersection) {
-                                iface.varying_ids.push(varying_id);
-                            }
                             let id = self.id_gen.next();
                             prelude.body.push(Instruction::load(
                                 argument_type_id,
