@@ -15,8 +15,8 @@ use crate::{
 use spirv::Word;
 use std::collections::hash_map::Entry;
 
-struct FunctionInterface<'a> {
-    varying_ids: &'a mut Vec<Word>,
+pub(crate) struct FunctionInterface<'a> {
+    pub(crate) varying_ids: &'a mut Vec<Word>,
     stage: crate::ShaderStage,
 }
 
@@ -703,26 +703,28 @@ impl Writer {
             .function
             .consume(prelude, Instruction::branch(next_id));
 
-        let workgroup_vars_init_exit_block_id =
-            match (context.writer.zero_initialize_workgroup_memory, interface) {
-                (
-                    super::ZeroInitializeWorkgroupMemoryMode::Polyfill,
-                    Some(
-                        ref mut interface @ FunctionInterface {
-                            stage: crate::ShaderStage::Compute,
-                            ..
-                        },
-                    ),
-                ) => context.writer.generate_workgroup_vars_init_block(
-                    next_id,
-                    ir_module,
-                    info,
-                    local_invocation_id,
-                    interface,
-                    context.function,
+        let workgroup_vars_init_exit_block_id = match (
+            context.writer.zero_initialize_workgroup_memory,
+            interface.as_mut(),
+        ) {
+            (
+                super::ZeroInitializeWorkgroupMemoryMode::Polyfill,
+                Some(
+                    interface @ &mut FunctionInterface {
+                        stage: crate::ShaderStage::Compute,
+                        ..
+                    },
                 ),
-                _ => None,
-            };
+            ) => context.writer.generate_workgroup_vars_init_block(
+                next_id,
+                ir_module,
+                info,
+                local_invocation_id,
+                interface,
+                context.function,
+            ),
+            _ => None,
+        };
 
         let main_id = if let Some(exit_id) = workgroup_vars_init_exit_block_id {
             exit_id
@@ -737,6 +739,7 @@ impl Writer {
             LoopContext::default(),
             debug_info.as_ref(),
             stage,
+            &mut interface,
         )?;
 
         // Consume the `BlockContext`, ending its borrows and letting the

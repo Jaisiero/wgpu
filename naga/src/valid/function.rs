@@ -1229,9 +1229,7 @@ impl super::Validator {
                         crate::RayQueryFunction::Terminate => {}
                     }
                 }
-                S::RayTracing {
-                    ref fun,
-                } => {
+                S::RayTracing { ref fun } => {
                     match *fun {
                         RayTracingFunction::TraceRay {
                             ref acceleration_structure,
@@ -1247,7 +1245,7 @@ impl super::Validator {
                                     return Err(FunctionError::InvalidAccelerationStructure(
                                         *acceleration_structure,
                                     )
-                                        .with_span_static(span, "invalid acceleration structure"))
+                                    .with_span_static(span, "invalid acceleration structure"))
                                 }
                             }
                             let desc_ty_given =
@@ -1285,22 +1283,24 @@ impl super::Validator {
                             // the intersection type can be anything
                             ..
                         } => {
-                            match *context
-                                .resolve_type(*hit_t, &self.valid_expression_set)?
-                            {
+                            match *context.resolve_type(*hit_t, &self.valid_expression_set)? {
                                 Ti::Scalar(crate::Scalar::F32) => {}
                                 _ => {
-                                    return Err(FunctionError::InvalidArgumentType { index: 1, name: "hit t".to_string()}
-                                        .with_span_static(span, "invalid hit t type"))
+                                    return Err(FunctionError::InvalidArgumentType {
+                                        index: 1,
+                                        name: "hit t".to_string(),
+                                    }
+                                    .with_span_static(span, "invalid hit t type"))
                                 }
                             }
-                            match *context
-                                .resolve_type(*hit_type, &self.valid_expression_set)?
-                            {
+                            match *context.resolve_type(*hit_type, &self.valid_expression_set)? {
                                 Ti::Scalar(crate::Scalar::U32) => {}
                                 _ => {
-                                    return Err(FunctionError::InvalidArgumentType { index: 2, name: "hit type".to_string()}
-                                        .with_span_static(span, "invalid hit type type"))
+                                    return Err(FunctionError::InvalidArgumentType {
+                                        index: 2,
+                                        name: "hit type".to_string(),
+                                    }
+                                    .with_span_static(span, "invalid hit type type"))
                                 }
                             }
                             self.emit_expression(*result, context)?;
