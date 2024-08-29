@@ -708,30 +708,34 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
                 crate::RayQueryFunction::Terminate => {}
             }
         }
-        Statement::RayTracing { ref mut fun } => match *fun {
-            crate::RayTracingFunction::TraceRay {
-                ref mut acceleration_structure,
-                ref mut descriptor,
-                ref mut payload,
-                ..
-            } => {
-                adjust(acceleration_structure);
-                adjust(descriptor);
-                adjust(payload);
+        Statement::RayTracing {
+            ref mut fun,
+        } => {
+            match *fun {
+                crate::RayTracingFunction::TraceRay {
+                    ref mut acceleration_structure,
+                    ref mut descriptor,
+                    ref mut payload,
+                    ..
+                } => {
+                    adjust(acceleration_structure);
+                    adjust(descriptor);
+                    adjust(payload);
+                }
+                crate::RayTracingFunction::ReportIntersection {
+                    ref mut hit_t,
+                    ref mut hit_type,
+                    ref mut intersection,
+                    ref mut result,
+                    ..
+                } => {
+                    adjust(hit_t);
+                    adjust(hit_type);
+                    adjust(intersection);
+                    adjust(result)
+                }
             }
-            crate::RayTracingFunction::ReportIntersection {
-                ref mut hit_t,
-                ref mut hit_type,
-                ref mut intersection,
-                ref mut result,
-                ..
-            } => {
-                adjust(hit_t);
-                adjust(hit_type);
-                adjust(intersection);
-                adjust(result)
-            }
-        },
+        }
         Statement::Break | Statement::Continue | Statement::Kill | Statement::Barrier(_) => {}
     }
 }

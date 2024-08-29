@@ -266,7 +266,6 @@ impl<'w> BlockContext<'w> {
         function: &crate::RayTracingFunction,
         block: &mut Block,
         stage: ShaderStage,
-        interface: &mut Option<super::writer::FunctionInterface>,
     ) -> Result<(), super::Error> {
         match *function {
             crate::RayTracingFunction::TraceRay {
@@ -365,11 +364,6 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::copy(payload_id, varying_id, None));
-                (interface
-                    .as_mut()
-                    .expect("can only call trace rays in ray gen entry"))
-                .varying_ids
-                .push(varying_id);
             }
             crate::RayTracingFunction::ReportIntersection {
                 hit_t,
@@ -393,7 +387,7 @@ impl<'w> BlockContext<'w> {
                     spirv::StorageClass::HitAttributeKHR,
                     None,
                 )
-                .to_words(&mut self.writer.logical_layout.declarations);
+                    .to_words(&mut self.writer.logical_layout.declarations);
                 let hit_t_id = self.cached[hit_t];
                 let hit_type_id = self.cached[hit_type];
                 let intersection_id = self.cached[intersection];
@@ -401,9 +395,11 @@ impl<'w> BlockContext<'w> {
                     .body
                     .push(Instruction::store(pointer_type_id, intersection_id, None));
                 let result_id = self.gen_id();
-                let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(
-                    crate::TypeInner::Scalar(crate::Scalar::BOOL),
-                ));
+                let result_ty_id =
+                    self.writer
+                        .get_expression_type_id(&TypeResolution::Value(crate::TypeInner::Scalar(
+                            crate::Scalar::BOOL,
+                        )));
                 block.body.push(Instruction::report_intersection(
                     result_ty_id,
                     result_id,

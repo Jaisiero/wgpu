@@ -2243,7 +2243,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_switch(module, func_ctx, level, selector, cases)?;
             }
             Statement::RayQuery { .. } => unreachable!(),
-            Statement::RayTracing { ref fun } => match *fun {
+            Statement::RayTracing {
+                ref fun,
+            } => match *fun {
                 RayTracingFunction::TraceRay {
                     ref descriptor,
                     ref payload,
@@ -2291,7 +2293,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, ", ")?;
                     self.write_expr(module, *intersection, func_ctx)?;
                     write!(self.out, ");")?;
-                }
+                },
             },
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
