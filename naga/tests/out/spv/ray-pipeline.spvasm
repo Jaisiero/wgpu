@@ -9,10 +9,10 @@ OpExtension "SPV_KHR_ray_query"
 OpExtension "SPV_KHR_ray_tracing"
 %1 = OpExtInstImport "GLSL.std.450"
 OpMemoryModel Logical GLSL450
-OpEntryPoint RayGenerationNV %15 "ray_gen" %12
-OpEntryPoint AnyHitNV %38 "discard_any_hit" %35
-OpEntryPoint AnyHitNV %47 "any_hit" %42 %44
-OpEntryPoint ClosestHitNV %55 "closest_hit" %51 %53
+OpEntryPoint RayGenerationNV %15 "ray_gen" %12 %23
+OpEntryPoint AnyHitNV %38 "discard_any_hit"
+OpEntryPoint AnyHitNV %47 "any_hit" %44
+OpEntryPoint ClosestHitNV %55 "closest_hit" %53
 OpEntryPoint MissNV %61 "miss"
 OpEntryPoint IntersectionNV %64 "intersect_return"
 OpMemberDecorate %8 0 Offset 0
@@ -55,23 +55,23 @@ OpDecorate %60 Location 0
 %31 = OpConstant  %6  0
 %32 = OpConstant  %6  1
 %34 = OpVariable  %9  IncomingRayPayloadNV
-%36 = OpTypePointer Input %11
-%35 = OpVariable  %36  Input
+%36 = OpTypePointer HitAttributeNV %11
+%35 = OpVariable  %36  HitAttributeNV
 %41 = OpVariable  %9  IncomingRayPayloadNV
-%42 = OpVariable  %36  Input
+%42 = OpVariable  %36  HitAttributeNV
 %45 = OpTypePointer Input %5
 %44 = OpVariable  %45  Input
 %50 = OpVariable  %9  IncomingRayPayloadNV
-%51 = OpVariable  %36  Input
+%51 = OpVariable  %36  HitAttributeNV
 %53 = OpVariable  %45  Input
 %56 = OpConstant  %5  1.0
 %57 = OpConstantComposite  %4  %56 %56 %56 %56
 %60 = OpVariable  %9  IncomingRayPayloadNV
 %65 = OpConstant  %5  0.5
 %66 = OpConstant  %6  5
-%68 = OpTypeBool
-%69 = OpTypePointer HitAttributeNV %6
-%70 = OpVariable  %69  HitAttributeNV
+%68 = OpTypePointer HitAttributeNV %6
+%69 = OpVariable  %68  HitAttributeNV
+%71 = OpTypeBool
 %15 = OpFunction  %2  None %16
 %14 = OpLabel
 %20 = OpVariable  %21  Function %18
@@ -126,7 +126,7 @@ OpFunctionEnd
 %63 = OpLabel
 OpBranch %67
 %67 = OpLabel
-OpStore %70 %31
-%71 = OpReportIntersectionNV  %68  %65 %66
+OpStore %69 %31
+%70 = OpReportIntersectionNV  %71  %65 %66
 OpReturn
 OpFunctionEnd
