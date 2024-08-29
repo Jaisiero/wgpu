@@ -571,9 +571,7 @@ impl super::Validator {
                 }
                 Ok(())
             }
-            crate::Statement::RayTracing {
-                ref fun,
-            } => {
+            crate::Statement::RayTracing { ref fun } => {
                 match *fun {
                     RayTracingFunction::TraceRay {
                         acceleration_structure,

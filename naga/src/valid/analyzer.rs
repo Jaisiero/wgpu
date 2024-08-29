@@ -7,7 +7,11 @@
 
 use super::{ExpressionError, FunctionError, ModuleInfo, ShaderStages, ValidationFlags};
 use crate::span::{AddSpan as _, WithSpan};
-use crate::{arena::{Arena, Handle}, proc::{ResolveContext, TypeResolution}, RayTracingFunction};
+use crate::{
+    arena::{Arena, Handle},
+    proc::{ResolveContext, TypeResolution},
+    RayTracingFunction,
+};
 use std::ops;
 
 pub type NonUniformResult = Option<Handle<crate::Expression>>;
@@ -767,10 +771,12 @@ impl FunctionInfo {
                 requirements: UniformityRequirements::empty(),
             },
             E::CallResult(function) => other_functions[function.index()].uniformity.clone(),
-            E::AtomicResult { .. } | E::RayQueryProceedResult | E::ReportIntersectionResult => Uniformity {
-                non_uniform_result: Some(handle),
-                requirements: UniformityRequirements::empty(),
-            },
+            E::AtomicResult { .. } | E::RayQueryProceedResult | E::ReportIntersectionResult => {
+                Uniformity {
+                    non_uniform_result: Some(handle),
+                    requirements: UniformityRequirements::empty(),
+                }
+            }
             E::WorkGroupUniformLoadResult { .. } => Uniformity {
                 // The result of WorkGroupUniformLoad is always uniform by definition
                 non_uniform_result: None,
@@ -1039,9 +1045,7 @@ impl FunctionInfo {
                     }
                     FunctionUniformity::new()
                 }
-                S::RayTracing {
-                    ref fun,
-                } => {
+                S::RayTracing { ref fun } => {
                     match *fun {
                         RayTracingFunction::ReportIntersection {
                             hit_t,

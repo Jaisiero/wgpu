@@ -2416,12 +2416,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             rctx.block
                                 .extend(rctx.emitter.finish(&rctx.function.expressions));
                             rctx.emitter.start(&rctx.function.expressions);
-                            rctx.block.push(
-                                crate::Statement::RayTracing {
-                                    fun,
-                                },
-                                span,
-                            );
+                            rctx.block.push(crate::Statement::RayTracing { fun }, span);
                             return Ok(None);
                         }
                         "ReportIntersection" => {
@@ -2437,7 +2432,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 crate::Expression::RayQueryProceedResult,
                                 span,
                             )?;
-                            
+
                             let fun = crate::RayTracingFunction::ReportIntersection {
                                 hit_t,
                                 hit_type,
@@ -2450,12 +2445,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             rctx.block
                                 .extend(rctx.emitter.finish(&rctx.function.expressions));
                             rctx.emitter.start(&rctx.function.expressions);
-                            rctx.block.push(
-                                crate::Statement::RayTracing {
-                                    fun,
-                                },
-                                span,
-                            );
+                            rctx.block.push(crate::Statement::RayTracing { fun }, span);
 
                             return Ok(Some(result));
                         }

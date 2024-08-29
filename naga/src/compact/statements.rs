@@ -99,9 +99,7 @@ impl FunctionTracer<'_> {
                         self.expressions_used.insert(query);
                         self.trace_ray_query_function(fun);
                     }
-                    St::RayTracing {
-                        ref fun,
-                    } => {
+                    St::RayTracing { ref fun } => {
                         self.trace_ray_tracing_function(fun);
                     }
                     St::SubgroupBallot { result, predicate } => {
@@ -319,9 +317,7 @@ impl FunctionMap {
                         adjust(query);
                         self.adjust_ray_query_function(fun);
                     }
-                    St::RayTracing {
-                        ref mut fun,
-                    } => {
+                    St::RayTracing { ref mut fun } => {
                         self.adjust_ray_tracing_function(fun);
                     }
                     St::SubgroupBallot {
