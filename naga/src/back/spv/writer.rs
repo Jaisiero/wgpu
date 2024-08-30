@@ -375,7 +375,7 @@ impl Writer {
 
                     let varying_id = self.write_varying(
                         ir_module,
-                        iface.stage,
+                        Some(iface.stage),
                         class,
                         name,
                         argument.ty,
@@ -412,7 +412,7 @@ impl Writer {
                         let binding = member.binding.as_ref().unwrap();
                         let varying_id = self.write_varying(
                             ir_module,
-                            iface.stage,
+                            Some(iface.stage),
                             class,
                             name,
                             member.ty,
@@ -477,7 +477,7 @@ impl Writer {
                         let type_id = self.get_type_id(LookupType::Handle(result.ty));
                         let varying_id = self.write_varying(
                             ir_module,
-                            iface.stage,
+                            Some(iface.stage),
                             class,
                             None,
                             result.ty,
@@ -500,7 +500,7 @@ impl Writer {
                                 *binding == crate::Binding::BuiltIn(crate::BuiltIn::PointSize);
                             let varying_id = self.write_varying(
                                 ir_module,
-                                iface.stage,
+                                Some(iface.stage),
                                 class,
                                 name,
                                 member.ty,
@@ -1491,7 +1491,7 @@ impl Writer {
     pub(super) fn write_varying(
         &mut self,
         ir_module: &crate::Module,
-        stage: crate::ShaderStage,
+        stage: Option<crate::ShaderStage>,
         class: spirv::StorageClass,
         debug_name: Option<&str>,
         ty: Handle<crate::Type>,
@@ -1526,11 +1526,11 @@ impl Writer {
                     // VUID-StandaloneSpirv-Flat-06202
                     // > The Flat, NoPerspective, Sample, and Centroid decorations
                     // > must not be used on variables with the Input storage class in a vertex shader
-                    (class == spirv::StorageClass::Input && stage == crate::ShaderStage::Vertex) ||
+                    (class == spirv::StorageClass::Input && stage == Some(crate::ShaderStage::Vertex)) ||
                     // VUID-StandaloneSpirv-Flat-06201
                     // > The Flat, NoPerspective, Sample, and Centroid decorations
                     // > must not be used on variables with the Output storage class in a fragment shader
-                    (class == spirv::StorageClass::Output && stage == crate::ShaderStage::Fragment);
+                    (class == spirv::StorageClass::Output && stage == Some(crate::ShaderStage::Fragment));
 
                 if !no_decorations {
                     match interpolation {
@@ -1781,7 +1781,9 @@ impl Writer {
                 // > Any variable with integer or double-precision floating-
                 // > point type and with Input storage class in a fragment
                 // > shader, must be decorated Flat
-                if class == spirv::StorageClass::Input && stage == crate::ShaderStage::Fragment {
+                if class == spirv::StorageClass::Input
+                    && stage == Some(crate::ShaderStage::Fragment)
+                {
                     let is_flat = match ir_module.types[ty].inner {
                         crate::TypeInner::Scalar(scalar)
                         | crate::TypeInner::Vector { scalar, .. } => match scalar.kind {

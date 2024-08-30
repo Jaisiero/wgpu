@@ -2666,7 +2666,7 @@ impl<'w> BlockContext<'w> {
                     self.write_ray_query_function(query, fun, &mut block);
                 }
                 Statement::RayTracing { ref fun } => {
-                    self.write_ray_tracing_function(fun, &mut block, stage.unwrap(), interface)?;
+                    self.write_ray_tracing_function(fun, &mut block, interface)?;
                 }
                 Statement::SubgroupBallot {
                     result,

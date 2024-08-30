@@ -5,7 +5,6 @@ Generating SPIR-V for ray query operations.
 use super::{Block, BlockContext, Instruction, LocalType, LookupType};
 use crate::arena::Handle;
 use crate::proc::TypeResolution;
-use crate::ShaderStage;
 
 impl<'w> BlockContext<'w> {
     pub(super) fn write_ray_query_function(
@@ -265,7 +264,6 @@ impl<'w> BlockContext<'w> {
         &mut self,
         function: &crate::RayTracingFunction,
         block: &mut Block,
-        stage: ShaderStage,
         interface: &mut Option<super::writer::FunctionInterface>,
     ) -> Result<(), super::Error> {
         match *function {
@@ -278,7 +276,7 @@ impl<'w> BlockContext<'w> {
                 let acc_struct_id = self.get_handle_id(acceleration_structure);
                 let varying_id = self.writer.write_varying(
                     self.ir_module,
-                    stage,
+                    None,
                     spirv::StorageClass::RayPayloadKHR,
                     None,
                     payload_ty,
@@ -365,11 +363,9 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::copy(payload_id, varying_id, None));
-                (interface
-                    .as_mut()
-                    .expect("can only call trace rays in ray gen entry"))
-                .varying_ids
-                .push(varying_id);
+                if let Some(interface) = interface.as_mut() {
+                    interface.varying_ids.push(varying_id)
+                }
             }
             crate::RayTracingFunction::ReportIntersection {
                 hit_t,
@@ -400,11 +396,9 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::store(pointer_type_id, intersection_id, None));
-                (interface
-                    .as_mut()
-                    .expect("can only call trace rays in ray gen entry"))
-                .varying_ids
-                .push(pointer_type_id);
+                if let Some(interface) = interface.as_mut() {
+                    interface.varying_ids.push(pointer_type_id)
+                }
                 let result_id = self.gen_id();
                 let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(
                     crate::TypeInner::Scalar(crate::Scalar::BOOL),

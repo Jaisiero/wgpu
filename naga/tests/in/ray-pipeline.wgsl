@@ -14,7 +14,13 @@ fn ray_gen() {
     }
     */
     traceRay(acc_struct, RayDesc(), &colour);
+    trace();
     return;
+}
+
+fn trace() {
+    var colour = vec4<f32>();
+    traceRay(acc_struct, RayDesc(), &colour);
 }
 
 @ray_any
