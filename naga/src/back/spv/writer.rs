@@ -71,6 +71,7 @@ impl Writer {
             lookup_type: crate::FastHashMap::default(),
             lookup_function: crate::FastHashMap::default(),
             lookup_function_type: crate::FastHashMap::default(),
+            lookup_ray_global_variables: crate::FastHashMap::default(),
             constant_ids: HandleVec::new(),
             cached_constants: crate::FastHashMap::default(),
             global_variables: HandleVec::new(),
@@ -125,6 +126,7 @@ impl Writer {
             lookup_type: take(&mut self.lookup_type).recycle(),
             lookup_function: take(&mut self.lookup_function).recycle(),
             lookup_function_type: take(&mut self.lookup_function_type).recycle(),
+            lookup_ray_global_variables: take(&mut self.lookup_ray_global_variables).recycle(),
             constant_ids: take(&mut self.constant_ids).recycle(),
             cached_constants: take(&mut self.cached_constants).recycle(),
             global_variables: take(&mut self.global_variables).recycle(),
@@ -333,7 +335,7 @@ impl Writer {
         mut interface: Option<FunctionInterface>,
         debug_info: &Option<DebugInfoInner>,
         stage: Option<crate::ShaderStage>,
-    ) -> Result<Word, Error> {
+    ) -> Result<(Word, Box<[Word]>), Error> {
         let mut function = Function::default();
 
         let prelude_id = self.id_gen.next();
@@ -627,6 +629,8 @@ impl Writer {
             self.global_variables[handle] = gv;
         }
 
+        let mut ray_global_vars = Vec::new();
+
         // Create a `BlockContext` for generating SPIR-V for the function's
         // body.
         let mut context = BlockContext {
@@ -643,6 +647,7 @@ impl Writer {
             expression_constness: super::ExpressionConstnessTracker::from_arena(
                 &ir_function.expressions,
             ),
+            ray_tracing_global_vars: &mut ray_global_vars,
         };
 
         // fill up the pre-emitted and const expressions
@@ -737,7 +742,6 @@ impl Writer {
             LoopContext::default(),
             debug_info.as_ref(),
             stage,
-            &mut interface,
         )?;
 
         // Consume the `BlockContext`, ending its borrows and letting the
@@ -751,7 +755,7 @@ impl Writer {
         function.to_words(&mut self.logical_layout.function_definitions);
         Instruction::function_end().to_words(&mut self.logical_layout.function_definitions);
 
-        Ok(function_id)
+        Ok((function_id, Box::from(ray_global_vars)))
     }
 
     fn write_execution_mode(
@@ -774,7 +778,7 @@ impl Writer {
         debug_info: &Option<DebugInfoInner>,
     ) -> Result<Instruction, Error> {
         let mut interface_ids = Vec::new();
-        let function_id = self.write_function(
+        let (function_id, ray_global_vars) = self.write_function(
             &entry_point.function,
             info,
             ir_module,
@@ -785,6 +789,7 @@ impl Writer {
             debug_info,
             Some(entry_point.stage),
         )?;
+        interface_ids.append(&mut ray_global_vars.to_vec());
 
         let exec_model = match entry_point.stage {
             crate::ShaderStage::Vertex => spirv::ExecutionModel::Vertex,
@@ -2198,7 +2203,8 @@ impl Writer {
             }
             let id =
                 self.write_function(ir_function, info, ir_module, None, &debug_info_inner, None)?;
-            self.lookup_function.insert(handle, id);
+            self.lookup_function.insert(handle, id.0);
+            self.lookup_ray_global_variables.insert(handle, id.1);
         }
 
         // write all or one entry points

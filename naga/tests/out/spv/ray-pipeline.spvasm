@@ -1,7 +1,7 @@
 ; SPIR-V
 ; Version: 1.4
 ; Generator: rspirv
-; Bound: 72
+; Bound: 85
 OpCapability Shader
 OpCapability RayTracingKHR
 OpCapability RayQueryKHR
@@ -9,12 +9,12 @@ OpExtension "SPV_KHR_ray_query"
 OpExtension "SPV_KHR_ray_tracing"
 %1 = OpExtInstImport "GLSL.std.450"
 OpMemoryModel Logical GLSL450
-OpEntryPoint RayGenerationNV %15 "ray_gen" %12 %23
-OpEntryPoint AnyHitNV %38 "discard_any_hit" %34 %35
-OpEntryPoint AnyHitNV %47 "any_hit" %41 %42 %44
-OpEntryPoint ClosestHitNV %55 "closest_hit" %50 %51 %53
-OpEntryPoint MissNV %61 "miss" %60
-OpEntryPoint IntersectionNV %64 "intersect_return" %69
+OpEntryPoint RayGenerationNV %34 "ray_gen" %12 %38 %23
+OpEntryPoint AnyHitNV %51 "discard_any_hit" %47 %48
+OpEntryPoint AnyHitNV %60 "any_hit" %54 %55 %57
+OpEntryPoint ClosestHitNV %68 "closest_hit" %63 %64 %66
+OpEntryPoint MissNV %74 "miss" %73
+OpEntryPoint IntersectionNV %77 "intersect_return" %82
 OpMemberDecorate %8 0 Offset 0
 OpMemberDecorate %8 1 Offset 4
 OpMemberDecorate %8 2 Offset 8
@@ -25,15 +25,16 @@ OpMemberDecorate %11 0 Offset 28
 OpDecorate %12 DescriptorSet 0
 OpDecorate %12 Binding 0
 OpDecorate %23 Location 0
-OpDecorate %34 Location 0
-OpDecorate %35 Location 0
-OpDecorate %41 Location 0
-OpDecorate %42 Location 0
-OpDecorate %44 BuiltIn RayTmaxNV
-OpDecorate %50 Location 0
-OpDecorate %51 Location 0
-OpDecorate %53 BuiltIn RayTmaxNV
-OpDecorate %60 Location 0
+OpDecorate %38 Location 0
+OpDecorate %47 Location 0
+OpDecorate %48 Location 0
+OpDecorate %54 Location 0
+OpDecorate %55 Location 0
+OpDecorate %57 BuiltIn RayTmaxNV
+OpDecorate %63 Location 0
+OpDecorate %64 Location 0
+OpDecorate %66 BuiltIn RayTmaxNV
+OpDecorate %73 Location 0
 %2 = OpTypeVoid
 %3 = OpTypeAccelerationStructureNV
 %5 = OpTypeFloat 32
@@ -54,24 +55,25 @@ OpDecorate %60 Location 0
 %23 = OpVariable  %24  RayPayloadNV
 %31 = OpConstant  %6  0
 %32 = OpConstant  %6  1
-%34 = OpVariable  %9  IncomingRayPayloadNV
-%36 = OpTypePointer HitAttributeNV %11
-%35 = OpVariable  %36  HitAttributeNV
-%41 = OpVariable  %9  IncomingRayPayloadNV
-%42 = OpVariable  %36  HitAttributeNV
-%45 = OpTypePointer Input %5
-%44 = OpVariable  %45  Input
-%50 = OpVariable  %9  IncomingRayPayloadNV
-%51 = OpVariable  %36  HitAttributeNV
-%53 = OpVariable  %45  Input
-%56 = OpConstant  %5  1.0
-%57 = OpConstantComposite  %4  %56 %56 %56 %56
-%60 = OpVariable  %9  IncomingRayPayloadNV
-%65 = OpConstant  %5  0.5
-%66 = OpConstant  %6  5
-%68 = OpTypePointer HitAttributeNV %6
-%69 = OpVariable  %68  HitAttributeNV
-%71 = OpTypeBool
+%38 = OpVariable  %24  RayPayloadNV
+%47 = OpVariable  %9  IncomingRayPayloadNV
+%49 = OpTypePointer HitAttributeNV %11
+%48 = OpVariable  %49  HitAttributeNV
+%54 = OpVariable  %9  IncomingRayPayloadNV
+%55 = OpVariable  %49  HitAttributeNV
+%58 = OpTypePointer Input %5
+%57 = OpVariable  %58  Input
+%63 = OpVariable  %9  IncomingRayPayloadNV
+%64 = OpVariable  %49  HitAttributeNV
+%66 = OpVariable  %58  Input
+%69 = OpConstant  %5  1.0
+%70 = OpConstantComposite  %4  %69 %69 %69 %69
+%73 = OpVariable  %9  IncomingRayPayloadNV
+%78 = OpConstant  %5  0.5
+%79 = OpConstant  %6  5
+%81 = OpTypePointer HitAttributeNV %6
+%82 = OpVariable  %81  HitAttributeNV
+%84 = OpTypeBool
 %15 = OpFunction  %2  None %16
 %14 = OpLabel
 %20 = OpVariable  %21  Function %18
@@ -89,44 +91,62 @@ OpTraceRayKHR %17 %25 %26 %31 %32 %31 %29 %27 %30 %28 %23
 OpCopyMemory %20 %23
 OpReturn
 OpFunctionEnd
-%38 = OpFunction  %2  None %16
+%34 = OpFunction  %2  None %16
 %33 = OpLabel
-%37 = OpLoad  %11  %35
-OpBranch %39
-%39 = OpLabel
-OpStore %34 %18
+%36 = OpVariable  %21  Function %18
+%35 = OpLoad  %3  %12
+OpBranch %37
+%37 = OpLabel
+%39 = OpCompositeExtract  %6  %19 0
+%40 = OpCompositeExtract  %6  %19 1
+%41 = OpCompositeExtract  %5  %19 2
+%42 = OpCompositeExtract  %5  %19 3
+%43 = OpCompositeExtract  %7  %19 4
+%44 = OpCompositeExtract  %7  %19 5
+OpCopyMemory %38 %36
+OpTraceRayKHR %35 %39 %40 %31 %32 %31 %43 %41 %44 %42 %38
+OpCopyMemory %36 %38
+%45 = OpFunctionCall  %2  %15
+OpReturn
+OpFunctionEnd
+%51 = OpFunction  %2  None %16
+%46 = OpLabel
+%50 = OpLoad  %11  %48
+OpBranch %52
+%52 = OpLabel
+OpStore %47 %18
 OpIgnoreIntersectionKHR
 OpFunctionEnd
-%47 = OpFunction  %2  None %16
-%40 = OpLabel
-%43 = OpLoad  %11  %42
-%46 = OpLoad  %5  %44
-OpBranch %48
-%48 = OpLabel
-OpStore %41 %18
+%60 = OpFunction  %2  None %16
+%53 = OpLabel
+%56 = OpLoad  %11  %55
+%59 = OpLoad  %5  %57
+OpBranch %61
+%61 = OpLabel
+OpStore %54 %18
 OpReturn
 OpFunctionEnd
-%55 = OpFunction  %2  None %16
-%49 = OpLabel
-%52 = OpLoad  %11  %51
-%54 = OpLoad  %5  %53
-OpBranch %58
-%58 = OpLabel
-OpStore %50 %57
-OpReturn
-OpFunctionEnd
-%61 = OpFunction  %2  None %16
-%59 = OpLabel
-OpBranch %62
+%68 = OpFunction  %2  None %16
 %62 = OpLabel
-OpStore %60 %18
+%65 = OpLoad  %11  %64
+%67 = OpLoad  %5  %66
+OpBranch %71
+%71 = OpLabel
+OpStore %63 %70
 OpReturn
 OpFunctionEnd
-%64 = OpFunction  %2  None %16
-%63 = OpLabel
-OpBranch %67
-%67 = OpLabel
-OpStore %69 %31
-%70 = OpReportIntersectionNV  %71  %65 %66
+%74 = OpFunction  %2  None %16
+%72 = OpLabel
+OpBranch %75
+%75 = OpLabel
+OpStore %73 %18
+OpReturn
+OpFunctionEnd
+%77 = OpFunction  %2  None %16
+%76 = OpLabel
+OpBranch %80
+%80 = OpLabel
+OpStore %82 %31
+%83 = OpReportIntersectionNV  %84  %78 %79
 OpReturn
 OpFunctionEnd

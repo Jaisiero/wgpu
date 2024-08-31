@@ -2047,7 +2047,6 @@ impl<'w> BlockContext<'w> {
         loop_context: LoopContext,
         debug_info: Option<&DebugInfoInner>,
         stage: Option<crate::ShaderStage>,
-        interface: &mut Option<super::writer::FunctionInterface>,
     ) -> Result<(), Error> {
         let mut block = Block::new(label_id);
         for (statement, span) in naga_block.span_iter() {
@@ -2091,7 +2090,6 @@ impl<'w> BlockContext<'w> {
                         loop_context,
                         debug_info,
                         stage,
-                        interface,
                     )?;
 
                     block = Block::new(merge_id);
@@ -2137,7 +2135,6 @@ impl<'w> BlockContext<'w> {
                             loop_context,
                             debug_info,
                             stage,
-                            interface,
                         )?;
                     }
                     if let Some(block_id) = reject_id {
@@ -2148,7 +2145,6 @@ impl<'w> BlockContext<'w> {
                             loop_context,
                             debug_info,
                             stage,
-                            interface,
                         )?;
                     }
 
@@ -2230,7 +2226,6 @@ impl<'w> BlockContext<'w> {
                             inner_context,
                             debug_info,
                             stage,
-                            interface,
                         )?;
                     }
 
@@ -2281,7 +2276,6 @@ impl<'w> BlockContext<'w> {
                         },
                         debug_info,
                         stage,
-                        interface,
                     )?;
 
                     let exit = match break_if {
@@ -2304,7 +2298,6 @@ impl<'w> BlockContext<'w> {
                         },
                         debug_info,
                         stage,
-                        interface,
                     )?;
 
                     block = Block::new(merge_id);
@@ -2415,6 +2408,10 @@ impl<'w> BlockContext<'w> {
                     ref arguments,
                     result,
                 } => {
+                    self.ray_tracing_global_vars.append(
+                        &mut self.writer.lookup_ray_global_variables[&local_function].to_vec(),
+                    );
+
                     let id = self.gen_id();
                     self.temp_list.clear();
                     for &argument in arguments {
@@ -2666,7 +2663,7 @@ impl<'w> BlockContext<'w> {
                     self.write_ray_query_function(query, fun, &mut block);
                 }
                 Statement::RayTracing { ref fun } => {
-                    self.write_ray_tracing_function(fun, &mut block, interface)?;
+                    self.write_ray_tracing_function(fun, &mut block)?;
                 }
                 Statement::SubgroupBallot {
                     result,

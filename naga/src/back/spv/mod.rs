@@ -592,6 +592,8 @@ struct BlockContext<'w> {
 
     /// Tracks the constness of `Expression`s residing in `self.ir_function.expressions`
     expression_constness: ExpressionConstnessTracker,
+
+    ray_tracing_global_vars: &'w mut Vec<Word>,
 }
 
 impl BlockContext<'_> {
@@ -661,6 +663,7 @@ pub struct Writer {
     lookup_type: crate::FastHashMap<LookupType, Word>,
     lookup_function: crate::FastHashMap<Handle<crate::Function>, Word>,
     lookup_function_type: crate::FastHashMap<LookupFunctionType, Word>,
+    lookup_ray_global_variables: crate::FastHashMap<Handle<crate::Function>, Box<[Word]>>,
     /// Indexed by const-expression handle indexes
     constant_ids: HandleVec<crate::Expression, Word>,
     cached_constants: crate::FastHashMap<CachedConstant, Word>,

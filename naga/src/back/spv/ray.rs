@@ -264,7 +264,6 @@ impl<'w> BlockContext<'w> {
         &mut self,
         function: &crate::RayTracingFunction,
         block: &mut Block,
-        interface: &mut Option<super::writer::FunctionInterface>,
     ) -> Result<(), super::Error> {
         match *function {
             crate::RayTracingFunction::TraceRay {
@@ -363,9 +362,7 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::copy(payload_id, varying_id, None));
-                if let Some(interface) = interface.as_mut() {
-                    interface.varying_ids.push(varying_id)
-                }
+                self.ray_tracing_global_vars.push(varying_id);
             }
             crate::RayTracingFunction::ReportIntersection {
                 hit_t,
@@ -396,9 +393,7 @@ impl<'w> BlockContext<'w> {
                 block
                     .body
                     .push(Instruction::store(pointer_type_id, intersection_id, None));
-                if let Some(interface) = interface.as_mut() {
-                    interface.varying_ids.push(pointer_type_id)
-                }
+                self.ray_tracing_global_vars.push(pointer_type_id);
                 let result_id = self.gen_id();
                 let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(
                     crate::TypeInner::Scalar(crate::Scalar::BOOL),
