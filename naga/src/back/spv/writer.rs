@@ -383,7 +383,10 @@ impl Writer {
                         argument.ty,
                         binding,
                     )?;
-                    iface.varying_ids.push(varying_id);
+                    if self.physical_layout.version >= 0x10400 || class == spirv::StorageClass::Input {
+                        iface.varying_ids.push(varying_id);
+                    }
+
                     let id = match binding {
                         &crate::Binding::BuiltIn(crate::BuiltIn::Payload) => varying_id,
                         _ => {
@@ -789,8 +792,9 @@ impl Writer {
             debug_info,
             Some(entry_point.stage),
         )?;
-        interface_ids.append(&mut ray_global_vars.to_vec());
-
+        if self.physical_layout.version >= 0x10400 {
+            interface_ids.append(&mut ray_global_vars.to_vec());
+        }
         let exec_model = match entry_point.stage {
             crate::ShaderStage::Vertex => spirv::ExecutionModel::Vertex,
             crate::ShaderStage::Fragment => {
