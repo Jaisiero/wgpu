@@ -1015,7 +1015,11 @@ impl PhysicalDeviceProperties {
 
         if requested_features.contains(wgt::Features::BUFFER_HANDLE) {
             extensions.push(khr::external_memory::NAME);
-            extensions.push(khr::external_memory_capabilities::NAME);
+            if self.supports_extension(khr::external_memory_win32::NAME) {
+                extensions.push(khr::external_memory_win32::NAME);
+            } else {
+                extensions.push(khr::external_memory_fd::NAME);
+            }
         }
 
         // Require `VK_EXT_conservative_rasterization` if the associated feature was requested
@@ -1718,10 +1722,12 @@ impl super::Adapter {
             None
         };
 
-        let buffer_handle_fns = match self.private_caps.preferred_buffer_handle {
-            PreferredBufferHandle::None => BufferHandleFunctions::None,
-            PreferredBufferHandle::Win32 => BufferHandleFunctions::Win32(khr::external_memory_win32::Device::new(&self.instance.raw, &raw_device)),
-            PreferredBufferHandle::Fd => BufferHandleFunctions::Fd(khr::external_memory_fd::Device::new(&self.instance.raw, &raw_device))
+        let buffer_handle_fns = if enabled_extensions.contains(&khr::external_memory::NAME) && enabled_extensions.contains(&khr::external_memory_win32::NAME) {
+            BufferHandleFunctions::Win32(khr::external_memory_win32::Device::new(&self.instance.raw, &raw_device))
+        } else if enabled_extensions.contains(&khr::external_memory::NAME) && enabled_extensions.contains(&khr::external_memory_fd::NAME) {
+            BufferHandleFunctions::Fd(khr::external_memory_fd::Device::new(&self.instance.raw, &raw_device))
+        } else {
+            BufferHandleFunctions::None
         };
 
         let naga_options = {
