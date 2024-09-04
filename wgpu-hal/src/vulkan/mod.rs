@@ -154,6 +154,7 @@ pub struct InstanceShared {
     flags: wgt::InstanceFlags,
     debug_utils: Option<DebugUtils>,
     get_physical_device_properties: Option<khr::get_physical_device_properties2::Instance>,
+    get_external_memory_capability: Option<khr::external_memory_capabilities::Instance>,
     entry: ash::Entry,
     has_nv_optimus: bool,
     android_sdk_version: u32,
@@ -469,11 +470,28 @@ struct DeviceExtensionFunctions {
     draw_indirect_count: Option<khr::draw_indirect_count::Device>,
     timeline_semaphore: Option<ExtensionFn<khr::timeline_semaphore::Device>>,
     ray_tracing: Option<RayTracingDeviceExtensionFunctions>,
+    buffer_handle: BufferHandleFunctions,
 }
 
 struct RayTracingDeviceExtensionFunctions {
     acceleration_structure: khr::acceleration_structure::Device,
     buffer_device_address: khr::buffer_device_address::Device,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum PreferredBufferHandle {
+    #[default]
+    None,
+    Win32,
+    Fd,
+}
+
+#[derive(Clone, Default)]
+enum BufferHandleFunctions {
+    #[default]
+    None,
+    Win32(khr::external_memory_win32::Device),
+    Fd(khr::external_memory_fd::Device),
 }
 
 /// Set of internal capabilities, which don't show up in the exposed
@@ -499,6 +517,7 @@ struct PrivateCapabilities {
     robust_image_access2: bool,
     zero_initialize_workgroup_memory: bool,
     image_format_list: bool,
+    preferred_buffer_handle: PreferredBufferHandle,
 }
 
 bitflags::bitflags!(

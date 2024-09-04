@@ -956,6 +956,8 @@ pub trait Device: WasmNotSendSync {
     fn generate_allocator_report(&self) -> Option<wgt::AllocatorReport> {
         None
     }
+
+    unsafe fn get_buffer_handle(&self, _buffer: &<Self::A as Api>::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError>;
 }
 
 pub trait Queue: WasmNotSendSync {
@@ -1569,6 +1571,7 @@ bitflags::bitflags! {
         const ACCELERATION_STRUCTURE_SCRATCH = 1 << 11;
         const BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT = 1 << 12;
         const TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT = 1 << 13;
+        const EXPORT_BUFFER_HANDLE = 1 << 14;
         /// The combination of states that a buffer may be in _at the same time_.
         const INCLUSIVE = Self::MAP_READ.bits() | Self::COPY_SRC.bits() |
             Self::INDEX.bits() | Self::VERTEX.bits() | Self::UNIFORM.bits() |

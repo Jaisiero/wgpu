@@ -1,4 +1,4 @@
-use super::conv;
+use super::{BufferHandleFunctions, conv, PreferredBufferHandle};
 
 use ash::{amd, ext, google, khr, vk};
 use parking_lot::Mutex;
@@ -111,6 +111,8 @@ pub struct PhysicalDeviceFeatures {
 
     /// Features provided by `VK_EXT_subgroup_size_control`, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlFeatures<'static>>,
+
+    buffer_handle: Option<vk::PhysicalDeviceExternalBufferInfo<'static>>
 }
 
 impl PhysicalDeviceFeatures {
@@ -451,6 +453,20 @@ impl PhysicalDeviceFeatures {
             } else {
                 None
             },
+            buffer_handle: if device_api_version >= vk::API_VERSION_1_1 || (enabled_extensions.contains(&khr::external_memory_capabilities::NAME)) {
+                Some(
+                    vk::PhysicalDeviceExternalBufferInfo::default()
+                        .usage(conv::map_buffer_usage(crate::BufferUses::COPY_SRC | crate::BufferUses::COPY_DST))
+                        .handle_type(
+                            #[cfg(target_os = "windows")]
+                            vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR,
+                            #[cfg(not(target_os = "windows"))]
+                            vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD,
+                        )
+                )
+            } else {
+                None
+            }
         }
     }
 
@@ -470,6 +486,7 @@ impl PhysicalDeviceFeatures {
     ) -> (wgt::Features, wgt::DownlevelFlags) {
         use crate::auxil::db;
         use wgt::{DownlevelFlags as Df, Features as F};
+        println!("{:?}", caps.supported_extensions);
         let mut features = F::empty()
             | F::SPIRV_SHADER_PASSTHROUGH
             | F::MAPPABLE_PRIMARY_BUFFERS
@@ -733,6 +750,12 @@ impl PhysicalDeviceFeatures {
 
         features.set(F::RAY_QUERY, caps.supports_extension(khr::ray_query::NAME));
 
+        features.set(
+            F::BUFFER_HANDLE,
+            caps.supports_extension(khr::external_memory::NAME)
+                && (caps.supports_extension(khr::external_memory_win32::NAME) || caps.supports_extension(khr::external_memory_fd::NAME)),
+        );
+
         let rg11b10ufloat_renderable = supports_format(
             instance,
             phd,
@@ -841,6 +864,8 @@ pub struct PhysicalDeviceProperties {
     /// Additional `vk::PhysicalDevice` properties from the
     /// `VK_EXT_subgroup_size_control` extension, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlProperties<'static>>,
+
+    prefered_buffer_handle: super::PreferredBufferHandle,
 
     /// The device API version.
     ///
@@ -986,6 +1011,11 @@ impl PhysicalDeviceProperties {
         // Require `VK_KHR_ray_query` if the associated feature was requested
         if requested_features.contains(wgt::Features::RAY_QUERY) {
             extensions.push(khr::ray_query::NAME);
+        }
+
+        if requested_features.contains(wgt::Features::BUFFER_HANDLE) {
+            extensions.push(khr::external_memory::NAME);
+            extensions.push(khr::external_memory_capabilities::NAME);
         }
 
         // Require `VK_EXT_conservative_rasterization` if the associated feature was requested
@@ -1193,6 +1223,13 @@ impl super::InstanceShared {
                         .retain(|&x| x.extension_name_as_c_str() != Ok(ext::robustness2::NAME));
                 }
             };
+            if capabilities.supports_extension(khr::external_memory::NAME) {
+                if capabilities.supports_extension(khr::external_memory_win32::NAME) {
+                    capabilities.prefered_buffer_handle = super::PreferredBufferHandle::Win32;
+                } else if capabilities.supports_extension(khr::external_memory_fd::NAME) {
+                    capabilities.prefered_buffer_handle = super::PreferredBufferHandle::Fd;
+                }
+            }
             capabilities
         };
 
@@ -1504,6 +1541,7 @@ impl super::Instance {
                 }),
             image_format_list: phd_capabilities.device_api_version >= vk::API_VERSION_1_2
                 || phd_capabilities.supports_extension(khr::image_format_list::NAME),
+            preferred_buffer_handle: phd_capabilities.prefered_buffer_handle.clone(),
         };
         let capabilities = crate::Capabilities {
             limits: phd_capabilities.to_wgpu_limits(),
@@ -1680,6 +1718,12 @@ impl super::Adapter {
             None
         };
 
+        let buffer_handle_fns = match self.private_caps.preferred_buffer_handle {
+            PreferredBufferHandle::None => BufferHandleFunctions::None,
+            PreferredBufferHandle::Win32 => BufferHandleFunctions::Win32(khr::external_memory_win32::Device::new(&self.instance.raw, &raw_device)),
+            PreferredBufferHandle::Fd => BufferHandleFunctions::Fd(khr::external_memory_fd::Device::new(&self.instance.raw, &raw_device))
+        };
+
         let naga_options = {
             use naga::back::spv;
 
@@ -1840,6 +1884,7 @@ impl super::Adapter {
                 draw_indirect_count: indirect_count_fn,
                 timeline_semaphore: timeline_semaphore_fn,
                 ray_tracing: ray_tracing_fns,
+                buffer_handle: buffer_handle_fns,
             },
             pipeline_cache_validation_key,
             vendor_id: self.phd_capabilities.properties.vendor_id,

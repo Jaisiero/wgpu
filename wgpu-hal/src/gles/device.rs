@@ -10,6 +10,7 @@ use std::{
 
 use arrayvec::ArrayVec;
 use std::sync::atomic::Ordering;
+use wgt::BufferHandle;
 
 type ShaderStage<'a> = (
     naga::ShaderStage,
@@ -1624,6 +1625,10 @@ impl crate::Device for super::Device {
 
     fn get_internal_counters(&self) -> wgt::HalCounters {
         self.counters.clone()
+    }
+
+    unsafe fn get_buffer_handle(&self, _buffer: &<Self::A as crate::Api>::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError> {
+        unimplemented!("buffer handle not supported");
     }
 }
 

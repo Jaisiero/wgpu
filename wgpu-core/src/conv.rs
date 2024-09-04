@@ -93,6 +93,10 @@ pub fn map_buffer_usage(usage: wgt::BufferUsages) -> hal::BufferUses {
         hal::BufferUses::QUERY_RESOLVE,
         usage.contains(wgt::BufferUsages::QUERY_RESOLVE),
     );
+    u.set(
+        hal::BufferUses::EXPORT_BUFFER_HANDLE,
+        usage.contains(wgt::BufferUsages::BUFFER_HANDLE)
+    );
     u
 }
 

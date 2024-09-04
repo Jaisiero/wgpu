@@ -1,4 +1,5 @@
 use ash::vk;
+use crate::vulkan::PreferredBufferHandle;
 
 impl super::PrivateCapabilities {
     pub fn map_texture_format(&self, format: wgt::TextureFormat) -> vk::Format {
@@ -963,4 +964,12 @@ pub fn map_acceleration_structure_usage_to_barrier(
     }
 
     (stages, access)
+}
+
+pub(super) fn map_preferred_buffer_handle(preferred_buffer_handle: &super::PreferredBufferHandle) -> Option<vk::ExternalMemoryHandleTypeFlags> {
+    match preferred_buffer_handle {
+        PreferredBufferHandle::None => None,
+        PreferredBufferHandle::Win32 => Some(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32),
+        PreferredBufferHandle::Fd => Some(vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD),
+    }
 }

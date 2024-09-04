@@ -1,4 +1,4 @@
-use super::conv;
+use super::{BufferHandleFunctions, conv};
 
 use arrayvec::ArrayVec;
 use ash::{khr, vk};
@@ -13,6 +13,8 @@ use std::{
     ptr,
     sync::Arc,
 };
+use std::ffi::c_void;
+use bitflags::Flags;
 
 impl super::DeviceShared {
     pub(super) unsafe fn set_object_name(&self, object: impl vk::Handle, name: &str) {
@@ -313,6 +315,19 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
             info_flags = vk::MemoryAllocateFlagsInfo::default()
                 .flags(vk::MemoryAllocateFlags::DEVICE_ADDRESS);
             info = info.push_next(&mut info_flags);
+        }
+
+        let mut export_mem_info;
+        let mut export_mem_info_win;
+
+        if self.private_caps.preferred_buffer_handle == super::PreferredBufferHandle::Win32  {
+            export_mem_info_win = vk::ExportMemoryWin32HandleInfoKHR::default();
+            info = info.push_next(&mut export_mem_info_win);
+        }
+
+        if self.private_caps.preferred_buffer_handle != super::PreferredBufferHandle::None {
+            export_mem_info = vk::ExportMemoryAllocateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.private_caps.preferred_buffer_handle).unwrap());
+            info = info.push_next(&mut export_mem_info);
         }
 
         match unsafe { self.raw.allocate_memory(&info, None) } {
@@ -914,16 +929,32 @@ impl crate::Device for super::Device {
             req.alignment
         } - 1;
 
-        let block = unsafe {
-            self.mem_allocator.lock().alloc(
-                &*self.shared,
-                gpu_alloc::Request {
-                    size: req.size,
-                    align_mask: alignment_mask,
-                    usage: alloc_usage,
-                    memory_types: req.memory_type_bits & self.valid_ash_memory_types,
-                },
-            )?
+        let block = if desc.usage.contains(crate::BufferUses::EXPORT_BUFFER_HANDLE) {
+            unsafe {
+                self.mem_allocator.lock().alloc_with_dedicated(
+                    &*self.shared,
+                    gpu_alloc::Request {
+                        size: req.size,
+                        align_mask: alignment_mask,
+                        usage: alloc_usage,
+                        memory_types: req.memory_type_bits & self.valid_ash_memory_types,
+                    },
+                    // it seems exporting buffer handles does not take offset
+                    gpu_alloc::Dedicated::Required,
+                )?
+            }
+        } else {
+            unsafe {
+                self.mem_allocator.lock().alloc(
+                    &*self.shared,
+                    gpu_alloc::Request {
+                        size: req.size,
+                        align_mask: alignment_mask,
+                        usage: alloc_usage,
+                        memory_types: req.memory_type_bits & self.valid_ash_memory_types,
+                    },
+                )?
+            }
         };
 
         unsafe {
@@ -2462,6 +2493,29 @@ impl crate::Device for super::Device {
             .set(self.shared.memory_allocations_counter.read());
 
         self.counters.clone()
+    }
+
+    unsafe fn get_buffer_handle(&self, buffer: &super::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError> {
+        Ok(match &self.shared.extension_fns.buffer_handle {
+            BufferHandleFunctions::None => unreachable!("no extension enabled"),
+            BufferHandleFunctions::Win32(win_32) => unsafe {
+                wgt::BufferHandle::Win32(
+                    win_32.get_memory_win32_handle(
+                        &vk::MemoryGetWin32HandleInfoKHR::default()
+                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR)
+                            .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
+                    ).map_err(super::map_host_device_oom_err)? as *mut c_void
+                ) },
+            BufferHandleFunctions::Fd(fd) => unsafe {
+                wgt::BufferHandle::Fd(
+                    fd.get_memory_fd(
+                        &vk::MemoryGetFdInfoKHR::default()
+                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD)
+                            .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
+                    ).map_err(super::map_host_device_oom_err)?
+                ) },
+            }
+        )
     }
 }
 

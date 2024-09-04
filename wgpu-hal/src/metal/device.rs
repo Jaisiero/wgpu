@@ -5,7 +5,7 @@ use std::{
     sync::{atomic, Arc},
     thread, time,
 };
-
+use wgt::BufferHandle;
 use super::conv;
 use crate::auxil::map_naga_stage;
 
@@ -1422,5 +1422,9 @@ impl crate::Device for super::Device {
 
     fn get_internal_counters(&self) -> wgt::HalCounters {
         self.counters.clone()
+    }
+
+    fn get_buffer_handle(&self, _buffer: &<Self::A as crate::Api>::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError> {
+        unimplemented!("buffer handle not supported");
     }
 }

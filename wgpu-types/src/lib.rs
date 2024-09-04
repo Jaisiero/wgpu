@@ -15,6 +15,7 @@ use serde::Serialize;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::{num::NonZeroU32, ops::Range};
+use std::ffi::c_void;
 
 pub mod assertions;
 mod counters;
@@ -968,6 +969,7 @@ bitflags::bitflags! {
         /// [VK_GOOGLE_display_timing]: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_GOOGLE_display_timing.html
         /// [`Surface::as_hal()`]: https://docs.rs/wgpu/latest/wgpu/struct.Surface.html#method.as_hal
         const VULKAN_GOOGLE_DISPLAY_TIMING = 1 << 62;
+        const BUFFER_HANDLE = 1 << 63;
     }
 }
 
@@ -5295,6 +5297,7 @@ bitflags::bitflags! {
         const INDIRECT = 1 << 8;
         /// Allow a buffer to be the destination buffer for a [`CommandEncoder::resolve_query_set`] operation.
         const QUERY_RESOLVE = 1 << 9;
+        const BUFFER_HANDLE = 1 << 10;
     }
 }
 
@@ -7538,4 +7541,9 @@ pub enum DeviceLostReason {
     /// will eventually be called. If the device is already invalid, wgpu
     /// will call the callback immediately, with this reason.
     DeviceInvalid = 4,
+}
+
+pub enum BufferHandle {
+    Win32(*mut c_void),
+    Fd(i32),
 }

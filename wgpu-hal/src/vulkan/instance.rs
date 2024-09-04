@@ -366,6 +366,17 @@ impl super::Instance {
                 None
             };
 
+        let get_external_memory_capability =
+            if extensions.contains(&khr::external_memory_capabilities::NAME) {
+                log::debug!("Enabling device properties2");
+                Some(khr::external_memory_capabilities::Instance::new(
+                    &entry,
+                    &raw_instance,
+                ))
+            } else {
+                None
+            };
+
         let drop_guard = crate::DropGuard::from_option(drop_callback);
 
         Ok(Self {
@@ -376,6 +387,7 @@ impl super::Instance {
                 flags,
                 debug_utils,
                 get_physical_device_properties,
+                get_external_memory_capability,
                 entry,
                 has_nv_optimus,
                 instance_api_version,

@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 
 use std::ops::Range;
+use wgt::BufferHandle;
 
 #[derive(Clone, Debug)]
 pub struct Api;
@@ -305,6 +306,10 @@ impl crate::Device for Context {
 
     fn get_internal_counters(&self) -> wgt::HalCounters {
         Default::default()
+    }
+
+    unsafe fn get_buffer_handle(&self, _buffer: &<Self::A as crate::Api>::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError> {
+        unimplemented!("buffer handle not supported");
     }
 }
 

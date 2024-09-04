@@ -15,7 +15,7 @@ use windows::{
         System::Threading,
     },
 };
-
+use wgt::BufferHandle;
 use super::{conv, descriptor, D3D12Lib};
 use crate::{
     auxil::{self, dxgi::result::HResult},
@@ -1846,5 +1846,9 @@ impl crate::Device for super::Device {
             total_allocated_bytes: upstream.total_allocated_bytes,
             total_reserved_bytes: upstream.total_reserved_bytes,
         })
+    }
+
+    unsafe fn get_buffer_handle(&self, _buffer: &<Self::A as crate::Api>::Buffer) -> Result<wgt::BufferHandle, crate::DeviceError> {
+        todo!("buffer handle not yet supported");
     }
 }
