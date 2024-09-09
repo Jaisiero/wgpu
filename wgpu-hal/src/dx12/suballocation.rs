@@ -156,12 +156,10 @@ pub(crate) fn create_acceleration_structure_resource(
     desc: &crate::AccelerationStructureDescriptor,
     raw_desc: Direct3D12::D3D12_RESOURCE_DESC,
 ) -> Result<(Direct3D12::ID3D12Resource, Option<AllocationWrapper>), crate::DeviceError> {
-
     // Workaround for Intel Xe drivers
     if !device.private_caps.suballocation_supported {
-        todo!()
-        //return create_committed_buffer_resource(device, desc, raw_desc)
-        //    .map(|resource| (resource, None));
+        return create_committed_acceleration_structure_resource(device, desc, raw_desc)
+            .map(|resource| (resource, None));
     }
 
     let location = MemoryLocation::GpuOnly;
@@ -189,7 +187,7 @@ pub(crate) fn create_acceleration_structure_resource(
             &mut resource,
         )
     }
-        .into_device_result("Placed acceleration structure creation")?;
+    .into_device_result("Placed acceleration structure creation")?;
 
     let resource = resource.ok_or(crate::DeviceError::Unexpected)?;
 
@@ -351,6 +349,54 @@ pub(crate) fn create_committed_texture_resource(
         )
     }
     .into_device_result("Committed texture creation")?;
+
+    resource.ok_or(crate::DeviceError::Unexpected)
+}
+
+pub(crate) fn create_committed_acceleration_structure_resource(
+    device: &crate::dx12::Device,
+    desc: &crate::AccelerationStructureDescriptor,
+    raw_desc: Direct3D12::D3D12_RESOURCE_DESC,
+) -> Result<Direct3D12::ID3D12Resource, crate::DeviceError> {
+    let is_cpu_read = desc.usage.contains(crate::BufferUses::MAP_READ);
+    let is_cpu_write = desc.usage.contains(crate::BufferUses::MAP_WRITE);
+
+    let heap_properties = Direct3D12::D3D12_HEAP_PROPERTIES {
+        Type: Direct3D12::D3D12_HEAP_TYPE_CUSTOM,
+        CPUPageProperty: if is_cpu_read {
+            Direct3D12::D3D12_CPU_PAGE_PROPERTY_WRITE_BACK
+        } else if is_cpu_write {
+            Direct3D12::D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE
+        } else {
+            Direct3D12::D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE
+        },
+        MemoryPoolPreference: match device.private_caps.memory_architecture {
+            crate::dx12::MemoryArchitecture::NonUnified if !is_cpu_read && !is_cpu_write => {
+                Direct3D12::D3D12_MEMORY_POOL_L1
+            }
+            _ => Direct3D12::D3D12_MEMORY_POOL_L0,
+        },
+        CreationNodeMask: 0,
+        VisibleNodeMask: 0,
+    };
+
+    let mut resource = None;
+
+    unsafe {
+        device.raw.CreateCommittedResource(
+            &heap_properties,
+            if device.private_caps.heap_create_not_zeroed {
+                Direct3D12::D3D12_HEAP_FLAG_CREATE_NOT_ZEROED
+            } else {
+                Direct3D12::D3D12_HEAP_FLAG_NONE
+            },
+            &raw_desc,
+            Direct3D12::D3D12_RESOURCE_STATE_COMMON,
+            None,
+            &mut resource,
+        )
+    }
+    .into_device_result("Committed buffer creation")?;
 
     resource.ok_or(crate::DeviceError::Unexpected)
 }

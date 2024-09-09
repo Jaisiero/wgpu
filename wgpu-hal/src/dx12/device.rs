@@ -17,8 +17,12 @@ use windows::{
     },
 };
 
-use super::{conv, descriptor, D3D12Lib, Buffer};
-use crate::{AccelerationStructureEntries, auxil::{self, dxgi::result::HResult}, dx12::{borrow_optional_interface_temporarily, shader_compilation, Event}};
+use super::{conv, descriptor, Buffer, D3D12Lib};
+use crate::{
+    auxil::{self, dxgi::result::HResult},
+    dx12::{borrow_optional_interface_temporarily, shader_compilation, Event},
+    AccelerationStructureEntries,
+};
 
 // this has to match Naga's HLSL backend, and also needs to be null-terminated
 const NAGA_LOCATION_SEMANTIC: &[u8] = b"LOC\0";
@@ -1783,39 +1787,65 @@ impl crate::Device for super::Device {
         let mut geometry_desc;
         let device5 = self.raw.cast::<Direct3D12::ID3D12Device5>().unwrap();
         let (ty, layout, inputs0, num_desc) = match desc.entries {
-            AccelerationStructureEntries::Instances(instances) => {
-                (
-                    Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
-                    Direct3D12::D3D12_ELEMENTS_LAYOUT::default(),
-                    Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_0 {
-                        InstanceDescs: instances.buffer.expect("needs buffer to build").resource.GetGPUVirtualAddress() + instances.offset as u64,
-                    },
-                    instances.count,
-                )
-            },
+            AccelerationStructureEntries::Instances(instances) => (
+                Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
+                Direct3D12::D3D12_ELEMENTS_LAYOUT::default(),
+                Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_0 {
+                    InstanceDescs: instances
+                        .buffer
+                        .expect("needs buffer to build")
+                        .resource
+                        .GetGPUVirtualAddress()
+                        + instances.offset as u64,
+                },
+                instances.count,
+            ),
             AccelerationStructureEntries::Triangles(triangles) => {
                 geometry_desc = Vec::with_capacity(triangles.len());
                 for triangle in triangles {
-                    geometry_desc.push(
-                        Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC {
-                            Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
-                            Flags: conv::map_acceleration_structure_geometry_flags(triangle.flags),
-                            Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
-                                Triangles: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC {
-                                    Transform3x4: triangle.transform.as_ref().map_or(0, |transform| transform.buffer.resource.GetGPUVirtualAddress() + transform.offset as u64),
-                                    IndexFormat: triangle.indices.as_ref().map_or(Dxgi::Common::DXGI_FORMAT_UNKNOWN, |indices| conv::map_index_format(indices.format)),
-                                    VertexFormat: conv::map_acceleration_structure_vertex_format(triangle.vertex_format),
-                                    IndexCount: triangle.indices.as_ref().map_or(0, |indices| indices.count),
-                                    VertexCount: triangle.vertex_count,
-                                    IndexBuffer: triangle.indices.as_ref().map_or(0, |indices| indices.buffer.expect("needs buffer to build").resource.GetGPUVirtualAddress() + indices.offset),
-                                    VertexBuffer: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                        StartAddress: triangle.vertex_buffer.expect("needs buffer to build").resource.GetGPUVirtualAddress() + (triangle.first_vertex as u64 * triangle.vertex_stride),
-                                        StrideInBytes: triangle.vertex_stride,
-                                    },
-                                }
+                    geometry_desc.push(Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC {
+                        Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
+                        Flags: conv::map_acceleration_structure_geometry_flags(triangle.flags),
+                        Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
+                            Triangles: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC {
+                                Transform3x4: triangle.transform.as_ref().map_or(0, |transform| {
+                                    transform.buffer.resource.GetGPUVirtualAddress()
+                                        + transform.offset as u64
+                                }),
+                                IndexFormat: triangle
+                                    .indices
+                                    .as_ref()
+                                    .map_or(Dxgi::Common::DXGI_FORMAT_UNKNOWN, |indices| {
+                                        conv::map_index_format(indices.format)
+                                    }),
+                                VertexFormat: conv::map_acceleration_structure_vertex_format(
+                                    triangle.vertex_format,
+                                ),
+                                IndexCount: triangle
+                                    .indices
+                                    .as_ref()
+                                    .map_or(0, |indices| indices.count),
+                                VertexCount: triangle.vertex_count,
+                                IndexBuffer: triangle.indices.as_ref().map_or(0, |indices| {
+                                    indices
+                                        .buffer
+                                        .expect("needs buffer to build")
+                                        .resource
+                                        .GetGPUVirtualAddress()
+                                        + indices.offset
+                                }),
+                                VertexBuffer: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
+                                    StartAddress: triangle
+                                        .vertex_buffer
+                                        .expect("needs buffer to build")
+                                        .resource
+                                        .GetGPUVirtualAddress()
+                                        + (triangle.first_vertex as u64 * triangle.vertex_stride),
+                                    StrideInBytes: triangle.vertex_stride,
+                                },
                             },
-                        }
-                    )
+                        },
+                    })
                 }
                 (
                     Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL,
@@ -1825,25 +1855,28 @@ impl crate::Device for super::Device {
                     },
                     geometry_desc.len() as u32,
                 )
-            },
+            }
             AccelerationStructureEntries::AABBs(aabbs) => {
                 geometry_desc = Vec::with_capacity(aabbs.len());
                 for aabb in aabbs {
-                    geometry_desc.push(
-                        Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC {
-                            Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
-                            Flags: conv::map_acceleration_structure_geometry_flags(aabb.flags),
-                            Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
-                                AABBs: Direct3D12::D3D12_RAYTRACING_GEOMETRY_AABBS_DESC {
-                                    AABBCount: aabb.count as u64,
-                                    AABBs: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                        StartAddress: aabb.buffer.expect("needs buffer to build").resource.GetGPUVirtualAddress() + (aabb.offset as u64 * aabb.stride),
-                                        StrideInBytes: aabb.stride,
-                                    },
-                                }
+                    geometry_desc.push(Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC {
+                        Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
+                        Flags: conv::map_acceleration_structure_geometry_flags(aabb.flags),
+                        Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
+                            AABBs: Direct3D12::D3D12_RAYTRACING_GEOMETRY_AABBS_DESC {
+                                AABBCount: aabb.count as u64,
+                                AABBs: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
+                                    StartAddress: aabb
+                                        .buffer
+                                        .expect("needs buffer to build")
+                                        .resource
+                                        .GetGPUVirtualAddress()
+                                        + (aabb.offset as u64 * aabb.stride),
+                                    StrideInBytes: aabb.stride,
+                                },
                             },
-                        }
-                    )
+                        },
+                    })
                 }
                 (
                     Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL,
@@ -1853,17 +1886,21 @@ impl crate::Device for super::Device {
                     },
                     geometry_desc.len() as u32,
                 )
-            },
+            }
         };
-        let acceleration_structure_inputs = Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS {
-            Type: ty,
-            Flags: conv::map_acceleration_structure_build_flags(desc.flags),
-            NumDescs: num_desc,
-            DescsLayout: layout,
-            Anonymous: inputs0,
-        };
+        let acceleration_structure_inputs =
+            Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS {
+                Type: ty,
+                Flags: conv::map_acceleration_structure_build_flags(desc.flags),
+                NumDescs: num_desc,
+                DescsLayout: layout,
+                Anonymous: inputs0,
+            };
         let mut info = Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO::default();
-        device5.GetRaytracingAccelerationStructurePrebuildInfo(&acceleration_structure_inputs, &mut info);
+        device5.GetRaytracingAccelerationStructurePrebuildInfo(
+            &acceleration_structure_inputs,
+            &mut info,
+        );
         crate::AccelerationStructureBuildSizes {
             acceleration_structure_size: info.ResultDataMaxSizeInBytes,
             update_scratch_size: info.UpdateScratchDataSizeInBytes,

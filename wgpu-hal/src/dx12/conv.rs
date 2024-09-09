@@ -347,10 +347,13 @@ pub fn map_depth_stencil(ds: &wgt::DepthStencilState) -> Direct3D12::D3D12_DEPTH
     }
 }
 
-pub(crate) fn map_acceleration_structure_build_flags(flags: wgt::AccelerationStructureFlags) -> Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS {
+pub(crate) fn map_acceleration_structure_build_flags(
+    flags: wgt::AccelerationStructureFlags,
+) -> Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS {
     let mut d3d_flags = Default::default();
     if flags.contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION) {
-        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
+        d3d_flags |=
+            Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
     }
 
     if flags.contains(wgt::AccelerationStructureFlags::ALLOW_UPDATE) {
@@ -362,17 +365,21 @@ pub(crate) fn map_acceleration_structure_build_flags(flags: wgt::AccelerationStr
     }
 
     if flags.contains(wgt::AccelerationStructureFlags::PREFER_FAST_BUILD) {
-        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+        d3d_flags |=
+            Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
     }
 
     if flags.contains(wgt::AccelerationStructureFlags::PREFER_FAST_TRACE) {
-        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        d3d_flags |=
+            Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     }
 
     d3d_flags
 }
 
-pub(crate) fn map_acceleration_structure_geometry_flags(flags: wgt::AccelerationStructureGeometryFlags) -> Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAGS {
+pub(crate) fn map_acceleration_structure_geometry_flags(
+    flags: wgt::AccelerationStructureGeometryFlags,
+) -> Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAGS {
     let mut d3d_flags = Default::default();
     if flags.contains(wgt::AccelerationStructureGeometryFlags::OPAQUE) {
         d3d_flags |= Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
@@ -390,7 +397,9 @@ pub(crate) fn map_index_format(format: wgt::IndexFormat) -> Dxgi::Common::DXGI_F
     }
 }
 
-pub(crate) fn map_acceleration_structure_vertex_format(format: wgt::VertexFormat) -> Dxgi::Common::DXGI_FORMAT {
+pub(crate) fn map_acceleration_structure_vertex_format(
+    format: wgt::VertexFormat,
+) -> Dxgi::Common::DXGI_FORMAT {
     match format {
         wgt::VertexFormat::Unorm8x2 => Dxgi::Common::DXGI_FORMAT_R8G8_UNORM,
         wgt::VertexFormat::Unorm8x4 => Dxgi::Common::DXGI_FORMAT_R8G8B8A8_UNORM,

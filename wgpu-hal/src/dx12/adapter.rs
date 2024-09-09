@@ -402,10 +402,7 @@ impl super::Adapter {
                 && features1.WaveOps.as_bool(),
         );
 
-        features.set(
-            wgt::Features::RAY_QUERY,
-            ray_query,
-        );
+        features.set(wgt::Features::RAY_QUERY, ray_query);
 
         let atomic_int64_on_typed_resource_supported = {
             let mut features9 = Direct3D12::D3D12_FEATURE_DATA_D3D12_OPTIONS9::default();
