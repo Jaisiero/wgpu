@@ -1251,7 +1251,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         for descriptor in descriptors {
             // TODO: This is the same as getting build sizes apart from requiring buffers, should this be de-duped?
             let mut geometry_desc;
-            let (ty, layout, inputs0, num_desc) = match desc.entries {
+            let (ty, layout, inputs0, num_desc) = match descriptor.entries {
                 AccelerationStructureEntries::Instances(instances) => (
                     Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
                     Direct3D12::D3D12_ELEMENTS_LAYOUT::default(),
