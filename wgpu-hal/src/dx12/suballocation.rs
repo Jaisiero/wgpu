@@ -358,20 +358,11 @@ pub(crate) fn create_committed_acceleration_structure_resource(
     desc: &crate::AccelerationStructureDescriptor,
     raw_desc: Direct3D12::D3D12_RESOURCE_DESC,
 ) -> Result<Direct3D12::ID3D12Resource, crate::DeviceError> {
-    let is_cpu_read = desc.usage.contains(crate::BufferUses::MAP_READ);
-    let is_cpu_write = desc.usage.contains(crate::BufferUses::MAP_WRITE);
-
     let heap_properties = Direct3D12::D3D12_HEAP_PROPERTIES {
         Type: Direct3D12::D3D12_HEAP_TYPE_CUSTOM,
-        CPUPageProperty: if is_cpu_read {
-            Direct3D12::D3D12_CPU_PAGE_PROPERTY_WRITE_BACK
-        } else if is_cpu_write {
-            Direct3D12::D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE
-        } else {
-            Direct3D12::D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE
-        },
+        CPUPageProperty: Direct3D12::D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE,
         MemoryPoolPreference: match device.private_caps.memory_architecture {
-            crate::dx12::MemoryArchitecture::NonUnified if !is_cpu_read && !is_cpu_write => {
+            crate::dx12::MemoryArchitecture::NonUnified => {
                 Direct3D12::D3D12_MEMORY_POOL_L1
             }
             _ => Direct3D12::D3D12_MEMORY_POOL_L0,

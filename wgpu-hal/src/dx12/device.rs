@@ -1832,7 +1832,7 @@ impl crate::Device for super::Device {
                                         .expect("needs buffer to build")
                                         .resource
                                         .GetGPUVirtualAddress()
-                                        + indices.offset
+                                        + indices.offset as u64
                                 }),
                                 VertexBuffer: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
                                     StartAddress: triangle
