@@ -1791,12 +1791,7 @@ impl crate::Device for super::Device {
                 Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
                 Direct3D12::D3D12_ELEMENTS_LAYOUT::default(),
                 Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_0 {
-                    InstanceDescs: instances
-                        .buffer
-                        .expect("needs buffer to build")
-                        .resource
-                        .GetGPUVirtualAddress()
-                        + instances.offset as u64,
+                    InstanceDescs: 0,
                 },
                 instances.count,
             ),
@@ -1808,10 +1803,7 @@ impl crate::Device for super::Device {
                         Flags: conv::map_acceleration_structure_geometry_flags(triangle.flags),
                         Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
                             Triangles: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC {
-                                Transform3x4: triangle.transform.as_ref().map_or(0, |transform| {
-                                    transform.buffer.resource.GetGPUVirtualAddress()
-                                        + transform.offset as u64
-                                }),
+                                Transform3x4: 0,
                                 IndexFormat: triangle
                                     .indices
                                     .as_ref()
@@ -1826,21 +1818,9 @@ impl crate::Device for super::Device {
                                     .as_ref()
                                     .map_or(0, |indices| indices.count),
                                 VertexCount: triangle.vertex_count,
-                                IndexBuffer: triangle.indices.as_ref().map_or(0, |indices| {
-                                    indices
-                                        .buffer
-                                        .expect("needs buffer to build")
-                                        .resource
-                                        .GetGPUVirtualAddress()
-                                        + indices.offset as u64
-                                }),
+                                IndexBuffer: 0,
                                 VertexBuffer: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                    StartAddress: triangle
-                                        .vertex_buffer
-                                        .expect("needs buffer to build")
-                                        .resource
-                                        .GetGPUVirtualAddress()
-                                        + (triangle.first_vertex as u64 * triangle.vertex_stride),
+                                    StartAddress: 0,
                                     StrideInBytes: triangle.vertex_stride,
                                 },
                             },
@@ -1866,12 +1846,7 @@ impl crate::Device for super::Device {
                             AABBs: Direct3D12::D3D12_RAYTRACING_GEOMETRY_AABBS_DESC {
                                 AABBCount: aabb.count as u64,
                                 AABBs: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                    StartAddress: aabb
-                                        .buffer
-                                        .expect("needs buffer to build")
-                                        .resource
-                                        .GetGPUVirtualAddress()
-                                        + (aabb.offset as u64 * aabb.stride),
+                                    StartAddress: 0,
                                     StrideInBytes: aabb.stride,
                                 },
                             },
