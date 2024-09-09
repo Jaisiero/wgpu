@@ -298,7 +298,14 @@ impl super::DeviceShared {
     }
 }
 
-impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
+// this is a workaround for gpu alloc not supporting dedicated allocations and buffer handles
+struct DeviceAllocator<'a> {
+    shared: &'a super::DeviceShared,
+    allocate_dedicated: Option<vk::MemoryDedicatedAllocateInfo<'a>>,
+    alloc_should_support_buf_handles: bool,
+}
+
+impl<'a> gpu_alloc::MemoryDevice<vk::DeviceMemory> for DeviceAllocator<'a> {
     unsafe fn allocate_memory(
         &self,
         size: u64,
@@ -320,19 +327,27 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
         let mut export_mem_info;
         let mut export_mem_info_win;
 
-        if self.private_caps.preferred_buffer_handle == super::PreferredBufferHandle::Win32  {
-            export_mem_info_win = vk::ExportMemoryWin32HandleInfoKHR::default();
-            info = info.push_next(&mut export_mem_info_win);
+        if self.alloc_should_support_buf_handles {
+            if self.shared.private_caps.preferred_buffer_handle == super::PreferredBufferHandle::Win32 {
+                export_mem_info_win = vk::ExportMemoryWin32HandleInfoKHR::default();
+                info = info.push_next(&mut export_mem_info_win);
+            }
+
+            if self.shared.private_caps.preferred_buffer_handle != super::PreferredBufferHandle::None {
+                export_mem_info = vk::ExportMemoryAllocateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.shared.private_caps.preferred_buffer_handle).unwrap());
+                info = info.push_next(&mut export_mem_info);
+            }
         }
 
-        if self.private_caps.preferred_buffer_handle != super::PreferredBufferHandle::None {
-            export_mem_info = vk::ExportMemoryAllocateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.private_caps.preferred_buffer_handle).unwrap());
-            info = info.push_next(&mut export_mem_info);
+        let mut alloc_dedicated;
+        if let Some(allocate_dedicated) = self.allocate_dedicated {
+            alloc_dedicated = allocate_dedicated.clone();
+            info = info.push_next(&mut alloc_dedicated)
         }
 
-        match unsafe { self.raw.allocate_memory(&info, None) } {
+        match unsafe { self.shared.raw.allocate_memory(&info, None) } {
             Ok(memory) => {
-                self.memory_allocations_counter.add(1);
+                self.shared.memory_allocations_counter.add(1);
                 Ok(memory)
             }
             Err(vk::Result::ERROR_OUT_OF_DEVICE_MEMORY) => {
@@ -350,9 +365,9 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
     }
 
     unsafe fn deallocate_memory(&self, memory: vk::DeviceMemory) {
-        self.memory_allocations_counter.sub(1);
+        self.shared.memory_allocations_counter.sub(1);
 
-        unsafe { self.raw.free_memory(memory, None) };
+        unsafe { self.shared.raw.free_memory(memory, None) };
     }
 
     unsafe fn map_memory(
@@ -362,7 +377,7 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
         size: u64,
     ) -> Result<ptr::NonNull<u8>, gpu_alloc::DeviceMapError> {
         match unsafe {
-            self.raw
+            self.shared.raw
                 .map_memory(*memory, offset, size, vk::MemoryMapFlags::empty())
         } {
             Ok(ptr) => Ok(ptr::NonNull::new(ptr.cast::<u8>())
@@ -379,7 +394,7 @@ impl gpu_alloc::MemoryDevice<vk::DeviceMemory> for super::DeviceShared {
     }
 
     unsafe fn unmap_memory(&self, memory: &mut vk::DeviceMemory) {
-        unsafe { self.raw.unmap_memory(*memory) };
+        unsafe { self.shared.raw.unmap_memory(*memory) };
     }
 
     unsafe fn invalidate_memory_ranges(
@@ -869,7 +884,13 @@ impl crate::Device for super::Device {
     type A = super::Api;
 
     unsafe fn exit(self, queue: super::Queue) {
-        unsafe { self.mem_allocator.into_inner().cleanup(&*self.shared) };
+        unsafe { self.mem_allocator.into_inner().cleanup(
+            &DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            }
+        ) };
         unsafe { self.desc_allocator.into_inner().cleanup(&*self.shared) };
         unsafe {
             queue
@@ -884,10 +905,16 @@ impl crate::Device for super::Device {
         &self,
         desc: &crate::BufferDescriptor,
     ) -> Result<super::Buffer, crate::DeviceError> {
-        let vk_info = vk::BufferCreateInfo::default()
+        let mut vk_info = vk::BufferCreateInfo::default()
             .size(desc.size)
             .usage(conv::map_buffer_usage(desc.usage))
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
+
+        let mut export_buffer;
+        if desc.usage.contains(crate::BufferUses::EXPORT_BUFFER_HANDLE) {
+            export_buffer = vk::ExternalMemoryBufferCreateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.shared.private_caps.preferred_buffer_handle).unwrap());
+            vk_info = vk_info.push_next(&mut export_buffer);
+        }
 
         let raw = unsafe {
             self.shared
@@ -932,7 +959,11 @@ impl crate::Device for super::Device {
         let block = if desc.usage.contains(crate::BufferUses::EXPORT_BUFFER_HANDLE) {
             unsafe {
                 self.mem_allocator.lock().alloc_with_dedicated(
-                    &*self.shared,
+                    &DeviceAllocator {
+                        shared: &*self.shared,
+                        allocate_dedicated: Some(vk::MemoryDedicatedAllocateInfo::default().buffer(raw)),
+                        alloc_should_support_buf_handles: true,
+                    },
                     gpu_alloc::Request {
                         size: req.size,
                         align_mask: alignment_mask,
@@ -946,7 +977,11 @@ impl crate::Device for super::Device {
         } else {
             unsafe {
                 self.mem_allocator.lock().alloc(
-                    &*self.shared,
+                    &DeviceAllocator {
+                        shared: &*self.shared,
+                        allocate_dedicated: None,
+                        alloc_should_support_buf_handles: false,
+                    },
                     gpu_alloc::Request {
                         size: req.size,
                         align_mask: alignment_mask,
@@ -981,7 +1016,11 @@ impl crate::Device for super::Device {
         if let Some(block) = buffer.block {
             let block = block.into_inner();
             self.counters.buffer_memory.sub(block.size() as isize);
-            unsafe { self.mem_allocator.lock().dealloc(&*self.shared, block) };
+            unsafe { self.mem_allocator.lock().dealloc(&DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            }, block) };
         }
 
         self.counters.buffers.sub(1);
@@ -995,7 +1034,11 @@ impl crate::Device for super::Device {
         if let Some(ref block) = buffer.block {
             let size = range.end - range.start;
             let mut block = block.lock();
-            let ptr = unsafe { block.map(&*self.shared, range.start, size as usize)? };
+            let ptr = unsafe { block.map(&DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            }, range.start, size as usize)? };
             let is_coherent = block
                 .props()
                 .contains(gpu_alloc::MemoryPropertyFlags::HOST_COHERENT);
@@ -1006,7 +1049,11 @@ impl crate::Device for super::Device {
     }
     unsafe fn unmap_buffer(&self, buffer: &super::Buffer) {
         if let Some(ref block) = buffer.block {
-            unsafe { block.lock().unmap(&*self.shared) };
+            unsafe { block.lock().unmap(&DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            }) };
         } else {
             super::hal_usage_error("tried to unmap external buffer")
         }
@@ -1109,7 +1156,11 @@ impl crate::Device for super::Device {
 
         let block = unsafe {
             self.mem_allocator.lock().alloc(
-                &*self.shared,
+                &DeviceAllocator {
+                    shared: &*self.shared,
+                    allocate_dedicated: None,
+                    alloc_should_support_buf_handles: false,
+                },
                 gpu_alloc::Request {
                     size: req.size,
                     align_mask: req.alignment - 1,
@@ -1152,7 +1203,11 @@ impl crate::Device for super::Device {
         if let Some(block) = texture.block {
             self.counters.texture_memory.sub(block.size() as isize);
 
-            unsafe { self.mem_allocator.lock().dealloc(&*self.shared, block) };
+            unsafe { self.mem_allocator.lock().dealloc(&DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            }, block) };
         }
 
         self.counters.textures.sub(1);
@@ -2420,8 +2475,11 @@ impl crate::Device for super::Device {
                 .map_err(super::map_host_device_oom_and_ioca_err)?;
             let req = self.shared.raw.get_buffer_memory_requirements(raw_buffer);
 
-            let block = self.mem_allocator.lock().alloc(
-                &*self.shared,
+            let block = self.mem_allocator.lock().alloc(&DeviceAllocator {
+                shared: &*self.shared,
+                allocate_dedicated: None,
+                alloc_should_support_buf_handles: false,
+            },
                 gpu_alloc::Request {
                     size: req.size,
                     align_mask: req.alignment - 1,
@@ -2483,7 +2541,11 @@ impl crate::Device for super::Device {
                 .destroy_buffer(acceleration_structure.buffer, None);
             self.mem_allocator
                 .lock()
-                .dealloc(&*self.shared, acceleration_structure.block.into_inner());
+                .dealloc(&DeviceAllocator {
+                    shared: &*self.shared,
+                    allocate_dedicated: None,
+                    alloc_should_support_buf_handles: false,
+                }, acceleration_structure.block.into_inner());
         }
     }
 
@@ -2502,7 +2564,7 @@ impl crate::Device for super::Device {
                 wgt::BufferHandle::Win32(
                     win_32.get_memory_win32_handle(
                         &vk::MemoryGetWin32HandleInfoKHR::default()
-                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR)
+                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32)
                             .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
                     ).map_err(super::map_host_device_oom_err)? as *mut c_void
                 ) },

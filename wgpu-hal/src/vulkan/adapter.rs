@@ -753,7 +753,8 @@ impl PhysicalDeviceFeatures {
         features.set(
             F::BUFFER_HANDLE,
             caps.supports_extension(khr::external_memory::NAME)
-                && (caps.supports_extension(khr::external_memory_win32::NAME) || caps.supports_extension(khr::external_memory_fd::NAME)),
+                && (caps.supports_extension(khr::external_memory_win32::NAME) || caps.supports_extension(khr::external_memory_fd::NAME))
+                && caps.supports_extension(khr::dedicated_allocation::NAME),
         );
 
         let rg11b10ufloat_renderable = supports_format(
@@ -1014,6 +1015,7 @@ impl PhysicalDeviceProperties {
         }
 
         if requested_features.contains(wgt::Features::BUFFER_HANDLE) {
+            extensions.push(khr::dedicated_allocation::NAME);
             extensions.push(khr::external_memory::NAME);
             if self.supports_extension(khr::external_memory_win32::NAME) {
                 extensions.push(khr::external_memory_win32::NAME);
