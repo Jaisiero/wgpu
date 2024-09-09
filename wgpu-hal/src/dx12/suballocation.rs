@@ -362,9 +362,7 @@ pub(crate) fn create_committed_acceleration_structure_resource(
         Type: Direct3D12::D3D12_HEAP_TYPE_CUSTOM,
         CPUPageProperty: Direct3D12::D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE,
         MemoryPoolPreference: match device.private_caps.memory_architecture {
-            crate::dx12::MemoryArchitecture::NonUnified => {
-                Direct3D12::D3D12_MEMORY_POOL_L1
-            }
+            crate::dx12::MemoryArchitecture::NonUnified => Direct3D12::D3D12_MEMORY_POOL_L1,
             _ => Direct3D12::D3D12_MEMORY_POOL_L0,
         },
         CreationNodeMask: 0,
