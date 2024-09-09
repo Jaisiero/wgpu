@@ -973,7 +973,10 @@ pub struct PipelineCache;
 impl crate::DynPipelineCache for PipelineCache {}
 
 #[derive(Debug)]
-pub struct AccelerationStructure {}
+pub struct AccelerationStructure {
+    resource: Direct3D12::ID3D12Resource,
+    allocation: Option<suballocation::AllocationWrapper>,
+}
 
 impl crate::DynAccelerationStructure for AccelerationStructure {}
 

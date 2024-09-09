@@ -151,6 +151,56 @@ pub(crate) fn create_texture_resource(
     Ok((resource, Some(AllocationWrapper { allocation })))
 }
 
+pub(crate) fn create_acceleration_structure_resource(
+    device: &crate::dx12::Device,
+    desc: &crate::AccelerationStructureDescriptor,
+    raw_desc: Direct3D12::D3D12_RESOURCE_DESC,
+) -> Result<(Direct3D12::ID3D12Resource, Option<AllocationWrapper>), crate::DeviceError> {
+
+    // Workaround for Intel Xe drivers
+    if !device.private_caps.suballocation_supported {
+        todo!()
+        //return create_committed_buffer_resource(device, desc, raw_desc)
+        //    .map(|resource| (resource, None));
+    }
+
+    let location = MemoryLocation::GpuOnly;
+
+    let name = desc.label.unwrap_or("Unlabeled acceleration structure");
+
+    let mut allocator = device.mem_allocator.lock();
+
+    let allocation_desc = AllocationCreateDesc::from_d3d12_resource_desc(
+        allocator.allocator.device(),
+        &raw_desc,
+        name,
+        location,
+    );
+    let allocation = allocator.allocator.allocate(&allocation_desc)?;
+    let mut resource = None;
+
+    unsafe {
+        device.raw.CreatePlacedResource(
+            allocation.heap(),
+            allocation.offset(),
+            &raw_desc,
+            Direct3D12::D3D12_RESOURCE_STATE_COMMON,
+            None,
+            &mut resource,
+        )
+    }
+        .into_device_result("Placed acceleration structure creation")?;
+
+    let resource = resource.ok_or(crate::DeviceError::Unexpected)?;
+
+    device
+        .counters
+        .buffer_memory
+        .add(allocation.size() as isize);
+
+    Ok((resource, Some(AllocationWrapper { allocation })))
+}
+
 pub(crate) fn free_buffer_allocation(
     device: &crate::dx12::Device,
     allocation: AllocationWrapper,

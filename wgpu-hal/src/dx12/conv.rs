@@ -1,4 +1,4 @@
-use windows::Win32::Graphics::{Direct3D, Direct3D12};
+use windows::Win32::Graphics::{Direct3D, Direct3D12, Dxgi};
 
 pub fn map_buffer_usage_to_resource_flags(
     usage: crate::BufferUses,
@@ -344,5 +344,68 @@ pub fn map_depth_stencil(ds: &wgt::DepthStencilState) -> Direct3D12::D3D12_DEPTH
         StencilWriteMask: ds.stencil.write_mask as u8,
         FrontFace: map_stencil_face(&ds.stencil.front),
         BackFace: map_stencil_face(&ds.stencil.back),
+    }
+}
+
+pub(crate) fn map_acceleration_structure_build_flags(flags: wgt::AccelerationStructureFlags) -> Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS {
+    let mut d3d_flags = Default::default();
+    if flags.contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
+    }
+
+    if flags.contains(wgt::AccelerationStructureFlags::ALLOW_UPDATE) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    }
+
+    if flags.contains(wgt::AccelerationStructureFlags::LOW_MEMORY) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_MINIMIZE_MEMORY;
+    }
+
+    if flags.contains(wgt::AccelerationStructureFlags::PREFER_FAST_BUILD) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+    }
+
+    if flags.contains(wgt::AccelerationStructureFlags::PREFER_FAST_TRACE) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    }
+
+    d3d_flags
+}
+
+pub(crate) fn map_acceleration_structure_geometry_flags(flags: wgt::AccelerationStructureGeometryFlags) -> Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAGS {
+    let mut d3d_flags = Default::default();
+    if flags.contains(wgt::AccelerationStructureGeometryFlags::OPAQUE) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+    }
+    if flags.contains(wgt::AccelerationStructureGeometryFlags::NO_DUPLICATE_ANY_HIT_INVOCATION) {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION;
+    }
+    d3d_flags
+}
+
+pub(crate) fn map_index_format(format: wgt::IndexFormat) -> Dxgi::Common::DXGI_FORMAT {
+    match format {
+        wgt::IndexFormat::Uint16 => Dxgi::Common::DXGI_FORMAT_R16_UINT,
+        wgt::IndexFormat::Uint32 => Dxgi::Common::DXGI_FORMAT_R32_UINT,
+    }
+}
+
+pub(crate) fn map_acceleration_structure_vertex_format(format: wgt::VertexFormat) -> Dxgi::Common::DXGI_FORMAT {
+    match format {
+        wgt::VertexFormat::Unorm8x2 => Dxgi::Common::DXGI_FORMAT_R8G8_UNORM,
+        wgt::VertexFormat::Unorm8x4 => Dxgi::Common::DXGI_FORMAT_R8G8B8A8_UNORM,
+        wgt::VertexFormat::Snorm8x2 => Dxgi::Common::DXGI_FORMAT_R8G8_SNORM,
+        wgt::VertexFormat::Snorm8x4 => Dxgi::Common::DXGI_FORMAT_R8G8B8A8_SNORM,
+        wgt::VertexFormat::Unorm16x2 => Dxgi::Common::DXGI_FORMAT_R16G16_UNORM,
+        wgt::VertexFormat::Unorm16x4 => Dxgi::Common::DXGI_FORMAT_R16G16B16A16_UNORM,
+        wgt::VertexFormat::Snorm16x2 => Dxgi::Common::DXGI_FORMAT_R16G16_SNORM,
+        wgt::VertexFormat::Snorm16x4 => Dxgi::Common::DXGI_FORMAT_R16G16B16A16_SNORM,
+        wgt::VertexFormat::Float16x2 => Dxgi::Common::DXGI_FORMAT_R16G16_FLOAT,
+        wgt::VertexFormat::Float16x4 => Dxgi::Common::DXGI_FORMAT_R16G16B16A16_FLOAT,
+        wgt::VertexFormat::Float32x2 => Dxgi::Common::DXGI_FORMAT_R32G32_FLOAT,
+        wgt::VertexFormat::Float32x3 => Dxgi::Common::DXGI_FORMAT_R32G32B32_FLOAT,
+        wgt::VertexFormat::Unorm10_10_10_2 => Dxgi::Common::DXGI_FORMAT_R10G10B10A2_UNORM,
+        // no other formats are supported
+        _ => unimplemented!("disallowed vertex format"),
     }
 }
