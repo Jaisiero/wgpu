@@ -26,11 +26,7 @@ int dim_1d = NagaDimensions1D(image_1d);
 ```
 */
 
-use super::{
-    super::FunctionCtx,
-    writer::{EXTRACT_BITS_FUNCTION, INSERT_BITS_FUNCTION},
-    BackendResult,
-};
+use super::{super::FunctionCtx, writer::{EXTRACT_BITS_FUNCTION, INSERT_BITS_FUNCTION}, BackendResult, Error};
 use crate::{arena::Handle, proc::NameKey};
 use std::fmt::Write;
 
@@ -841,6 +837,9 @@ impl<'a, W: Write> super::Writer<'a, W> {
                 &crate::PredeclaredType::AtomicCompareExchangeWeakResult { .. } => {}
             }
         }
+        if module.special_types.ray_desc.is_some() {
+            self.write_ray_desc_from_ray_desc_constructor_function(module)?;
+        }
 
         Ok(())
     }
@@ -852,16 +851,26 @@ impl<'a, W: Write> super::Writer<'a, W> {
         expressions: &crate::Arena<crate::Expression>,
     ) -> BackendResult {
         for (handle, _) in expressions.iter() {
-            if let crate::Expression::Compose { ty, .. } = expressions[handle] {
-                match module.types[ty].inner {
-                    crate::TypeInner::Struct { .. } | crate::TypeInner::Array { .. } => {
-                        let constructor = WrappedConstructor { ty };
-                        if self.wrapped.constructors.insert(constructor) {
-                            self.write_wrapped_constructor_function(module, constructor)?;
+            match expressions[handle] {
+                crate::Expression::Compose { ty, .. } => {
+                    match module.types[ty].inner {
+                        crate::TypeInner::Struct { .. } | crate::TypeInner::Array { .. } => {
+                            let constructor = WrappedConstructor { ty };
+                            if self.wrapped.constructors.insert(constructor) {
+                                self.write_wrapped_constructor_function(module, constructor)?;
+                            }
                         }
+                        _ => {}
+                    };
+                }
+                crate::Expression::RayQueryGetIntersection { committed, .. } => {
+                    if committed {
+                        self.write_commited_intersection_function(module)?;
+                    } else {
+                        return Err(Error::Unimplemented("candidate intersection".to_string()));
                     }
-                    _ => {}
-                };
+                }
+                _ => {}
             }
         }
         Ok(())

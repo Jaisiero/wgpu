@@ -103,6 +103,7 @@ mod help;
 mod keywords;
 mod storage;
 mod writer;
+mod ray;
 
 use std::fmt::Error as FmtError;
 use thiserror::Error;
@@ -327,6 +328,7 @@ pub struct Writer<'a, W> {
     /// Set of expressions that have associated temporary variables
     named_expressions: crate::NamedExpressions,
     wrapped: Wrapped,
+    written_committed_intersection: bool,
     continue_ctx: back::continue_forward::ContinueCtx,
 
     /// A reference to some part of a global variable, lowered to a series of

@@ -6,11 +6,7 @@ use super::{
     storage::StoreValue,
     BackendResult, Error, FragmentEntryPoint, Options,
 };
-use crate::{
-    back::{self, Baked},
-    proc::{self, ExpressionKindTracker, NameKey},
-    valid, Handle, Module, Scalar, ScalarKind, ShaderStage, TypeInner,
-};
+use crate::{back::{self, Baked}, proc::{self, ExpressionKindTracker, NameKey}, valid, Handle, Module, Scalar, ScalarKind, ShaderStage, TypeInner, RayQueryFunction};
 use std::{fmt, mem};
 
 const LOCATION_SEMANTIC: &str = "LOC";
@@ -104,6 +100,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             entry_point_io: Vec::new(),
             named_expressions: crate::NamedExpressions::default(),
             wrapped: super::Wrapped::default(),
+            written_committed_intersection: false,
             continue_ctx: back::continue_forward::ContinueCtx::default(),
             temp_access_chain: Vec::new(),
             need_bake_expressions: Default::default(),
@@ -123,6 +120,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         self.entry_point_io.clear();
         self.named_expressions.clear();
         self.wrapped.clear();
+        self.written_committed_intersection = false;
         self.continue_ctx.clear();
         self.need_bake_expressions.clear();
     }
@@ -1217,6 +1215,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             TypeInner::Array { base, size, .. } | TypeInner::BindingArray { base, size } => {
                 self.write_array_size(module, base, size)?;
             }
+            TypeInner::AccelerationStructure => {
+                write!(self.out, "RaytracingAccelerationStructure")?;
+            }
+            TypeInner::RayQuery => {
+                // these are constant flags, there are dynamic flags also but constant flags are not supported by naga
+                write!(self.out, "RayQuery<RAY_FLAG_NONE>")?;
+            }
             _ => return Err(Error::Unimplemented(format!("write_value_type {inner:?}"))),
         }
 
@@ -1374,15 +1379,20 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_array_size(module, base, size)?;
             }
 
-            write!(self.out, " = ")?;
-            // Write the local initializer if needed
-            if let Some(init) = local.init {
-                self.write_expr(module, init, func_ctx)?;
-            } else {
-                // Zero initialize local variables
-                self.write_default_init(module, local.ty)?;
+            match module.types[local.ty].inner {
+                // from https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#tracerayinline-example-1 it seems that ray queries shouldn't be zeroed
+                TypeInner::RayQuery => {}
+                _ => {
+                    write!(self.out, " = ")?;
+                    // Write the local initializer if needed
+                    if let Some(init) = local.init {
+                        self.write_expr(module, init, func_ctx)?;
+                    } else {
+                        // Zero initialize local variables
+                        self.write_default_init(module, local.ty)?;
+                    }
+                }
             }
-
             // Finish the local with `;` and add a newline (only for readability)
             writeln!(self.out, ";")?
         }
@@ -2223,7 +2233,38 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             } => {
                 self.write_switch(module, func_ctx, level, selector, cases)?;
             }
-            Statement::RayQuery { .. } => unreachable!(),
+            Statement::RayQuery { query, ref fun } => {
+                match *fun {
+                    RayQueryFunction::Initialize { acceleration_structure, descriptor } => {
+                        write!(self.out, "{level}")?;
+                        self.write_expr(module, query, func_ctx)?;
+                        write!(self.out, ".TraceRayInline(")?;
+                        self.write_expr(module, acceleration_structure, func_ctx)?;
+                        write!(self.out, ", ")?;
+                        self.write_expr(module, descriptor, func_ctx)?;
+                        write!(self.out, ".flags, ")?;
+                        self.write_expr(module, descriptor, func_ctx)?;
+                        write!(self.out, ".cull_mask, ")?;
+                        self.write_expr(module, descriptor, func_ctx)?;
+                        write!(self.out, ".flags, ")?;
+                        write!(self.out, "RayDescFromRayDesc_(")?;
+                        self.write_expr(module, descriptor, func_ctx)?;
+                        writeln!(self.out, "))")?;
+                    }
+                    RayQueryFunction::Proceed { result } => {
+                        write!(self.out, "{level}")?;
+                        let name = Baked(result).to_string();
+                        write!(self.out, "const uint4 {name} = ")?;
+                        self.named_expressions.insert(result, name);
+                        self.write_expr(module, query, func_ctx)?;
+                        writeln!(self.out, ".Proceed()")?;
+                    }
+                    RayQueryFunction::Terminate => {
+                        self.write_expr(module, query, func_ctx)?;
+                        writeln!(self.out, ".Abort()")?;
+                    }
+                }
+            }
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let name = Baked(result).to_string();
@@ -3530,8 +3571,15 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_expr(module, reject, func_ctx)?;
                 write!(self.out, ")")?
             }
-            // Not supported yet
-            Expression::RayQueryGetIntersection { .. } => unreachable!(),
+            Expression::RayQueryGetIntersection { query, committed } => {
+                if committed {
+                    write!(self.out, "GetCommittedIntersection(")?;
+                    self.write_expr(module, query, func_ctx)?;
+                    write!(self.out, ")")?;
+                } else {
+                    return Err(Error::Unimplemented("candidate intersection".to_string()));
+                }
+            }
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }
