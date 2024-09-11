@@ -1296,16 +1296,17 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                         .as_ref()
                                         .map_or(0, |indices| indices.count),
                                     VertexCount: triangle.vertex_count,
-                                    IndexBuffer: triangle.indices.as_ref().map_or(0, |indices| {
-                                        unsafe {
+                                    IndexBuffer: triangle.indices.as_ref().map_or(
+                                        0,
+                                        |indices| unsafe {
                                             indices
                                                 .buffer
                                                 .expect("needs buffer to build")
                                                 .resource
                                                 .GetGPUVirtualAddress()
                                                 + indices.offset as u64
-                                        }
-                                    }),
+                                        },
+                                    ),
                                     VertexBuffer:
                                         Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
                                             StartAddress: unsafe {
@@ -1315,7 +1316,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                                     .resource
                                                     .GetGPUVirtualAddress()
                                                     + (triangle.first_vertex as u64
-                                                    * triangle.vertex_stride)
+                                                        * triangle.vertex_stride)
                                             },
                                             StrideInBytes: triangle.vertex_stride,
                                         },
@@ -1343,8 +1344,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                     AABBCount: aabb.count as u64,
                                     AABBs: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
                                         StartAddress: unsafe {
-                                            aabb
-                                                .buffer
+                                            aabb.buffer
                                                 .expect("needs buffer to build")
                                                 .resource
                                                 .GetGPUVirtualAddress()
@@ -1385,12 +1385,11 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 SourceAccelerationStructureData: descriptor
                     .source_acceleration_structure
                     .as_ref()
-                    .map_or(0, |source| unsafe { source.resource.GetGPUVirtualAddress() }),
+                    .map_or(0, |source| unsafe {
+                        source.resource.GetGPUVirtualAddress()
+                    }),
                 ScratchAccelerationStructureData: unsafe {
-                    descriptor
-                        .scratch_buffer
-                        .resource
-                        .GetGPUVirtualAddress()
+                    descriptor.scratch_buffer.resource.GetGPUVirtualAddress()
                         + descriptor.scratch_buffer_offset
                 },
             };

@@ -26,7 +26,11 @@ int dim_1d = NagaDimensions1D(image_1d);
 ```
 */
 
-use super::{super::FunctionCtx, writer::{EXTRACT_BITS_FUNCTION, INSERT_BITS_FUNCTION}, BackendResult, Error};
+use super::{
+    super::FunctionCtx,
+    writer::{EXTRACT_BITS_FUNCTION, INSERT_BITS_FUNCTION},
+    BackendResult, Error,
+};
 use crate::{arena::Handle, proc::NameKey};
 use std::fmt::Write;
 

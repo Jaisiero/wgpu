@@ -6,7 +6,11 @@ use super::{
     storage::StoreValue,
     BackendResult, Error, FragmentEntryPoint, Options,
 };
-use crate::{back::{self, Baked}, proc::{self, ExpressionKindTracker, NameKey}, valid, Handle, Module, Scalar, ScalarKind, ShaderStage, TypeInner, RayQueryFunction};
+use crate::{
+    back::{self, Baked},
+    proc::{self, ExpressionKindTracker, NameKey},
+    valid, Handle, Module, RayQueryFunction, Scalar, ScalarKind, ShaderStage, TypeInner,
+};
 use std::{fmt, mem};
 
 const LOCATION_SEMANTIC: &str = "LOC";
@@ -2233,38 +2237,37 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             } => {
                 self.write_switch(module, func_ctx, level, selector, cases)?;
             }
-            Statement::RayQuery { query, ref fun } => {
-                match *fun {
-                    RayQueryFunction::Initialize { acceleration_structure, descriptor } => {
-                        write!(self.out, "{level}")?;
-                        self.write_expr(module, query, func_ctx)?;
-                        write!(self.out, ".TraceRayInline(")?;
-                        self.write_expr(module, acceleration_structure, func_ctx)?;
-                        write!(self.out, ", ")?;
-                        self.write_expr(module, descriptor, func_ctx)?;
-                        write!(self.out, ".flags, ")?;
-                        self.write_expr(module, descriptor, func_ctx)?;
-                        write!(self.out, ".cull_mask, ")?;
-                        self.write_expr(module, descriptor, func_ctx)?;
-                        write!(self.out, ".flags, ")?;
-                        write!(self.out, "RayDescFromRayDesc_(")?;
-                        self.write_expr(module, descriptor, func_ctx)?;
-                        writeln!(self.out, "))")?;
-                    }
-                    RayQueryFunction::Proceed { result } => {
-                        write!(self.out, "{level}")?;
-                        let name = Baked(result).to_string();
-                        write!(self.out, "const uint4 {name} = ")?;
-                        self.named_expressions.insert(result, name);
-                        self.write_expr(module, query, func_ctx)?;
-                        writeln!(self.out, ".Proceed()")?;
-                    }
-                    RayQueryFunction::Terminate => {
-                        self.write_expr(module, query, func_ctx)?;
-                        writeln!(self.out, ".Abort()")?;
-                    }
+            Statement::RayQuery { query, ref fun } => match *fun {
+                RayQueryFunction::Initialize {
+                    acceleration_structure,
+                    descriptor,
+                } => {
+                    write!(self.out, "{level}")?;
+                    self.write_expr(module, query, func_ctx)?;
+                    write!(self.out, ".TraceRayInline(")?;
+                    self.write_expr(module, acceleration_structure, func_ctx)?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    write!(self.out, ".flags, ")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    write!(self.out, ".cull_mask, ")?;
+                    write!(self.out, "RayDescFromRayDesc_(")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    writeln!(self.out, "))")?;
                 }
-            }
+                RayQueryFunction::Proceed { result } => {
+                    write!(self.out, "{level}")?;
+                    let name = Baked(result).to_string();
+                    write!(self.out, "const uint4 {name} = ")?;
+                    self.named_expressions.insert(result, name);
+                    self.write_expr(module, query, func_ctx)?;
+                    writeln!(self.out, ".Proceed()")?;
+                }
+                RayQueryFunction::Terminate => {
+                    self.write_expr(module, query, func_ctx)?;
+                    writeln!(self.out, ".Abort()")?;
+                }
+            },
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
                 let name = Baked(result).to_string();

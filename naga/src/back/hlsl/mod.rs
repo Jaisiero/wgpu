@@ -101,9 +101,9 @@ accessing individual columns by dynamic index.
 mod conv;
 mod help;
 mod keywords;
+mod ray;
 mod storage;
 mod writer;
-mod ray;
 
 use std::fmt::Error as FmtError;
 use thiserror::Error;
