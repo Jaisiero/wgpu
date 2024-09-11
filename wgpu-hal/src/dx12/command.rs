@@ -1256,12 +1256,14 @@ impl crate::CommandEncoder for super::CommandEncoder {
                     Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
                     Direct3D12::D3D12_ELEMENTS_LAYOUT::default(),
                     Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_0 {
-                        InstanceDescs: instances
-                            .buffer
-                            .expect("needs buffer to build")
-                            .resource
-                            .GetGPUVirtualAddress()
-                            + instances.offset as u64,
+                        InstanceDescs: unsafe {
+                            instances
+                                .buffer
+                                .expect("needs buffer to build")
+                                .resource
+                                .GetGPUVirtualAddress()
+                                + instances.offset as u64
+                        },
                     },
                     instances.count,
                 ),
@@ -1275,7 +1277,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                 Triangles: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC {
                                     Transform3x4: triangle.transform.as_ref().map_or(
                                         0,
-                                        |transform| {
+                                        |transform| unsafe {
                                             transform.buffer.resource.GetGPUVirtualAddress()
                                                 + transform.offset as u64
                                         },
@@ -1295,22 +1297,26 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                         .map_or(0, |indices| indices.count),
                                     VertexCount: triangle.vertex_count,
                                     IndexBuffer: triangle.indices.as_ref().map_or(0, |indices| {
-                                        indices
-                                            .buffer
-                                            .expect("needs buffer to build")
-                                            .resource
-                                            .GetGPUVirtualAddress()
-                                            + indices.offset as u64
-                                    }),
-                                    VertexBuffer:
-                                        Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                            StartAddress: triangle
-                                                .vertex_buffer
+                                        unsafe {
+                                            indices
+                                                .buffer
                                                 .expect("needs buffer to build")
                                                 .resource
                                                 .GetGPUVirtualAddress()
-                                                + (triangle.first_vertex as u64
-                                                    * triangle.vertex_stride),
+                                                + indices.offset as u64
+                                        }
+                                    }),
+                                    VertexBuffer:
+                                        Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
+                                            StartAddress: unsafe {
+                                                triangle
+                                                    .vertex_buffer
+                                                    .expect("needs buffer to build")
+                                                    .resource
+                                                    .GetGPUVirtualAddress()
+                                                    + (triangle.first_vertex as u64
+                                                    * triangle.vertex_stride)
+                                            },
                                             StrideInBytes: triangle.vertex_stride,
                                         },
                                 },
@@ -1336,12 +1342,14 @@ impl crate::CommandEncoder for super::CommandEncoder {
                                 AABBs: Direct3D12::D3D12_RAYTRACING_GEOMETRY_AABBS_DESC {
                                     AABBCount: aabb.count as u64,
                                     AABBs: Direct3D12::D3D12_GPU_VIRTUAL_ADDRESS_AND_STRIDE {
-                                        StartAddress: aabb
-                                            .buffer
-                                            .expect("needs buffer to build")
-                                            .resource
-                                            .GetGPUVirtualAddress()
-                                            + (aabb.offset as u64 * aabb.stride),
+                                        StartAddress: unsafe {
+                                            aabb
+                                                .buffer
+                                                .expect("needs buffer to build")
+                                                .resource
+                                                .GetGPUVirtualAddress()
+                                                + (aabb.offset as u64 * aabb.stride)
+                                        },
                                         StrideInBytes: aabb.stride,
                                     },
                                 },
@@ -1367,22 +1375,26 @@ impl crate::CommandEncoder for super::CommandEncoder {
                     Anonymous: inputs0,
                 };
             let desc = Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC {
-                DestAccelerationStructureData: descriptor
-                    .destination_acceleration_structure
-                    .resource
-                    .GetGPUVirtualAddress(),
+                DestAccelerationStructureData: unsafe {
+                    descriptor
+                        .destination_acceleration_structure
+                        .resource
+                        .GetGPUVirtualAddress()
+                },
                 Inputs: acceleration_structure_inputs,
                 SourceAccelerationStructureData: descriptor
                     .source_acceleration_structure
                     .as_ref()
-                    .map_or(0, |source| source.resource.GetGPUVirtualAddress()),
-                ScratchAccelerationStructureData: descriptor
-                    .scratch_buffer
-                    .resource
-                    .GetGPUVirtualAddress()
-                    + descriptor.scratch_buffer_offset,
+                    .map_or(0, |source| unsafe { source.resource.GetGPUVirtualAddress() }),
+                ScratchAccelerationStructureData: unsafe {
+                    descriptor
+                        .scratch_buffer
+                        .resource
+                        .GetGPUVirtualAddress()
+                        + descriptor.scratch_buffer_offset
+                },
             };
-            list.BuildRaytracingAccelerationStructure(&desc, None);
+            unsafe { list.BuildRaytracingAccelerationStructure(&desc, None) };
         }
     }
 
@@ -1396,14 +1408,16 @@ impl crate::CommandEncoder for super::CommandEncoder {
             .unwrap()
             .cast::<Direct3D12::ID3D12GraphicsCommandList4>()
             .unwrap();
-        list.ResourceBarrier(&[Direct3D12::D3D12_RESOURCE_BARRIER {
-            Type: Direct3D12::D3D12_RESOURCE_BARRIER_TYPE_UAV,
-            Flags: Direct3D12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
-            Anonymous: Direct3D12::D3D12_RESOURCE_BARRIER_0 {
-                UAV: ManuallyDrop::new(Direct3D12::D3D12_RESOURCE_UAV_BARRIER {
-                    pResource: Default::default(),
-                }),
-            },
-        }])
+        unsafe {
+            list.ResourceBarrier(&[Direct3D12::D3D12_RESOURCE_BARRIER {
+                Type: Direct3D12::D3D12_RESOURCE_BARRIER_TYPE_UAV,
+                Flags: Direct3D12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                Anonymous: Direct3D12::D3D12_RESOURCE_BARRIER_0 {
+                    UAV: ManuallyDrop::new(Direct3D12::D3D12_RESOURCE_UAV_BARRIER {
+                        pResource: Default::default(),
+                    }),
+                },
+            }])
+        }
     }
 }

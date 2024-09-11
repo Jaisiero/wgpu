@@ -355,7 +355,7 @@ pub(crate) fn create_committed_texture_resource(
 
 pub(crate) fn create_committed_acceleration_structure_resource(
     device: &crate::dx12::Device,
-    desc: &crate::AccelerationStructureDescriptor,
+    _desc: &crate::AccelerationStructureDescriptor,
     raw_desc: Direct3D12::D3D12_RESOURCE_DESC,
 ) -> Result<Direct3D12::ID3D12Resource, crate::DeviceError> {
     let heap_properties = Direct3D12::D3D12_HEAP_PROPERTIES {

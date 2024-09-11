@@ -17,7 +17,7 @@ use windows::{
     },
 };
 
-use super::{conv, descriptor, Buffer, D3D12Lib};
+use super::{conv, descriptor, D3D12Lib};
 use crate::{
     auxil::{self, dxgi::result::HResult},
     dx12::{borrow_optional_interface_temporarily, shader_compilation, Event},
@@ -1872,10 +1872,12 @@ impl crate::Device for super::Device {
                 Anonymous: inputs0,
             };
         let mut info = Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO::default();
-        device5.GetRaytracingAccelerationStructurePrebuildInfo(
-            &acceleration_structure_inputs,
-            &mut info,
-        );
+        unsafe {
+            device5.GetRaytracingAccelerationStructurePrebuildInfo(
+                &acceleration_structure_inputs,
+                &mut info,
+            )
+        };
         crate::AccelerationStructureBuildSizes {
             acceleration_structure_size: info.ResultDataMaxSizeInBytes,
             update_scratch_size: info.UpdateScratchDataSizeInBytes,
@@ -1887,7 +1889,7 @@ impl crate::Device for super::Device {
         &self,
         acceleration_structure: &super::AccelerationStructure,
     ) -> wgt::BufferAddress {
-        acceleration_structure.resource.GetGPUVirtualAddress()
+        unsafe { acceleration_structure.resource.GetGPUVirtualAddress() }
     }
 
     unsafe fn create_acceleration_structure(
@@ -1895,7 +1897,7 @@ impl crate::Device for super::Device {
         desc: &crate::AccelerationStructureDescriptor,
     ) -> Result<super::AccelerationStructure, crate::DeviceError> {
         // Create a D3D12 resource as per-usual.
-        let mut size = desc.size;
+        let size = desc.size;
 
         let raw_desc = Direct3D12::D3D12_RESOURCE_DESC {
             Dimension: Direct3D12::D3D12_RESOURCE_DIMENSION_BUFFER,
