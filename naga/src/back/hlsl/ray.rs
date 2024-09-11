@@ -21,7 +21,7 @@ impl<'a, W: Write> super::Writer<'a, W> {
         writeln!(self.out)?;
         Ok(())
     }
-    pub(super) fn write_commited_intersection_function(
+    pub(super) fn write_committed_intersection_function(
         &mut self,
         module: &crate::Module,
     ) -> BackendResult {

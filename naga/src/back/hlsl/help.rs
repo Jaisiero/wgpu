@@ -869,7 +869,7 @@ impl<'a, W: Write> super::Writer<'a, W> {
                 }
                 crate::Expression::RayQueryGetIntersection { committed, .. } => {
                     if committed {
-                        self.write_commited_intersection_function(module)?;
+                        self.write_committed_intersection_function(module)?;
                     } else {
                         return Err(Error::Unimplemented("candidate intersection".to_string()));
                     }

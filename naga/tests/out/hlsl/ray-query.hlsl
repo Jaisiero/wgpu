@@ -42,6 +42,7 @@ RayDesc RayDescFromRayDesc_(RayDesc_ arg0) {
     ret.TMin = arg0.tmin;
     ret.Direction = arg0.dir;
     ret.TMax = arg0.tmax;
+    return ret;
 }
 
 RaytracingAccelerationStructure acc_struct : register(t0);
@@ -60,14 +61,14 @@ RayDesc_ ConstructRayDesc_(uint arg0, uint arg1, float arg2, float arg3, float3 
 
 RayIntersection GetCommittedIntersection(RayQuery<RAY_FLAG_NONE> rq) {
     RayIntersection ret = (RayIntersection)0;
-    ret.kind = rq.CommittedStatus()
+    ret.kind = rq.CommittedStatus();
     if( rq.CommittedStatus() == COMMITTED_NOTHING) {} else {
         ret.t = rq.CommittedRayT();
         ret.instance_custom_index = rq.CommittedInstanceIndex();
         ret.instance_id = rq.CommittedInstanceID();
         ret.sbt_record_offset = rq.CommittedInstanceContributionToHitGroupIndex();
         ret.geometry_index = rq.CommittedGeometryIndex();
-        ret.primitive_index = .CommittedPrimitiveIndex();
+        ret.primitive_index = rq.CommittedPrimitiveIndex();
         if( rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT ) {
             ret.barycentrics = rq.CommittedTriangleBarycentrics();
             ret.front_face = rq.CommittedTriangleFrontFace();
@@ -82,7 +83,7 @@ RayIntersection query_loop(float3 pos, float3 dir, RaytracingAccelerationStructu
 {
     RayQuery<RAY_FLAG_NONE> rq;
 
-    rq.TraceRayInline(acs, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).flags, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).cull_mask, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).flags, RayDescFromRayDesc_(ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir)))
+    rq.TraceRayInline(acs, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).flags, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).cull_mask, RayDescFromRayDesc_(ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir)))
     while(true) {
         const uint4 _e9 = rq.Proceed()
         if (_e9) {
