@@ -2253,7 +2253,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, ".cull_mask, ")?;
                     write!(self.out, "RayDescFromRayDesc_(")?;
                     self.write_expr(module, descriptor, func_ctx)?;
-                    writeln!(self.out, "))")?;
+                    writeln!(self.out, "));")?;
                 }
                 RayQueryFunction::Proceed { result } => {
                     write!(self.out, "{level}")?;
@@ -2261,11 +2261,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, "const uint4 {name} = ")?;
                     self.named_expressions.insert(result, name);
                     self.write_expr(module, query, func_ctx)?;
-                    writeln!(self.out, ".Proceed()")?;
+                    writeln!(self.out, ".Proceed();")?;
                 }
                 RayQueryFunction::Terminate => {
                     self.write_expr(module, query, func_ctx)?;
-                    writeln!(self.out, ".Abort()")?;
+                    writeln!(self.out, ".Abort();")?;
                 }
             },
             Statement::SubgroupBallot { result, predicate } => {
