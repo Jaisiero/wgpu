@@ -2258,7 +2258,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 RayQueryFunction::Proceed { result } => {
                     write!(self.out, "{level}")?;
                     let name = Baked(result).to_string();
-                    write!(self.out, "const uint4 {name} = ")?;
+                    write!(self.out, "const bool {name} = ")?;
                     self.named_expressions.insert(result, name);
                     self.write_expr(module, query, func_ctx)?;
                     writeln!(self.out, ".Proceed();")?;

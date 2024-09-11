@@ -85,7 +85,7 @@ RayIntersection query_loop(float3 pos, float3 dir, RaytracingAccelerationStructu
 
     rq.TraceRayInline(acs, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).flags, ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir).cull_mask, RayDescFromRayDesc_(ConstructRayDesc_(4u, 255u, 0.1, 100.0, pos, dir)));
     while(true) {
-        const uint4 _e9 = rq.Proceed();
+        const bool _e9 = rq.Proceed();
         if (_e9) {
         } else {
             break;
