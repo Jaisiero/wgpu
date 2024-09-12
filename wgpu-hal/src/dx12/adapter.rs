@@ -195,23 +195,6 @@ impl super::Adapter {
             .is_ok()
         };
 
-        let ray_query = {
-            let mut features5 = Direct3D12::D3D12_FEATURE_DATA_D3D12_OPTIONS5::default();
-            let has_features5 = unsafe {
-                device.CheckFeatureSupport(
-                    Direct3D12::D3D12_FEATURE_D3D12_OPTIONS5,
-                    <*mut _>::cast(&mut features5),
-                    size_of_val(&features5) as u32,
-                )
-            }
-            .is_ok();
-            if has_features5 {
-                features5.RaytracingTier == Direct3D12::D3D12_RAYTRACING_TIER_1_1
-            } else {
-                false
-            }
-        };
-
         let shader_model = if dxc_container.is_none() {
             naga::back::hlsl::ShaderModel::V5_1
         } else {
@@ -401,8 +384,19 @@ impl super::Adapter {
                 && hr.is_ok()
                 && features1.WaveOps.as_bool(),
         );
+        let mut features5 = Direct3D12::D3D12_FEATURE_DATA_D3D12_OPTIONS5::default();
+        let has_features5 = unsafe {
+            device.CheckFeatureSupport(
+                Direct3D12::D3D12_FEATURE_D3D12_OPTIONS5,
+                <*mut _>::cast(&mut features5),
+                size_of_val(&features5) as u32,
+            )
+        }
+            .is_ok();
+        if has_features5 {
+            features.set(wgt::Features::RAY_QUERY, features5.RaytracingTier == Direct3D12::D3D12_RAYTRACING_TIER_1_1 && shader_model >= naga::back::hlsl::ShaderModel::V6_5);
+        }
 
-        features.set(wgt::Features::RAY_QUERY, ray_query);
 
         let atomic_int64_on_typed_resource_supported = {
             let mut features9 = Direct3D12::D3D12_FEATURE_DATA_D3D12_OPTIONS9::default();
