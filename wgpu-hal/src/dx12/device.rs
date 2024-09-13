@@ -747,7 +747,12 @@ impl crate::Device for super::Device {
         &self,
         desc: &crate::BindGroupLayoutDescriptor,
     ) -> Result<super::BindGroupLayout, crate::DeviceError> {
-        let (mut num_buffer_views, mut num_samplers, mut num_texture_views, mut num_acceleration_structures) = (0, 0, 0, 0);
+        let (
+            mut num_buffer_views,
+            mut num_samplers,
+            mut num_texture_views,
+            mut num_acceleration_structures,
+        ) = (0, 0, 0, 0);
         for entry in desc.entries.iter() {
             let count = entry.count.map_or(1, NonZeroU32::get);
             match entry.ty {
@@ -1297,20 +1302,19 @@ impl crate::Device for super::Device {
                         let raw_desc = Direct3D12::D3D12_SHADER_RESOURCE_VIEW_DESC {
                             Format: Dxgi::Common::DXGI_FORMAT_UNKNOWN,
                             Shader4ComponentMapping:
-                            Direct3D12::D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-                            ViewDimension: Direct3D12::D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE,
+                                Direct3D12::D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                            ViewDimension:
+                                Direct3D12::D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE,
                             Anonymous: Direct3D12::D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
-                                RaytracingAccelerationStructure: Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_SRV {
-                                    Location: data.resource.GetGPUVirtualAddress(),
-                                },
+                                RaytracingAccelerationStructure:
+                                    Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_SRV {
+                                        Location: unsafe { data.resource.GetGPUVirtualAddress() },
+                                    },
                             },
                         };
                         unsafe {
-                            self.raw.CreateShaderResourceView(
-                                None,
-                                Some(&raw_desc),
-                                handle,
-                            )
+                            self.raw
+                                .CreateShaderResourceView(None, Some(&raw_desc), handle)
                         };
                         inner.stage.push(handle);
                     }
@@ -1939,7 +1943,8 @@ impl crate::Device for super::Device {
                 Quality: 0,
             },
             Layout: Direct3D12::D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-            Flags: Direct3D12::D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE | Direct3D12::D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+            Flags: Direct3D12::D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE
+                | Direct3D12::D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
         };
 
         let (resource, allocation) =
@@ -1954,7 +1959,6 @@ impl crate::Device for super::Device {
 
         Ok(super::AccelerationStructure {
             resource,
-            size,
             allocation,
         })
     }
@@ -1967,7 +1971,11 @@ impl crate::Device for super::Device {
             // Resource should be dropped before free suballocation
             drop(acceleration_structure);
 
-            super::suballocation::free_buffer_allocation(self, alloc, &self.mem_allocator);
+            super::suballocation::free_acceleration_structure_allocation(
+                self,
+                alloc,
+                &self.mem_allocator,
+            );
         }
     }
 

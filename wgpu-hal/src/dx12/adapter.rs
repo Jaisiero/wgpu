@@ -392,11 +392,14 @@ impl super::Adapter {
                 size_of_val(&features5) as u32,
             )
         }
-            .is_ok();
+        .is_ok();
         if has_features5 {
-            features.set(wgt::Features::RAY_QUERY, features5.RaytracingTier == Direct3D12::D3D12_RAYTRACING_TIER_1_1 && shader_model >= naga::back::hlsl::ShaderModel::V6_5);
+            features.set(
+                wgt::Features::RAY_QUERY,
+                features5.RaytracingTier == Direct3D12::D3D12_RAYTRACING_TIER_1_1
+                    && shader_model >= naga::back::hlsl::ShaderModel::V6_5,
+            );
         }
-
 
         let atomic_int64_on_typed_resource_supported = {
             let mut features9 = Direct3D12::D3D12_FEATURE_DATA_D3D12_OPTIONS9::default();

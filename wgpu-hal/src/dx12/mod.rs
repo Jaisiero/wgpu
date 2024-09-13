@@ -976,7 +976,6 @@ impl crate::DynPipelineCache for PipelineCache {}
 pub struct AccelerationStructure {
     resource: Direct3D12::ID3D12Resource,
     allocation: Option<suballocation::AllocationWrapper>,
-    size: wgt::BufferAddress,
 }
 
 impl crate::DynAccelerationStructure for AccelerationStructure {}

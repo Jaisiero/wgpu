@@ -1369,7 +1369,10 @@ impl crate::CommandEncoder for super::CommandEncoder {
             let acceleration_structure_inputs =
                 Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS {
                     Type: ty,
-                    Flags: conv::map_acceleration_structure_build_flags(descriptor.flags, Some(descriptor.mode)),
+                    Flags: conv::map_acceleration_structure_build_flags(
+                        descriptor.flags,
+                        Some(descriptor.mode),
+                    ),
                     NumDescs: num_desc,
                     DescsLayout: layout,
                     Anonymous: inputs0,
