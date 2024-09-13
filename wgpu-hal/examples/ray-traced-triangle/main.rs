@@ -13,6 +13,7 @@ use std::{
     ptr,
     time::Instant,
 };
+use wgt::Features;
 use winit::window::WindowButtons;
 
 const DESIRED_MAX_LATENCY: u32 = 2;
@@ -245,6 +246,7 @@ impl<A: hal::Api> Example<A> {
             }
             let exposed = adapters.swap_remove(0);
             dbg!(exposed.features);
+            assert!(exposed.features.contains(Features::RAY_QUERY));
             (exposed.adapter, exposed.features)
         };
         let surface_caps = unsafe { adapter.surface_capabilities(&surface) }
@@ -265,9 +267,9 @@ impl<A: hal::Api> Example<A> {
         dbg!(&surface_caps.formats);
         let surface_format = if surface_caps
             .formats
-            .contains(&wgt::TextureFormat::Rgba8Snorm)
+            .contains(&wgt::TextureFormat::Bgra8Unorm)
         {
-            wgt::TextureFormat::Rgba8Unorm
+            wgt::TextureFormat::Bgra8Unorm
         } else {
             *surface_caps.formats.first().unwrap()
         };
@@ -449,7 +451,8 @@ impl<A: hal::Api> Example<A> {
             vertex_buffer: Some(&vertices_buffer),
             first_vertex: 0,
             vertex_format: wgt::VertexFormat::Float32x3,
-            vertex_count: vertices.len() as u32,
+            // each vertex is 3 floats, and floats are stored raw in the array
+            vertex_count: vertices.len() as u32 / 3,
             vertex_stride: 3 * 4,
             indices: Some(hal::AccelerationStructureTriangleIndices {
                 buffer: Some(&indices_buffer),
@@ -553,10 +556,10 @@ impl<A: hal::Api> Example<A> {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgt::TextureDimension::D2,
-            format: wgt::TextureFormat::Rgba8Unorm,
+            format: wgt::TextureFormat::Bgra8Unorm,
             usage: hal::TextureUses::STORAGE_READ_WRITE | hal::TextureUses::COPY_SRC,
             memory_flags: hal::MemoryFlags::empty(),
-            view_formats: vec![wgt::TextureFormat::Rgba8Unorm],
+            view_formats: vec![wgt::TextureFormat::Bgra8Unorm],
         };
         let texture = unsafe { device.create_texture(&texture_desc).unwrap() };
 
