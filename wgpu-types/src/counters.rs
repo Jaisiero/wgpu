@@ -127,6 +127,8 @@ pub struct HalCounters {
     pub texture_memory: InternalCounter,
     /// Number of gpu memory allocations.
     pub memory_allocations: InternalCounter,
+    /// Amount of allocated gpu memory attributed to buffers, in bytes.
+    pub acceleration_structure_memory: InternalCounter,
 }
 
 /// `wgpu-core`'s internal counters.

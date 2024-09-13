@@ -747,7 +747,7 @@ impl crate::Device for super::Device {
         &self,
         desc: &crate::BindGroupLayoutDescriptor,
     ) -> Result<super::BindGroupLayout, crate::DeviceError> {
-        let (mut num_buffer_views, mut num_samplers, mut num_texture_views) = (0, 0, 0);
+        let (mut num_buffer_views, mut num_samplers, mut num_texture_views, mut num_acceleration_structures) = (0, 0, 0, 0);
         for entry in desc.entries.iter() {
             let count = entry.count.map_or(1, NonZeroU32::get);
             match entry.ty {
@@ -760,13 +760,13 @@ impl crate::Device for super::Device {
                     num_texture_views += count
                 }
                 wgt::BindingType::Sampler { .. } => num_samplers += count,
-                wgt::BindingType::AccelerationStructure => todo!(),
+                wgt::BindingType::AccelerationStructure => num_acceleration_structures += count,
             }
         }
 
         self.counters.bind_group_layouts.add(1);
 
-        let num_views = num_buffer_views + num_texture_views;
+        let num_views = num_buffer_views + num_texture_views + num_acceleration_structures;
         Ok(super::BindGroupLayout {
             entries: desc.entries.to_vec(),
             cpu_heap_views: if num_views != 0 {
@@ -1287,7 +1287,34 @@ impl crate::Device for super::Device {
                         cpu_samplers.as_mut().unwrap().stage.push(data.handle.raw);
                     }
                 }
-                wgt::BindingType::AccelerationStructure => todo!(),
+                wgt::BindingType::AccelerationStructure => {
+                    let start = entry.resource_index as usize;
+                    let end = start + entry.count as usize;
+                    for data in &desc.acceleration_structures[start..end] {
+                        let inner = cpu_views.as_mut().unwrap();
+                        let cpu_index = inner.stage.len() as u32;
+                        let handle = desc.layout.cpu_heap_views.as_ref().unwrap().at(cpu_index);
+                        let raw_desc = Direct3D12::D3D12_SHADER_RESOURCE_VIEW_DESC {
+                            Format: Dxgi::Common::DXGI_FORMAT_UNKNOWN,
+                            Shader4ComponentMapping:
+                            Direct3D12::D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                            ViewDimension: Direct3D12::D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE,
+                            Anonymous: Direct3D12::D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+                                RaytracingAccelerationStructure: Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_SRV {
+                                    Location: data.resource.GetGPUVirtualAddress(),
+                                },
+                            },
+                        };
+                        unsafe {
+                            self.raw.CreateShaderResourceView(
+                                None,
+                                Some(&raw_desc),
+                                handle,
+                            )
+                        };
+                        inner.stage.push(handle);
+                    }
+                }
             }
         }
 
@@ -1866,7 +1893,7 @@ impl crate::Device for super::Device {
         let acceleration_structure_inputs =
             Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS {
                 Type: ty,
-                Flags: conv::map_acceleration_structure_build_flags(desc.flags),
+                Flags: conv::map_acceleration_structure_build_flags(desc.flags, None),
                 NumDescs: num_desc,
                 DescsLayout: layout,
                 Anonymous: inputs0,
@@ -1912,7 +1939,7 @@ impl crate::Device for super::Device {
                 Quality: 0,
             },
             Layout: Direct3D12::D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-            Flags: Direct3D12::D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE,
+            Flags: Direct3D12::D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE | Direct3D12::D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
         };
 
         let (resource, allocation) =
@@ -1927,6 +1954,7 @@ impl crate::Device for super::Device {
 
         Ok(super::AccelerationStructure {
             resource,
+            size,
             allocation,
         })
     }

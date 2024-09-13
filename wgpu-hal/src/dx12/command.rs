@@ -1337,7 +1337,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                     geometry_desc = Vec::with_capacity(aabbs.len());
                     for aabb in aabbs {
                         geometry_desc.push(Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC {
-                            Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES,
+                            Type: Direct3D12::D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS,
                             Flags: conv::map_acceleration_structure_geometry_flags(aabb.flags),
                             Anonymous: Direct3D12::D3D12_RAYTRACING_GEOMETRY_DESC_0 {
                                 AABBs: Direct3D12::D3D12_RAYTRACING_GEOMETRY_AABBS_DESC {
@@ -1369,7 +1369,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
             let acceleration_structure_inputs =
                 Direct3D12::D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS {
                     Type: ty,
-                    Flags: conv::map_acceleration_structure_build_flags(descriptor.flags),
+                    Flags: conv::map_acceleration_structure_build_flags(descriptor.flags, Some(descriptor.mode)),
                     NumDescs: num_desc,
                     DescsLayout: layout,
                     Anonymous: inputs0,

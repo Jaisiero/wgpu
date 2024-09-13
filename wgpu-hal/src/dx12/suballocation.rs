@@ -182,7 +182,7 @@ pub(crate) fn create_acceleration_structure_resource(
             allocation.heap(),
             allocation.offset(),
             &raw_desc,
-            Direct3D12::D3D12_RESOURCE_STATE_COMMON,
+            Direct3D12::D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             None,
             &mut resource,
         )
@@ -193,7 +193,7 @@ pub(crate) fn create_acceleration_structure_resource(
 
     device
         .counters
-        .buffer_memory
+        .acceleration_structure_memory
         .add(allocation.size() as isize);
 
     Ok((resource, Some(AllocationWrapper { allocation })))
@@ -228,6 +228,22 @@ pub(crate) fn free_texture_allocation(
         Ok(_) => (),
         // TODO: Don't panic here
         Err(e) => panic!("Failed to destroy dx12 texture, {e}"),
+    };
+}
+
+pub(crate) fn free_acceleration_structure_allocation(
+    device: &crate::dx12::Device,
+    allocation: AllocationWrapper,
+    allocator: &Mutex<GpuAllocatorWrapper>,
+) {
+    device
+        .counters
+        .acceleration_structure_memory
+        .sub(allocation.allocation.size() as isize);
+    match allocator.lock().allocator.free(allocation.allocation) {
+        Ok(_) => (),
+        // TODO: Don't panic here
+        Err(e) => panic!("Failed to destroy dx12 buffer, {e}"),
     };
 }
 
@@ -380,7 +396,7 @@ pub(crate) fn create_committed_acceleration_structure_resource(
                 Direct3D12::D3D12_HEAP_FLAG_NONE
             },
             &raw_desc,
-            Direct3D12::D3D12_RESOURCE_STATE_COMMON,
+            Direct3D12::D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
             None,
             &mut resource,
         )

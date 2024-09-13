@@ -108,7 +108,7 @@ pub fn map_binding_type(ty: &wgt::BindingType) -> Direct3D12::D3D12_DESCRIPTOR_R
             ..
         }
         | Bt::StorageTexture { .. } => Direct3D12::D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
-        Bt::AccelerationStructure => todo!(),
+        Bt::AccelerationStructure => Direct3D12::D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
     }
 }
 
@@ -349,6 +349,7 @@ pub fn map_depth_stencil(ds: &wgt::DepthStencilState) -> Direct3D12::D3D12_DEPTH
 
 pub(crate) fn map_acceleration_structure_build_flags(
     flags: wgt::AccelerationStructureFlags,
+    mode: Option<crate::AccelerationStructureBuildMode>,
 ) -> Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS {
     let mut d3d_flags = Default::default();
     if flags.contains(wgt::AccelerationStructureFlags::ALLOW_COMPACTION) {
@@ -372,6 +373,10 @@ pub(crate) fn map_acceleration_structure_build_flags(
     if flags.contains(wgt::AccelerationStructureFlags::PREFER_FAST_TRACE) {
         d3d_flags |=
             Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    }
+
+    if let Some(crate::AccelerationStructureBuildMode::Update) = mode {
+        d3d_flags |= Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE
     }
 
     d3d_flags
