@@ -111,8 +111,6 @@ pub struct PhysicalDeviceFeatures {
 
     /// Features provided by `VK_EXT_subgroup_size_control`, promoted to Vulkan 1.3.
     subgroup_size_control: Option<vk::PhysicalDeviceSubgroupSizeControlFeatures<'static>>,
-
-    buffer_handle: Option<vk::PhysicalDeviceExternalBufferInfo<'static>>
 }
 
 impl PhysicalDeviceFeatures {
@@ -453,20 +451,6 @@ impl PhysicalDeviceFeatures {
             } else {
                 None
             },
-            buffer_handle: if device_api_version >= vk::API_VERSION_1_1 || (enabled_extensions.contains(&khr::external_memory_capabilities::NAME)) {
-                Some(
-                    vk::PhysicalDeviceExternalBufferInfo::default()
-                        .usage(conv::map_buffer_usage(crate::BufferUses::COPY_SRC | crate::BufferUses::COPY_DST))
-                        .handle_type(
-                            #[cfg(target_os = "windows")]
-                            vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR,
-                            #[cfg(not(target_os = "windows"))]
-                            vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD,
-                        )
-                )
-            } else {
-                None
-            }
         }
     }
 
@@ -486,7 +470,6 @@ impl PhysicalDeviceFeatures {
     ) -> (wgt::Features, wgt::DownlevelFlags) {
         use crate::auxil::db;
         use wgt::{DownlevelFlags as Df, Features as F};
-        println!("{:?}", caps.supported_extensions);
         let mut features = F::empty()
             | F::SPIRV_SHADER_PASSTHROUGH
             | F::MAPPABLE_PRIMARY_BUFFERS

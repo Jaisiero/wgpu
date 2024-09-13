@@ -333,10 +333,8 @@ impl<'a> gpu_alloc::MemoryDevice<vk::DeviceMemory> for DeviceAllocator<'a> {
                 info = info.push_next(&mut export_mem_info_win);
             }
 
-            if self.shared.private_caps.preferred_buffer_handle != super::PreferredBufferHandle::None {
-                export_mem_info = vk::ExportMemoryAllocateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.shared.private_caps.preferred_buffer_handle).unwrap());
-                info = info.push_next(&mut export_mem_info);
-            }
+            export_mem_info = vk::ExportMemoryAllocateInfo::default().handle_types(conv::map_preferred_buffer_handle(&self.shared.private_caps.preferred_buffer_handle).unwrap());
+            info = info.push_next(&mut export_mem_info);
         }
 
         let mut alloc_dedicated;
@@ -2561,12 +2559,17 @@ impl crate::Device for super::Device {
         Ok(match &self.shared.extension_fns.buffer_handle {
             BufferHandleFunctions::None => unreachable!("no extension enabled"),
             BufferHandleFunctions::Win32(win_32) => unsafe {
+                let handle_ty = vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32;
+                let handle = win_32.get_memory_win32_handle(
+                    &vk::MemoryGetWin32HandleInfoKHR::default()
+                        .handle_type(handle_ty)
+                        .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
+                ).map_err(super::map_host_device_oom_err)?;
+                let mut properties = vk::MemoryWin32HandlePropertiesKHR::default().memory_type_bits(handle_ty.as_raw());
+                win_32.get_memory_win32_handle_properties(handle_ty, handle, &mut properties).unwrap();
+                println!("{}, {handle}", properties.memory_type_bits);
                 wgt::BufferHandle::Win32(
-                    win_32.get_memory_win32_handle(
-                        &vk::MemoryGetWin32HandleInfoKHR::default()
-                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32)
-                            .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
-                    ).map_err(super::map_host_device_oom_err)? as *mut c_void
+                    handle as _
                 ) },
             BufferHandleFunctions::Fd(fd) => unsafe {
                 wgt::BufferHandle::Fd(
