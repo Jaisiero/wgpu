@@ -2565,9 +2565,6 @@ impl crate::Device for super::Device {
                         .handle_type(handle_ty)
                         .memory(*buffer.block.as_ref().expect("cannot export imported buffer").lock().memory()),
                 ).map_err(super::map_host_device_oom_err)?;
-                let mut properties = vk::MemoryWin32HandlePropertiesKHR::default().memory_type_bits(handle_ty.as_raw());
-                win_32.get_memory_win32_handle_properties(handle_ty, handle, &mut properties).unwrap();
-                println!("{}, {handle}", properties.memory_type_bits);
                 wgt::BufferHandle::Win32(
                     handle as _
                 ) },
