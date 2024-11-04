@@ -3432,6 +3432,19 @@ impl crate::Context for ContextWgpuCore {
                     });
                     wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
                 }
+                crate::ray_tracing::ContextBlasGeometries::ProceduralGeometries(
+                    procedural_geometries,
+                ) => {
+                    let iter = procedural_geometries.into_iter().map(|pg| {
+                        wgc::ray_tracing::BlasProceduralGeometry {
+                            size: pg.size,
+                            bounding_box_buffer: pg.bounding_box_buffer,
+                            bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                            bounding_box_stride: pg.bounding_box_stride,
+                        }
+                    });
+                    wgc::ray_tracing::BlasGeometries::ProceduralGeometries(Box::new(iter))
+                }
             };
             wgc::ray_tracing::BlasBuildEntry {
                 blas_id: e.blas_id,
@@ -3487,6 +3500,19 @@ impl crate::Context for ContextWgpuCore {
                         }
                     });
                     wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
+                }
+                crate::ray_tracing::ContextBlasGeometries::ProceduralGeometries(
+                    procedural_geometries,
+                ) => {
+                    let iter = procedural_geometries.into_iter().map(|pg| {
+                        wgc::ray_tracing::BlasProceduralGeometry {
+                            size: pg.size,
+                            bounding_box_buffer: pg.bounding_box_buffer,
+                            bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                            bounding_box_stride: pg.bounding_box_stride,
+                        }
+                    });
+                    wgc::ray_tracing::BlasGeometries::ProceduralGeometries(Box::new(iter))
                 }
             };
             wgc::ray_tracing::BlasBuildEntry {

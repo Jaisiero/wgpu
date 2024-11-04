@@ -70,6 +70,23 @@ impl Device {
                     )
                 }
             }
+            wgt::BlasGeometrySizeDescriptors::AABBs { desc } => {
+                let entries = desc.iter().map(|x| hal::AccelerationStructureAABBs {
+                    buffer: None,
+                    offset: 0,
+                    count: x.primitive_count,
+                    stride: 24, // TODO(jaisiero): fix this
+                    flags: x.flags,
+                });
+                unsafe {
+                    self.raw().get_acceleration_structure_build_sizes(
+                        &hal::GetAccelerationStructureBuildSizesDescriptor {
+                            entries: &hal::AccelerationStructureEntries::AABBs(entries.collect()),
+                            flags: blas_desc.flags,
+                        },
+                    )
+                }
+            }
         };
 
         let raw = unsafe {

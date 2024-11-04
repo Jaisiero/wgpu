@@ -60,7 +60,7 @@ pub struct AccelerationStructureGeometryFlags{
 // Descriptors used to determine the memory requirements and validation of a acceleration structure 
 pub enum BlasGeometrySizeDescriptors{
     Triangles{desc: Vec<BlasTriangleGeometrySizeDescriptor>},
-    Procedural(desc: Vec<BlasProceduralGeometrySize>) 
+    Procedural(desc: Vec<BlasProceduralGeometrySizeDescriptor>),
 }
 
 // With prefer update, we decide if an update is possible, else we rebuild.

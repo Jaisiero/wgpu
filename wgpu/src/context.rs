@@ -4192,6 +4192,19 @@ where
                     });
                     crate::ray_tracing::ContextBlasGeometries::TriangleGeometries(Box::new(iter))
                 }
+                crate::ray_tracing::DynContextBlasGeometries::ProceduralGeometries(
+                    procedural_geometries,
+                ) => {
+                    let iter = procedural_geometries.into_iter().map(|pg| {
+                        crate::ray_tracing::ContextBlasProceduralGeometry {
+                            size: pg.size,
+                            bounding_box_buffer: <T::BufferId>::from(pg.bounding_box_buffer),
+                            bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                            bounding_box_stride: pg.bounding_box_stride,
+                        }
+                    });
+                    crate::ray_tracing::ContextBlasGeometries::ProceduralGeometries(Box::new(iter))
+                }
             };
             crate::ray_tracing::ContextBlasBuildEntry {
                 blas_id: <T::BlasId>::from(e.blas_id),
@@ -4249,6 +4262,19 @@ where
                         }
                     });
                     crate::ray_tracing::ContextBlasGeometries::TriangleGeometries(Box::new(iter))
+                }
+                crate::ray_tracing::DynContextBlasGeometries::ProceduralGeometries(
+                    procedural_geometries,
+                ) => {
+                    let iter = procedural_geometries.into_iter().map(|pg| {
+                        crate::ray_tracing::ContextBlasProceduralGeometry {
+                            size: pg.size,
+                            bounding_box_buffer: <T::BufferId>::from(pg.bounding_box_buffer),
+                            bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                            bounding_box_stride: pg.bounding_box_stride,
+                        }
+                    });
+                    crate::ray_tracing::ContextBlasGeometries::ProceduralGeometries(Box::new(iter))
                 }
             };
             crate::ray_tracing::ContextBlasBuildEntry {

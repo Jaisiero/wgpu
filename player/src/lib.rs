@@ -139,6 +139,21 @@ impl GlobalPlay for wgc::global::Global {
                                 });
                                 wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
                             }
+                            wgc::ray_tracing::TraceBlasGeometries::ProceduralGeometries(
+                                procedural_geometries,
+                            ) => {
+                                let iter = procedural_geometries.iter().map(|pg| {
+                                    wgc::ray_tracing::BlasProceduralGeometry {
+                                        size: &pg.size,
+                                        bounding_box_buffer: pg.bounding_box_buffer,
+                                        bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                                        bounding_box_stride: pg.bounding_box_stride,
+                                    }
+                                });
+                                wgc::ray_tracing::BlasGeometries::ProceduralGeometries(Box::new(
+                                    iter,
+                                ))
+                            }
                         };
                         wgc::ray_tracing::BlasBuildEntry {
                             blas_id: x.blas_id,
@@ -176,6 +191,21 @@ impl GlobalPlay for wgc::global::Global {
                                     }
                                 });
                                 wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
+                            }
+                            wgc::ray_tracing::TraceBlasGeometries::ProceduralGeometries(
+                                procedural_geometries,
+                            ) => {
+                                let iter = procedural_geometries.iter().map(|pg| {
+                                    wgc::ray_tracing::BlasProceduralGeometry {
+                                        size: &pg.size,
+                                        bounding_box_buffer: pg.bounding_box_buffer,
+                                        bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                                        bounding_box_stride: pg.bounding_box_stride,
+                                    }
+                                });
+                                wgc::ray_tracing::BlasGeometries::ProceduralGeometries(Box::new(
+                                    iter,
+                                ))
                             }
                         };
                         wgc::ray_tracing::BlasBuildEntry {

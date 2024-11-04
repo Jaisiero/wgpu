@@ -162,8 +162,26 @@ pub struct BlasTriangleGeometry<'a> {
     pub transform_buffer_offset: Option<BufferAddress>,
 }
 
+#[derive(Debug)]
+pub struct BlasProceduralGeometry<'a> {
+    pub size: &'a wgt::BlasProceduralGeometrySizeDescriptor,
+    pub bounding_box_buffer: BufferId,
+    pub bounding_box_buffer_offset: BufferAddress,
+    pub bounding_box_stride: BufferAddress,
+}
+
+/// Enum to encapsulate different geometry types in a BLAS (Bottom-Level Acceleration Structure).
+#[derive(Debug)]
+pub enum BlasGeometry<'a> {
+    /// Variant for triangle geometry.
+    Triangle(BlasTriangleGeometry<'a>),
+    /// Variant for procedural (e.g., AABB) geometry.
+    Procedural(BlasProceduralGeometry<'a>),
+}
+
 pub enum BlasGeometries<'a> {
     TriangleGeometries(Box<dyn Iterator<Item = BlasTriangleGeometry<'a>> + 'a>),
+    ProceduralGeometries(Box<dyn Iterator<Item = BlasProceduralGeometry<'a>> + 'a>),
 }
 
 pub struct BlasBuildEntry<'a> {
@@ -235,8 +253,18 @@ pub struct TraceBlasTriangleGeometry {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TraceBlasProceduralGeometry {
+    pub size: wgt::BlasProceduralGeometrySizeDescriptor,
+    pub bounding_box_buffer: BufferId,
+    pub bounding_box_buffer_offset: BufferAddress,
+    pub bounding_box_stride: BufferAddress,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TraceBlasGeometries {
     TriangleGeometries(Vec<TraceBlasTriangleGeometry>),
+    ProceduralGeometries(Vec<TraceBlasProceduralGeometry>),
 }
 
 #[derive(Debug, Clone)]

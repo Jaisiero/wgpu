@@ -10,6 +10,10 @@ use crate::{
 pub type BlasTriangleGeometrySizeDescriptor = wgt::BlasTriangleGeometrySizeDescriptor;
 static_assertions::assert_impl_all!(BlasTriangleGeometrySizeDescriptor: Send, Sync);
 
+/// Descriptor for the size defining attributes of a procedural geometry, for a bottom level acceleration structure.
+pub type BlasProceduralGeometrySizeDescriptor = wgt::BlasProceduralGeometrySizeDescriptor;
+static_assertions::assert_impl_all!(BlasProceduralGeometrySizeDescriptor: Send, Sync);
+
 /// Descriptor for the size defining attributes, for a bottom level acceleration structure.
 pub type BlasGeometrySizeDescriptors = wgt::BlasGeometrySizeDescriptors;
 static_assertions::assert_impl_all!(BlasGeometrySizeDescriptors: Send, Sync);
@@ -58,10 +62,28 @@ pub struct BlasTriangleGeometry<'a> {
 }
 static_assertions::assert_impl_all!(BlasTriangleGeometry<'_>: WasmNotSendSync);
 
+#[derive(Debug)]
+/// Definition for a procedural geometry.
+/// The size must match the rest of the structures fields, otherwise the build will fail.
+/// (e.g. if a index count is present in the size, the index buffer must be present as well.)
+pub struct BlasProceduralGeometry<'a> {
+    /// Sub descriptor for the size defining attributes of a procedural geometry.
+    pub size: &'a BlasProceduralGeometrySizeDescriptor,
+    /// Bounding box buffer.
+    pub bounding_box_buffer: &'a Buffer,
+    /// Bounding box buffer offset in bytes.
+    pub bounding_box_buffer_offset: wgt::BufferAddress,
+    /// Bounding box stride in bytes.
+    pub bounding_box_stride: wgt::BufferAddress,
+}
+static_assertions::assert_impl_all!(BlasProceduralGeometry<'_>: WasmNotSendSync);
+
 /// Geometries for a bottom level acceleration structure.
 pub enum BlasGeometries<'a> {
     /// Triangle geometry variant.
     TriangleGeometries(Vec<BlasTriangleGeometry<'a>>),
+    /// Procedural geometry variant.
+    ProceduralGeometries(Vec<BlasProceduralGeometry<'a>>),
 }
 static_assertions::assert_impl_all!(BlasGeometries<'_>: WasmNotSendSync);
 
@@ -270,8 +292,16 @@ pub(crate) struct DynContextBlasTriangleGeometry<'a> {
     pub(crate) transform_buffer_offset: Option<wgt::BufferAddress>,
 }
 
+pub(crate) struct DynContextBlasProceduralGeometry<'a> {
+    pub(crate) size: &'a BlasProceduralGeometrySizeDescriptor,
+    pub(crate) bounding_box_buffer: ObjectId,
+    pub(crate) bounding_box_buffer_offset: wgt::BufferAddress,
+    pub(crate) bounding_box_stride: wgt::BufferAddress,
+}
+
 pub(crate) enum DynContextBlasGeometries<'a> {
     TriangleGeometries(Box<dyn Iterator<Item = DynContextBlasTriangleGeometry<'a>> + 'a>),
+    ProceduralGeometries(Box<dyn Iterator<Item = DynContextBlasProceduralGeometry<'a>> + 'a>),
 }
 
 pub(crate) struct DynContextBlasBuildEntry<'a> {
@@ -304,10 +334,21 @@ pub struct ContextBlasTriangleGeometry<'a, T: Context> {
     pub(crate) transform_buffer_offset: Option<wgt::BufferAddress>,
 }
 
+/// [Context version] see `BlasProceduralGeometry`.
+#[allow(dead_code)]
+pub struct ContextBlasProceduralGeometry<'a, T: Context> {
+    pub(crate) size: &'a BlasProceduralGeometrySizeDescriptor,
+    pub(crate) bounding_box_buffer: T::BufferId,
+    pub(crate) bounding_box_buffer_offset: wgt::BufferAddress,
+    pub(crate) bounding_box_stride: wgt::BufferAddress,
+}
+
 /// [Context version] see `BlasGeometries`.
 pub enum ContextBlasGeometries<'a, T: Context> {
     /// Triangle geometries.
     TriangleGeometries(Box<dyn Iterator<Item = ContextBlasTriangleGeometry<'a, T>> + 'a>),
+    /// Procedural geometries.
+    ProceduralGeometries(Box<dyn Iterator<Item = ContextBlasProceduralGeometry<'a, T>> + 'a>),
 }
 
 /// [Context version] see `BlasBuildEntry`.
@@ -463,6 +504,20 @@ impl CommandEncoderRayTracing for CommandEncoder {
                         );
                     DynContextBlasGeometries::TriangleGeometries(Box::new(iter))
                 }
+                BlasGeometries::ProceduralGeometries(procedura_geometries) => {
+                    let iter =
+                        procedura_geometries
+                            .iter()
+                            .map(|pg: &BlasProceduralGeometry<'_>| {
+                                DynContextBlasProceduralGeometry {
+                                    size: pg.size,
+                                    bounding_box_buffer: pg.bounding_box_buffer.id,
+                                    bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                                    bounding_box_stride: pg.bounding_box_stride,
+                                }
+                            });
+                    DynContextBlasGeometries::ProceduralGeometries(Box::new(iter))
+                }
             };
             DynContextBlasBuildEntry {
                 blas_id: e.blas.id,
@@ -525,6 +580,20 @@ impl CommandEncoderRayTracing for CommandEncoder {
                             },
                         );
                     DynContextBlasGeometries::TriangleGeometries(Box::new(iter))
+                }
+                BlasGeometries::ProceduralGeometries(procedura_geometries) => {
+                    let iter =
+                        procedura_geometries
+                            .iter()
+                            .map(|pg: &BlasProceduralGeometry<'_>| {
+                                DynContextBlasProceduralGeometry {
+                                    size: pg.size,
+                                    bounding_box_buffer: pg.bounding_box_buffer.id,
+                                    bounding_box_buffer_offset: pg.bounding_box_buffer_offset,
+                                    bounding_box_stride: pg.bounding_box_stride,
+                                }
+                            });
+                    DynContextBlasGeometries::ProceduralGeometries(Box::new(iter))
                 }
             };
             DynContextBlasBuildEntry {

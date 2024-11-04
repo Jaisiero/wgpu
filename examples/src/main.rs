@@ -147,6 +147,12 @@ const EXAMPLES: &[ExampleDesc] = &[
         webgpu: true,
     },
     ExampleDesc {
+        name: "ray_aabb_compute",
+        function: wgpu_examples::ray_aabb_compute::main,
+        webgl: false,  // No Ray-tracing extensions
+        webgpu: false, // No Ray-tracing extensions (yet)
+    },
+    ExampleDesc {
         name: "ray_cube_compute",
         function: wgpu_examples::ray_cube_compute::main,
         webgl: false,  // No Ray-tracing extensions

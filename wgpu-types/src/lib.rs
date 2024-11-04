@@ -7304,7 +7304,7 @@ impl Default for InstanceDescriptor {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-/// Descriptor for all size definiing attributes of a single triangle geometry inside a bottom level acceleration structure.
+/// Descriptor for all size defining attributes of a single triangle geometry inside a bottom level acceleration structure.
 pub struct BlasTriangleGeometrySizeDescriptor {
     /// Format of a vertex position.
     pub vertex_format: VertexFormat,
@@ -7320,14 +7320,29 @@ pub struct BlasTriangleGeometrySizeDescriptor {
     pub flags: AccelerationStructureGeometryFlags,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+/// Descriptor for all size defining attributes of a single procedural geometry inside a bottom level acceleration structure.
+pub struct BlasProceduralGeometrySizeDescriptor {
+    /// Number of primitives.
+    pub primitive_count: u32,
+    /// Flags for the geometry.
+    pub flags: AccelerationStructureGeometryFlags,
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-/// Descriptor for all size definiing attributes of all geometries inside a bottom level acceleration structure.
+/// Descriptor for all size defining attributes of all geometries inside a bottom level acceleration structure.
 pub enum BlasGeometrySizeDescriptors {
     /// Triangle geometry version.
     Triangles {
         /// Descriptor for each triangle geometry.
         desc: Vec<BlasTriangleGeometrySizeDescriptor>,
+    },
+    /// Procedural geometry version.
+    AABBs {
+        /// Descriptor for each AABB geometry.
+        desc: Vec<BlasProceduralGeometrySizeDescriptor>,
     },
 }
 
