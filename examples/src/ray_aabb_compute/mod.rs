@@ -228,6 +228,7 @@ impl crate::framework::Example for Example {
             | wgpu::Features::VERTEX_WRITABLE_STORAGE
             | wgpu::Features::RAY_QUERY
             | wgpu::Features::RAY_TRACING_ACCELERATION_STRUCTURE
+            | wgpu::Features::SPIRV_SHADER_PASSTHROUGH 
     }
 
     fn required_downlevel_capabilities() -> wgpu::DownlevelCapabilities {
@@ -334,26 +335,82 @@ impl crate::framework::Example for Example {
             max_instances: side_count * side_count,
         });
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("rt_computer"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-        });
+        let shader;
+        // Creating a shader module spirv should fail.
+        unsafe {
+            shader = device.create_shader_module_spirv(&wgpu::include_spirv_raw!("shader.comp.spv"));
+        }
+        // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some("rt_shader"),
+        //     source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+        // });
 
-        let blit_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("blit"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("blit.wgsl"))),
-        });
+        let compute_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(
+                                (32 * mem::size_of::<f32>()) as _,
+                            ),
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::AccelerationStructure {
+                            vertex_return: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(
+                                (aabb_data.len() * mem::size_of::<Aabb>()) as _,
+                            ),
+                        },
+                        count: None,
+                    },
+                ],
+                label: None,
+            });
+
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("compute"),
+                bind_group_layouts: &[&compute_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("rt"),
-            layout: None,
+            layout: Some(&compute_pipeline_layout),
             module: &shader,
             entry_point: Some("main"),
             compilation_options: Default::default(),
             cache: None,
         });
 
-        let compute_bind_group_layout = compute_pipeline.get_bind_group_layout(0);
+        // let compute_bind_group_layout = compute_pipeline.get_bind_group_layout(0);
 
         let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -371,7 +428,16 @@ impl crate::framework::Example for Example {
                     binding: 2,
                     resource: wgpu::BindingResource::AccelerationStructure(&tlas),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: aabb_buf.as_entire_binding(),
+                },
             ],
+        });
+
+        let blit_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("blit"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("blit.wgsl"))),
         });
 
         let blit_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

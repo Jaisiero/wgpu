@@ -45,6 +45,7 @@ pollster.workspace = true
 web-time.workspace = true
 wgpu = { workspace = true, default-features = false, features = [
     "wgsl",
+    "spirv",
     "dx12",
     "metal",
 ] }
