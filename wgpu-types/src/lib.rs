@@ -7326,6 +7326,8 @@ pub struct BlasTriangleGeometrySizeDescriptor {
 pub struct BlasProceduralGeometrySizeDescriptor {
     /// Number of primitives.
     pub primitive_count: u32,
+    /// Stride between two consecutive primitives.
+    pub stride: u64,
     /// Flags for the geometry.
     pub flags: AccelerationStructureGeometryFlags,
 }

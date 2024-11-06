@@ -75,7 +75,7 @@ impl Device {
                     buffer: None,
                     offset: 0,
                     count: x.primitive_count,
-                    stride: 24, // TODO(jaisiero): fix this
+                    stride: x.stride,
                     flags: x.flags,
                 });
                 unsafe {

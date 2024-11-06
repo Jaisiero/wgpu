@@ -13,19 +13,24 @@ use wgpu::{ray_tracing as rt, StoreOp};
 struct Aabb {
     _min: [f32; 3],
     _max: [f32; 3],
+    _padding: u32,
+    _padding2: u32,
 }
 
 fn aabb(min: [f32; 3], max: [f32; 3]) -> Aabb {
     Aabb {
         _min: min,
         _max: max,
+        _padding: 0,
+        _padding2: 0,
     }
 }
 
 fn create_aabbs() -> Vec<Aabb> {
     let aabb_data = [
         // top (0, 0, 1)
-        aabb([-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]),
+        aabb([-1.0, -1.0, -1.0], [-0.5, -0.5, -0.5]),
+        aabb([0.5, 0.5, 0.5], [1.0, 1.0, 1.0]),
     ];
 
     aabb_data.to_vec()
@@ -314,6 +319,7 @@ impl crate::framework::Example for Example {
 
         let blas_geo_size_desc = rt::BlasProceduralGeometrySizeDescriptor {
             primitive_count: aabb_data.len() as u32,
+            stride: mem::size_of::<Aabb>() as u64,
             flags: rt::AccelerationStructureGeometryFlags::OPAQUE,
         };
 

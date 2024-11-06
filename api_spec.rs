@@ -24,6 +24,7 @@ pub struct BlasTriangleGeometrySizeDescriptor{
 
 pub struct BlasProceduralGeometrySizeDescriptor{
     pub count: u32,
+    pub stride: wgt::BufferAddress,
     pub flags: AccelerationStructureGeometryFlags,
 } 
 

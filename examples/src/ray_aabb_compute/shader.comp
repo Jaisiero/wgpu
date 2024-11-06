@@ -18,6 +18,8 @@ layout(set = 0, binding = 2) uniform accelerationStructureEXT acc_struct;
 struct Aabb {
     vec3 _min;
     vec3 _max;
+    uint _padding;
+    uint _padding2;
 };
 
 // Storage buffer for aabb data at binding 3
