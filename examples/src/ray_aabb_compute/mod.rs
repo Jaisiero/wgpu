@@ -233,7 +233,7 @@ impl crate::framework::Example for Example {
             | wgpu::Features::VERTEX_WRITABLE_STORAGE
             | wgpu::Features::RAY_QUERY
             | wgpu::Features::RAY_TRACING_ACCELERATION_STRUCTURE
-            | wgpu::Features::SPIRV_SHADER_PASSTHROUGH 
+            | wgpu::Features::SPIRV_SHADER_PASSTHROUGH
     }
 
     fn required_downlevel_capabilities() -> wgpu::DownlevelCapabilities {
@@ -344,7 +344,8 @@ impl crate::framework::Example for Example {
         let shader;
         // Creating a shader module spirv should fail.
         unsafe {
-            shader = device.create_shader_module_spirv(&wgpu::include_spirv_raw!("shader.comp.spv"));
+            shader =
+                device.create_shader_module_spirv(&wgpu::include_spirv_raw!("shader.comp.spv"));
         }
         // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         //     label: Some("rt_shader"),

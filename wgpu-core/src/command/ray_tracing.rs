@@ -1281,7 +1281,7 @@ fn iter_buffers<'a, 'b>(
                 SCRATCH_BUFFER_ALIGNMENT,
             ) as u64;
 
-            if triangle_entries.len() > 0 {
+            if !triangle_entries.is_empty() {
                 blas_storage.push((
                     blas.clone(),
                     hal::AccelerationStructureEntries::Triangles(triangle_entries),
@@ -1289,7 +1289,7 @@ fn iter_buffers<'a, 'b>(
                 ));
                 triangle_entries = Vec::new();
             }
-            if procedural_entries.len() > 0 {
+            if !procedural_entries.is_empty() {
                 blas_storage.push((
                     blas.clone(),
                     hal::AccelerationStructureEntries::AABBs(procedural_entries),
