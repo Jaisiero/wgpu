@@ -531,6 +531,12 @@ fn adjust_expr(new_pos: &HandleVec<Expression, Handle<Expression>>, expr: &mut E
         } => {
             adjust(query);
         }
+        Expression::RayQueryGenerateIntersection {
+            ref mut query,
+            hit: _,
+        } => {
+            adjust(query);
+        }
     }
 }
 

@@ -341,15 +341,15 @@ impl crate::framework::Example for Example {
             max_instances: side_count * side_count,
         });
 
-        let shader;
-        // Creating a shader module spirv should fail.
-        unsafe {
-            shader = device.create_shader_module_spirv(&wgpu::include_spirv_raw!("shader.comp.spv"));
-        }
-        // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        //     label: Some("rt_shader"),
-        //     source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-        // });
+        // let shader;
+        // // Creating a shader module spirv should fail.
+        // unsafe {
+        //     shader = device.create_shader_module_spirv(&wgpu::include_spirv_raw!("shader.comp.spv"));
+        // }
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("rt_shader"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+        });
 
         let compute_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -415,8 +415,6 @@ impl crate::framework::Example for Example {
             compilation_options: Default::default(),
             cache: None,
         });
-
-        // let compute_bind_group_layout = compute_pipeline.get_bind_group_layout(0);
 
         let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,

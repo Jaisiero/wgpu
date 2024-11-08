@@ -1663,6 +1663,14 @@ pub enum Expression {
         committed: bool,
     },
 
+    /// Generate a hit for AABB geometry in a [`RayQuery`]
+    /// 
+    /// [`RayQuery`]: Statement::RayQuery
+    RayQueryGenerateIntersection {
+        query: Handle<Expression>,
+        hit: Handle<Expression>,
+    },
+
     /// Result of a [`Proceed`] [`RayQuery`] statement.
     ///
     /// [`Proceed`]: RayQueryFunction::Proceed
@@ -2223,6 +2231,12 @@ pub struct SpecialTypes {
     ///
     /// Call [`Module::generate_vertex_return_type`]
     pub ray_vertex_return: Option<Handle<Type>>,
+
+    /// Type for `RayGenerateIntersection`.
+    ///
+    /// Call [`Module::generate_ray_intersection`] to populate
+    pub ray_generate_intersection: Option<Handle<Type>>,
+
 
     /// Types for predeclared wgsl types instantiated on demand.
     ///

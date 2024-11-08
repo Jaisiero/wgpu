@@ -3916,7 +3916,8 @@ impl<'a, W: Write> Writer<'a, W> {
             }
             // not supported yet
             Expression::RayQueryGetIntersection { .. }
-            | Expression::RayQueryVertexPositions { .. } => unreachable!(),
+            | Expression::RayQueryVertexPositions { .. }
+            | Expression::RayQueryGenerateIntersection { .. } => unreachable!(),
         }
 
         Ok(())

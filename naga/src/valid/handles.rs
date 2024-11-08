@@ -434,7 +434,12 @@ impl super::Validator {
             | crate::Expression::RayQueryVertexPositions {
                 query,
                 committed: _,
-            } => {
+            } 
+            | crate::Expression::RayQueryGenerateIntersection {
+                query,
+                hit: _,
+            }
+            => {
                 handle.check_dep(query)?;
             }
         }

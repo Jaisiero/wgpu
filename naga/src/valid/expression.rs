@@ -1655,6 +1655,25 @@ impl super::Validator {
                     return Err(ExpressionError::InvalidRayQueryType(query));
                 }
             },
+            E::RayQueryGenerateIntersection {
+                query,
+                hit: _,
+            } => match resolver[query] {
+                Ti::Pointer {
+                    base,
+                    space: crate::AddressSpace::Function,
+                } => match resolver.types[base].inner {
+                    Ti::RayQuery { .. } => ShaderStages::all(),
+                    ref other => {
+                        log::error!("Intersection result of a pointer to {:?}", other);
+                        return Err(ExpressionError::InvalidRayQueryType(query));
+                    }
+                },
+                ref other => {
+                    log::error!("Intersection result of {:?}", other);
+                    return Err(ExpressionError::InvalidRayQueryType(query));
+                }
+            },
             E::SubgroupBallotResult | E::SubgroupOperationResult { .. } => self.subgroup_stages,
         };
         Ok(stages)

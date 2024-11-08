@@ -2396,6 +2396,17 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 .push(crate::Statement::RayQuery { query, fun }, span);
                             return Ok(Some(result));
                         }
+                        "rayQueryGetGeneratedIntersectionType" => {
+                            let mut args = ctx.prepare_args(arguments, 1, span);
+                            let query = self.ray_query_pointer(args.next()?, ctx)?;
+                            args.finish()?;
+
+                            // Generate the intersection type as a `u32`
+                            crate::Expression::RayQueryGetIntersection {
+                                query,
+                                committed: false, // 'false' indicates it's a generated intersection
+                            }
+                        }
                         "rayQueryGetCommittedIntersection" => {
                             let mut args = ctx.prepare_args(arguments, 1, span);
                             let query = self.ray_query_pointer(args.next()?, ctx)?;
@@ -2407,6 +2418,16 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 query,
                                 committed: true,
                             }
+                        }
+                        "rayQueryGenerateIntersection" => {
+                            let mut args = ctx.prepare_args(arguments, 2, span);
+                            let query = self.ray_query_pointer(args.next()?, ctx)?;
+                            let hit = self.expression(args.next()?, ctx)?;
+                            args.finish()?;
+
+                            let _ = ctx.module.generate_ray_intersection();
+                            
+                            crate::Expression::RayQueryGenerateIntersection { query, hit }
                         }
                         "RayDesc" => {
                             let ty = ctx.module.generate_ray_desc_type();

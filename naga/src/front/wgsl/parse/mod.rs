@@ -666,6 +666,22 @@ impl Parser {
                 let _ = lexer.next();
                 ast::Expression::Literal(ast::Literal::Number(Number::U32(0)))
             }
+            (Token::Word("RAY_QUERY_INTERSECTION_TRIANGLE"), _) => {
+                let _ = lexer.next();
+                ast::Expression::Literal(ast::Literal::Number(Number::U32(1)))
+            }
+            (Token::Word("RAY_QUERY_INTERSECTION_PROCEDURAL"), _) => {
+                let _ = lexer.next();
+                ast::Expression::Literal(ast::Literal::Number(Number::U32(2)))
+            }
+            (Token::Word("RAY_QUERY_GENERATED_TRIANGLE"), _) => {
+                let _ = lexer.next();
+                ast::Expression::Literal(ast::Literal::Number(Number::U32(0)))
+            }
+            (Token::Word("RAY_QUERY_GENERATED_PROCEDURAL"), _) => {
+                let _ = lexer.next();
+                ast::Expression::Literal(ast::Literal::Number(Number::U32(1)))
+            }
             (Token::Word(word), span) => {
                 let start = lexer.start_byte_offset();
                 let _ = lexer.next();

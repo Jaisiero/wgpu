@@ -806,6 +806,13 @@ impl FunctionInfo {
                 non_uniform_result: self.add_ref(query),
                 requirements: UniformityRequirements::empty(),
             },
+            E::RayQueryGenerateIntersection {
+                query,
+                hit: _,
+            } => Uniformity {
+                non_uniform_result: self.add_ref(query),
+                requirements: UniformityRequirements::empty(),
+            },
         };
 
         let ty = resolve_context.resolve(expression, |h| Ok(&self[h].ty))?;

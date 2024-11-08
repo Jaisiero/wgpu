@@ -1722,15 +1722,19 @@ impl<'w> BlockContext<'w> {
             crate::Expression::ArrayLength(expr) => self.write_runtime_array_length(expr, block)?,
             crate::Expression::RayQueryGetIntersection { query, committed } => {
                 if !committed {
-                    return Err(Error::FeatureNotImplemented("candidate intersection"));
+                    self.write_ray_query_get_candidate_intersection(query, block)
+                } else {
+                    self.write_ray_query_get_intersection(query, block)
                 }
-                self.write_ray_query_get_intersection(query, block)
             }
             crate::Expression::RayQueryVertexPositions { query, committed } => {
                 if !committed {
                     return Err(Error::FeatureNotImplemented("candidate intersection"));
                 }
                 self.write_ray_query_return_vertex_position(query, block)
+            }
+            crate::Expression::RayQueryGenerateIntersection { query, hit } => {
+                self.write_ray_query_generate_intersection(query, hit, block)
             }
         };
 

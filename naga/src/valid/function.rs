@@ -716,7 +716,9 @@ impl super::Validator {
                             | Ex::As { .. }
                             | Ex::ArrayLength(_)
                             | Ex::RayQueryGetIntersection { .. }
-                            | Ex::RayQueryVertexPositions { .. } => {
+                            | Ex::RayQueryVertexPositions { .. }
+                            | Ex::RayQueryGenerateIntersection { .. }
+                            => {
                                 self.emit_expression(handle, context)?
                             }
                             Ex::CallResult(_)

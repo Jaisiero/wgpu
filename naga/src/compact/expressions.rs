@@ -229,6 +229,13 @@ impl<'tracer> ExpressionTracer<'tracer> {
                 } => {
                     self.expressions_used.insert(query);
                 }
+                Ex::RayQueryGenerateIntersection {
+                    query,
+                    hit,
+                } => {
+                    self.expressions_used.insert(query);
+                    self.expressions_used.insert(hit);
+                }
             }
         }
     }
@@ -397,6 +404,12 @@ impl ModuleMap {
                 ref mut query,
                 committed: _,
             } => adjust(query),
+            Ex::RayQueryGenerateIntersection {
+                ref mut query,
+                hit: _,
+            } => {
+                adjust(query);
+            }
         }
     }
 

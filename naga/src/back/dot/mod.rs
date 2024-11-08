@@ -707,6 +707,12 @@ fn write_function_expressions(
                 let ty = if committed { "Committed" } else { "Candidate" };
                 (format!("get{}HitVertexPositions", ty).into(), 4)
             }
+            E::RayQueryGenerateIntersection { query, hit } => {
+                edges.insert("", query);
+                edges.insert("hit", hit);
+                ("rayQueryGenerateIntersection".into(), 4)
+
+            }
         };
 
         // give uniform expressions an outline

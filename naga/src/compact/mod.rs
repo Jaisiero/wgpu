@@ -229,6 +229,7 @@ impl<'module> ModuleTracer<'module> {
             ref ray_desc,
             ref ray_intersection,
             ref ray_vertex_return,
+            ref ray_generate_intersection,
             ref predeclared_types,
         } = *special_types;
 
@@ -240,6 +241,9 @@ impl<'module> ModuleTracer<'module> {
         }
         if let Some(ray_vertex_return) = *ray_vertex_return {
             self.types_used.insert(ray_vertex_return);
+        }
+        if let Some(ray_generate_intersection) = *ray_generate_intersection {
+            self.types_used.insert(ray_generate_intersection);
         }
         for (_, &handle) in predeclared_types {
             self.types_used.insert(handle);
@@ -301,6 +305,7 @@ impl ModuleMap {
             ref mut ray_desc,
             ref mut ray_intersection,
             ref mut ray_vertex_return,
+            ref mut ray_generate_intersection,
             ref mut predeclared_types,
         } = *special;
 
@@ -310,11 +315,12 @@ impl ModuleMap {
         if let Some(ref mut ray_intersection) = *ray_intersection {
             self.types.adjust(ray_intersection);
         }
-
         if let Some(ref mut ray_vertex_return) = *ray_vertex_return {
             self.types.adjust(ray_vertex_return);
         }
-
+        if let Some(ref mut ray_generate_intersection) = *ray_generate_intersection {
+            self.types.adjust(ray_generate_intersection);
+        }
         for handle in predeclared_types.values_mut() {
             self.types.adjust(handle);
         }

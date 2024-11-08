@@ -45,6 +45,13 @@ struct Uniforms {
     proj_inv: mat4x4<f32>,
 };
 
+struct Aabb {
+    _min: vec3<f32>,
+    _max: vec3<f32>,
+    _padding: u32,
+    _padding2: u32,
+};
+
 @group(0) @binding(0)
 var output: texture_storage_2d<rgba8unorm, write>;
 
@@ -54,17 +61,23 @@ var<uniform> uniforms: Uniforms;
 @group(0) @binding(2)
 var acc_struct: acceleration_structure;
 
-fn query_loop(pos: vec3<f32>, dir: vec3<f32>, acs: acceleration_structure) -> u32 {
+@group(0) @binding(3)
+var<storage, read> geometries: array<Aabb>;
+
+fn query_loop(pos: vec3<f32>, dir: vec3<f32>, acs: acceleration_structure, _proceed: ptr<function,bool>) -> RayIntersection {
     var rq: ray_query;
     rayQueryInitialize(&rq, acs, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0xFFu, 0.1, 200.0, pos, dir));
 
-    // while (rayQueryProceed(&rq)) {
-    //     let type = rayQueryGetIntersectionType(&rq, false);
-    //     if (type == RAY_QUERY_INTERSECTION_AABB) {
-    //         rayQueryGenerateIntersection(&rq, 200.0);
-    //     }
-    // }
-    while (rayQueryProceed(&rq)) {}
+    *_proceed = false;
+
+    while (rayQueryProceed(&rq)) {
+        let generated = rayQueryGetGeneratedIntersectionType(&rq);
+        if (generated.kind == RAY_QUERY_GENERATED_PROCEDURAL) {
+            rayQueryGenerateIntersection(&rq, 200.0);
+            *_proceed = true;
+            break;
+        }
+    }
 
     return rayQueryGetCommittedIntersection(&rq);
 }
@@ -83,8 +96,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let temp = uniforms.proj_inv * vec4<f32>(d.x, d.y, 1.0, 1.0);
 	let direction = (uniforms.view_inv * vec4<f32>(normalize(temp.xyz), 0.0)).xyz;
 
-    let intersection = query_loop(origin, direction, acc_struct);
+    var _proceed = false;
 
+    let intersection = query_loop(origin, direction, acc_struct, &_proceed);
+
+    // if (_proceed) {
     if (intersection.kind != RAY_QUERY_INTERSECTION_NONE) {
         color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
     }

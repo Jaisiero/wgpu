@@ -758,6 +758,20 @@ impl super::Instruction {
         instruction
     }
 
+    pub(super) fn ray_query_generate_intersection(
+        result_type_id: Word,
+        id: Word,
+        query: Word,
+        hit_id: Word,
+    ) -> Self {
+        let mut instruction = Self::new(Op::RayQueryGenerateIntersectionKHR);
+        instruction.set_type(result_type_id);
+        instruction.set_result(id);
+        instruction.add_operand(query);
+        instruction.add_operand(hit_id);
+        instruction
+    }
+
     pub(super) fn ray_query_get_intersection(
         op: Op,
         result_type_id: Word,

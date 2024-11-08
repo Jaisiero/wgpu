@@ -2141,6 +2141,9 @@ impl<W: Write> Writer<W> {
             crate::Expression::RayQueryVertexPositions { .. } => {
                 unimplemented!()
             }
+            crate::Expression::RayQueryGenerateIntersection { .. } => {
+                unimplemented!()
+            }
             crate::Expression::RayQueryGetIntersection { query, committed } => {
                 if context.lang_version < (2, 4) {
                     return Err(Error::UnsupportedRayTracing);

@@ -1819,7 +1819,9 @@ impl<W: Write> Writer<W> {
             }
             // Not supported yet
             Expression::RayQueryGetIntersection { .. }
-            | Expression::RayQueryVertexPositions { .. } => unreachable!(),
+            | Expression::RayQueryVertexPositions { .. } 
+            | Expression::RayQueryGenerateIntersection { .. }
+            => unreachable!(),
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)
             | Expression::AtomicResult { .. }

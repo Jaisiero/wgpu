@@ -904,6 +904,13 @@ impl<'a> ResolveContext<'a> {
                     .ok_or(ResolveError::MissingSpecialType)?;
                 TypeResolution::Handle(result)
             }
+            crate::Expression::RayQueryGenerateIntersection { .. } => {
+                let result = self
+                    .special_types
+                    .ray_generate_intersection
+                    .ok_or(ResolveError::MissingSpecialType)?;
+                TypeResolution::Handle(result)
+            }
             crate::Expression::SubgroupBallotResult => TypeResolution::Value(Ti::Vector {
                 scalar: crate::Scalar::U32,
                 size: crate::VectorSize::Quad,

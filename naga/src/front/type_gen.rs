@@ -103,6 +103,23 @@ impl crate::Module {
     }
 
     /// Make sure the types for the vertex return are in the module's type
+    pub fn generate_ray_intersection(&mut self) -> Handle<crate::Type> {
+        if let Some(handle) = self.special_types.ray_generate_intersection {
+            return handle;
+        }
+        let ty_bool = self.types.insert(
+            crate::Type {
+                name: None,
+                inner: crate::TypeInner::Scalar(crate::Scalar::BOOL),
+            },
+            Span::UNDEFINED,
+        );
+        
+        self.special_types.ray_generate_intersection = Some(ty_bool);
+        ty_bool
+    }
+
+    /// Make sure the types for the vertex return are in the module's type
     pub fn generate_vertex_return_type(&mut self) -> Handle<crate::Type> {
         if let Some(handle) = self.special_types.ray_vertex_return {
             return handle;
